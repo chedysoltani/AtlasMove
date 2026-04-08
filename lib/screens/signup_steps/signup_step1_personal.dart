@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
-import '../models/user.dart';
-import '../utils/app_theme.dart';
-import '../widgets/custom_button.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/role_selector.dart';
+import '../../utils/app_theme.dart';
+import '../../widgets/custom_button.dart';
+import '../../widgets/custom_text_field.dart';
 
-class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+class SignupStep1Personal extends StatefulWidget {
+  const SignupStep1Personal({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  State<SignupStep1Personal> createState() => _SignupStep1PersonalState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class _SignupStep1PersonalState extends State<SignupStep1Personal> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -20,11 +18,6 @@ class _SignupScreenState extends State<SignupScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
-  UserRole _selectedRole = UserRole.client;
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
-  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -37,54 +30,10 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _togglePasswordVisibility() {
-    setState(() {
-      _obscurePassword = !_obscurePassword;
-    });
-  }
-
-  void _toggleConfirmPasswordVisibility() {
-    setState(() {
-      _obscureConfirmPassword = !_obscureConfirmPassword;
-    });
-  }
-
-  Future<void> _handleSignup() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // Simuler un appel API
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // TODO: Implémenter la logique d'inscription
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Inscription réussie'),
-          backgroundColor: AppTheme.successColor,
-        ),
-      );
-
-      // Rediriger vers l'écran de login
-      Navigator.pop(context);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur d\'inscription: $e'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+  void _goToNextStep() {
+    if (_formKey.currentState!.validate()) {
+      // TODO: Stocker les données temporairement
+      Navigator.of(context).pushNamed('/signup_step2');
     }
   }
 
@@ -99,6 +48,29 @@ class _SignupScreenState extends State<SignupScreen> {
           icon: const Icon(Icons.arrow_back, color: AppTheme.primaryColor),
           onPressed: () => Navigator.pop(context),
         ),
+        title: const Text(
+          'Étape 1/3',
+          style: TextStyle(
+            color: AppTheme.primaryColor,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: true,
+        actions: [
+          Container(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Text(
+                'Livreur',
+                style: TextStyle(
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -106,14 +78,44 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
+              // Progress Indicator
+              Container(
+                width: double.infinity,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: FractionallySizedBox(
+                  widthFactor: 0.33,
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+              ),
               
-              // Header
+              const SizedBox(height: 32),
+              
+              // Title
               Text(
-                'Créer votre compte',
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  color: AppTheme.primaryColor,
+                'Informations personnelles',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: AppTheme.textWhite,
                   fontWeight: FontWeight.bold,
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              
+              Text(
+                'Veuillez remplir vos informations personnelles pour continuer',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.textSecondary,
                 ),
               ),
               
@@ -124,7 +126,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    // Name Fields
+                    // Name Fields Row
                     Row(
                       children: [
                         Expanded(
@@ -165,7 +167,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     CustomTextField(
                       controller: _emailController,
                       labelText: 'Email',
-                      hintText: 'exemple@email.com',
+                      hintText: 'jean.dupont@email.com',
                       keyboardType: TextInputType.emailAddress,
                       prefixIcon: const Icon(Icons.email_outlined),
                       textInputAction: TextInputAction.next,
@@ -185,7 +187,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     // Phone Field
                     CustomTextField(
                       controller: _phoneController,
-                      labelText: 'Téléphone',
+                      labelText: 'Numéro de téléphone',
                       hintText: '+33 6 12 34 56 78',
                       keyboardType: TextInputType.phone,
                       prefixIcon: const Icon(Icons.phone_outlined),
@@ -200,19 +202,13 @@ class _SignupScreenState extends State<SignupScreen> {
                     
                     const SizedBox(height: 20),
                     
-                    // Password Fields
+                    // Password Field
                     CustomTextField(
                       controller: _passwordController,
                       labelText: 'Mot de passe',
-                      hintText: '••••••••',
-                      obscureText: _obscurePassword,
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        ),
-                        onPressed: _togglePasswordVisibility,
-                      ),
+                      hintText: '••••••••••',
+                      obscureText: true,
+                      prefixIcon: const Icon(Icons.lock_outlined),
                       textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -227,18 +223,13 @@ class _SignupScreenState extends State<SignupScreen> {
                     
                     const SizedBox(height: 20),
                     
+                    // Confirm Password Field
                     CustomTextField(
                       controller: _confirmPasswordController,
                       labelText: 'Confirmer le mot de passe',
-                      hintText: '••••••••',
-                      obscureText: _obscureConfirmPassword,
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                        ),
-                        onPressed: _toggleConfirmPasswordVisibility,
-                      ),
+                      hintText: '••••••••••',
+                      obscureText: true,
+                      prefixIcon: const Icon(Icons.lock_outlined),
                       textInputAction: TextInputAction.done,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -253,32 +244,12 @@ class _SignupScreenState extends State<SignupScreen> {
                     
                     const SizedBox(height: 40),
                     
-                    // Signup Button
+                    // Next Button
                     CustomButton(
-                      text: 'S\'inscrire',
-                      onPressed: _handleSignup,
-                      isLoading: _isLoading,
+                      text: 'Suivant',
+                      onPressed: _goToNextStep,
                       width: double.infinity,
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Login Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Déjà un compte? ',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        CustomButton(
-                          text: 'Se connecter',
-                          type: ButtonType.text,
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
+                      height: 56,
                     ),
                   ],
                 ),

@@ -49,18 +49,17 @@ class _LoginScreenState extends State<LoginScreen> {
       
       // TODO: Implémenter la logique de login
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Connexion réussie en tant que ${_selectedRole.displayName}'),
+        const SnackBar(
+          content: Text('Connexion réussie!'),
           backgroundColor: AppTheme.successColor,
         ),
       );
 
-      // Naviguer vers l'écran approprié selon le rôle
-      if (_selectedRole == UserRole.client) {
-        // Navigator.pushReplacementNamed(context, '/client_home');
-      } else {
-        // Navigator.pushReplacementNamed(context, '/delivery_home');
-      }
+      // Rediriger vers le dashboard client
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/client_dashboard',
+        (route) => false,
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -94,19 +93,45 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 40),
               
               // Header
-              Text(
-                'Bienvenue',
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  color: AppTheme.primaryColor,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppTheme.surfaceColor,
+                      foregroundColor: AppTheme.primaryColor,
+                      padding: const EdgeInsets.all(12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: AppTheme.primaryColor.withOpacity(0.2)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Connectez-vous à votre compte AtlasMove',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+              
+              const SizedBox(height: 20),
+              
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bienvenue',
+                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Connectez-vous à votre compte AtlasMove',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
               ),
               
               const SizedBox(height: 40),
