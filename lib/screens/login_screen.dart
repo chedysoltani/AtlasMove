@@ -4,6 +4,9 @@ import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/role_selector.dart';
+import '../services/auth_service.dart';
+import '../models/responses/auth_response.dart';
+import '../core/network/http_client.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -44,29 +47,77 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // Simuler un appel API
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // TODO: Implémenter la logique de login
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connexion réussie!'),
-          backgroundColor: AppTheme.successColor,
-        ),
+      // Appel à l'API de login
+      final response = await AuthService.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
       );
 
-      // Rediriger vers le dashboard client
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/client_dashboard',
-        (route) => false,
-      );
+      // Vérifier si une étape OTP est requise
+      if (response.requiresOtp) {
+        // Rediriger vers la page de vérification OTP
+        if (mounted) {
+          Navigator.pushNamed(
+            context,
+            '/otp_verification',
+            arguments: {
+              'email': _emailController.text.trim(),
+              'sessionToken': response.sessionToken ?? response.token,
+            },
+          );
+        }
+      } else if (response.isComplete) {
+        // Connexion directe réussie
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connexion réussie! Bienvenue ${response.user.fullName}'),
+            backgroundColor: AppTheme.successColor,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        // Rediriger selon le rôle de l'utilisateur
+        if (mounted) {
+          if (response.user.role == UserRole.client) {
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/client_dashboard',
+              (route) => false,
+            );
+          } else if (response.user.role == UserRole.delivery) {
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/driver_main',
+              (route) => false,
+            );
+          }
+        }
+      } else {
+        throw Exception('Réponse de connexion invalide');
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur de connexion: $e'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+      String errorMessage = 'Erreur de connexion';
+      
+      // Gestion des erreurs spécifiques
+      if (e is ServiceValidationException) {
+        errorMessage = e.toString();
+      } else if (e is ValidationException) {
+        errorMessage = e.toString();
+      } else if (e is AuthErrorResponse) {
+        errorMessage = e.message;
+      } else if (e is NetworkException) {
+        errorMessage = e.message;
+      } else {
+        errorMessage = 'Erreur de connexion: $e';
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: AppTheme.errorColor,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {

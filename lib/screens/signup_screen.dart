@@ -3,7 +3,10 @@ import '../models/user.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
-import '../widgets/role_selector.dart';
+import '../services/auth_service.dart';
+import '../models/requests/register_request.dart';
+import '../models/responses/auth_response.dart';
+import '../core/network/http_client.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -59,26 +62,70 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
-      // Simuler un appel API
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // TODO: Implémenter la logique d'inscription
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Inscription réussie'),
-          backgroundColor: AppTheme.successColor,
-        ),
-      );
+      if (_selectedRole == UserRole.client) {
+        // Inscription client via l'API
+        final request = ClientRegisterRequest(
+          firstName: _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim(),
+          email: _emailController.text.trim(),
+          phone: _phoneController.text.trim(),
+          password: _passwordController.text,
+          confirmPassword: _confirmPasswordController.text,
+        );
 
-      // Rediriger vers l'écran de login
-      Navigator.pop(context);
+        final response = await AuthService.registerClient(request);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Inscription réussie! Bienvenue ${response.user.fullName}'),
+            backgroundColor: AppTheme.successColor,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+
+        // Rediriger vers l'écran de login
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      } else {
+        // Pour les livreurs, rediriger vers le processus d'inscription complet
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Redirection vers l\'inscription livreur...'),
+            backgroundColor: AppTheme.primaryColor,
+          ),
+        );
+        
+        // TODO: Naviguer vers l'inscription livreur complète
+        if (mounted) {
+          Navigator.pushNamed(context, '/signup_step1');
+        }
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur d\'inscription: $e'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+      String errorMessage = 'Erreur d\'inscription';
+      
+      // Gestion des erreurs spécifiques
+      if (e is ServiceValidationException) {
+        errorMessage = e.toString();
+      } else if (e is ValidationException) {
+        errorMessage = e.toString();
+      } else if (e is AuthErrorResponse) {
+        errorMessage = e.message;
+      } else if (e is NetworkException) {
+        errorMessage = e.message;
+      } else {
+        errorMessage = 'Erreur d\'inscription: $e';
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: AppTheme.errorColor,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -251,12 +298,53 @@ class _SignupScreenState extends State<SignupScreen> {
                       },
                     ),
                     
+                    const SizedBox(height: 30),
+                    
+                    // Section d'information API
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green.shade600, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'API Intégrée',
+                                  style: TextStyle(
+                                    color: Colors.green.shade600,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  'Inscription client via api.atla.business',
+                                  style: TextStyle(
+                                    color: Colors.green.shade700,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
                     const SizedBox(height: 40),
                     
                     // Signup Button
                     CustomButton(
-                      text: 'S\'inscrire',
-                      onPressed: _handleSignup,
+                      text: _isLoading ? 'Inscription en cours...' : 'S\'inscrire',
+                      onPressed: _isLoading ? null : _handleSignup,
                       isLoading: _isLoading,
                       width: double.infinity,
                     ),

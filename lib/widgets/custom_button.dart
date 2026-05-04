@@ -35,22 +35,24 @@ class CustomButton extends StatelessWidget {
     return SizedBox(
       width: width,
       height: height ?? 56,
-      child: _buildButton(context),
+      child: _buildButton(),
     );
   }
 
-  Widget _buildButton(BuildContext context) {
+  Widget _buildButton() {
     switch (type) {
       case ButtonType.primary:
         return ElevatedButton(
           onPressed: isLoading ? null : onPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.primaryColor,
-            foregroundColor: AppTheme.textWhite,
+            foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(borderRadius),
             ),
             elevation: 4,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            minimumSize: const Size(0, 44),
           ),
           child: _buildButtonContent(),
         );
@@ -60,11 +62,13 @@ class CustomButton extends StatelessWidget {
           onPressed: isLoading ? null : onPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.secondaryColor,
-            foregroundColor: AppTheme.textWhite,
+            foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(borderRadius),
             ),
             elevation: 4,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            minimumSize: const Size(0, 44),
           ),
           child: _buildButtonContent(),
         );
@@ -77,6 +81,8 @@ class CustomButton extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(borderRadius),
             ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            minimumSize: const Size(0, 44),
           ),
           child: _buildButtonContent(),
         );
@@ -86,6 +92,8 @@ class CustomButton extends StatelessWidget {
           onPressed: isLoading ? null : onPressed,
           style: TextButton.styleFrom(
             foregroundColor: AppTheme.primaryColor,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            minimumSize: const Size(0, 44),
           ),
           child: _buildButtonContent(),
         );
@@ -95,27 +103,33 @@ class CustomButton extends StatelessWidget {
   Widget _buildButtonContent() {
     if (isLoading) {
       return const SizedBox(
-        width: 24,
-        height: 24,
+        width: 20,
+        height: 20,
         child: CircularProgressIndicator(
-          strokeWidth: 2.5,
-          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.textWhite),
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
         ),
       );
     }
 
     return Row(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (icon != null) ...[
           icon!,
           const SizedBox(width: 8),
         ],
-        Text(
-          text,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+        Flexible(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ),
       ],

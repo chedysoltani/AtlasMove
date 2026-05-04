@@ -4,12 +4,30 @@ import 'package:flutter/painting.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 
-enum ServiceType {
-  taxi,
-  moto,
+// Catégories principales
+enum TransportCategory {
+  transport,
   camion,
-  yacht,
+  autre,
+}
+
+// Services de transport
+enum TransportService {
+  taxi,
+  motoTaxi,
+}
+
+// Services de camion
+enum CamionService {
   livraison,
+  demenagement,
+  poidsLourd,
+}
+
+// Services autres véhicules
+enum AutreService {
+  yacht,
+  voiture,
 }
 
 class MapGridPainter extends CustomPainter {
@@ -71,6 +89,52 @@ class MapGridPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+class RoutePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppTheme.primaryColor
+      ..strokeWidth = 4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // Draw route line
+    final path = Path();
+    path.moveTo(size.width * 0.2, size.height * 0.3);
+    path.quadraticBezierTo(
+      size.width * 0.5, size.height * 0.2,
+      size.width * 0.8, size.height * 0.7,
+    );
+    
+    canvas.drawPath(path, paint);
+    
+    // Draw start point
+    final startPaint = Paint()
+      ..color = Colors.green
+      ..style = PaintingStyle.fill;
+    
+    canvas.drawCircle(
+      Offset(size.width * 0.2, size.height * 0.3),
+      8,
+      startPaint,
+    );
+    
+    // Draw end point
+    final endPaint = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.fill;
+    
+    canvas.drawCircle(
+      Offset(size.width * 0.8, size.height * 0.7),
+      8,
+      endPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class BookingScreen extends StatefulWidget {
   const BookingScreen({super.key});
 
@@ -79,7 +143,10 @@ class BookingScreen extends StatefulWidget {
 }
 
 class _BookingScreenState extends State<BookingScreen> {
-  ServiceType? _selectedService;
+  TransportCategory? _selectedCategory;
+  TransportService? _selectedTransportService;
+  CamionService? _selectedCamionService;
+  AutreService? _selectedAutreService;
   
   // Form controllers
   final TextEditingController _departureController = TextEditingController();
@@ -90,198 +157,116 @@ class _BookingScreenState extends State<BookingScreen> {
   final TextEditingController _truckSizeController = TextEditingController();
   final TextEditingController _durationController = TextEditingController();
   final TextEditingController _peopleController = TextEditingController();
+  final TextEditingController _carTypeController = TextEditingController();
   
   // Form values
   bool _isFragile = false;
   bool _needHelp = false;
   DateTime? _selectedDateTime;
   bool _isNow = true;
+  String? _selectedTruckDiameter;
+
+  // Available truck diameters (from delivery trucks)
+  static const List<Map<String, String>> _truckDiameters = [
+    {'size': 'Petit (3-5m)', 'description': 'Colis et petites livraisons', 'icon': 'local_shipping'},
+    {'size': 'Moyen (6-8m)', 'description': 'Meubles et déménagement moyen', 'icon': 'moving'},
+    {'size': 'Grand (9-12m)', 'description': 'Grands volumes et marchandises', 'icon': 'local_shipping'},
+    {'size': 'Très grand (13-16m)', 'description': 'Déménagement complet et industriel', 'icon': 'local_shipping'},
+    {'size': 'Extra large (17-20m)', 'description': 'Transport de charges très lourdes', 'icon': 'local_shipping'},
+    {'size': 'Spécial (sur mesure)', 'description': 'Transport spécialisé', 'icon': 'settings'},
+  ];
   
   // Calculated values
   double _estimatedPrice = 0.0;
   double _distance = 0.0;
-  String _estimatedTime = '';
+  String _estimatedTime = '0';
+
+  @override
+  void dispose() {
+    _departureController.dispose();
+    _destinationController.dispose();
+    _passengersController.dispose();
+    _packageTypeController.dispose();
+    _weightController.dispose();
+    _truckSizeController.dispose();
+    _durationController.dispose();
+    _peopleController.dispose();
+    _carTypeController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Réserver un trajet',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: true,
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+        ),
+      ),
+      body: Column(
         children: [
-          // Map Background
-          _buildMapBackground(),
-          
-          // Header
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: _buildHeader(),
+          // Map Section
+          Expanded(
+            flex: 2,
+            child: _buildMapSection(),
           ),
           
-          // Service Selection (when no service is selected)
-          if (_selectedService == null)
-            Positioned.fill(
-              child: _buildServiceSelection(),
-            ),
-          
-          // Booking Form (when service is selected)
-          if (_selectedService != null)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: _buildBookingForm(),
-            ),
+          // Form Section
+          Expanded(
+            flex: 3,
+            child: _buildFormSection(),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildMapBackground() {
+  Widget _buildMapSection() {
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.blue.shade50,
-            Colors.blue.shade100,
-            Colors.grey.shade200,
-          ],
-        ),
+        color: Colors.grey.shade100,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
       ),
       child: Stack(
         children: [
-          // Map Grid Pattern
+          // Custom Map Grid
           CustomPaint(
-            size: Size.infinite,
             painter: MapGridPainter(),
-          ),
-          
-          // Map Elements
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Current Location Marker
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.3),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.blue, width: 3),
-                  ),
-                  child: const Icon(
-                    Icons.my_location,
-                    color: Colors.blue,
-                    size: 32,
-                  ),
-                ),
-                
-                const SizedBox(height: 40),
-                
-                // Destination Marker
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.3),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.red, width: 3),
-                  ),
-                  child: const Icon(
-                    Icons.location_on,
-                    color: Colors.red,
-                    size: 28,
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Route Line
-                Container(
-                  width: 4,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue, Colors.red],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                
-                const SizedBox(height: 32),
-                
-                // Map Info
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Carte Interactive',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Google Maps Integration',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Distance: 15.5 km | Temps: 25 min',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.primaryColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
             ),
           ),
           
           // Map Controls
           Positioned(
-            top: 100,
-            right: 20,
+            top: 16,
+            right: 16,
             child: Column(
               children: [
-                _buildMapControl(Icons.zoom_in, () {
-                  // TODO: Zoom in
-                }),
+                _buildMapControl(Icons.my_location, () {}),
                 const SizedBox(height: 8),
-                _buildMapControl(Icons.zoom_out, () {
-                  // TODO: Zoom out
-                }),
-                const SizedBox(height: 8),
-                _buildMapControl(Icons.my_location, () {
-                  // TODO: Center on current location
-                }),
+                _buildMapControl(Icons.layers, () {}),
               ],
+            ),
+          ),
+          
+          // Route Line (simplified)
+          Positioned.fill(
+            child: CustomPaint(
+              painter: RoutePainter(),
             ),
           ),
         ],
@@ -290,614 +275,1097 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Widget _buildMapControl(IconData icon, VoidCallback onPressed) {
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: IconButton(
-        onPressed: onPressed,
-        icon: Icon(icon, color: Colors.black, size: 24),
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          color: Colors.black,
+          size: 20,
+        ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildFormSection() {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+      padding: const EdgeInsets.all(24),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Category Selection
+            _buildCategorySelection(),
+            
+            const SizedBox(height: 20),
+            
+            // Service Selection (based on category)
+            if (_selectedCategory != null) _buildServiceSelection(),
+            
+            const SizedBox(height: 20),
+            
+            // Dynamic Form Fields
+            if (_selectedCategory != null) _buildDynamicForm(),
+            
+            const SizedBox(height: 20),
+            
+            // Find Driver Button
+            CustomButton(
+              text: 'Trouver un chauffeur',
+              onPressed: _findDriver,
+              height: 50,
+            ),
+          ],
+        ),
       ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
+    );
+  }
+
+  Widget _buildCategorySelection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Catégorie de transport',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
           ),
-          Expanded(
-            child: Text(
-              _selectedService != null 
-                ? 'Réserver ${_getServiceName(_selectedService!)}'
-                : 'Choisir un service',
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _buildCategoryCard(
+              'Transport',
+              Icons.local_taxi,
+              TransportCategory.transport,
+              Colors.blue,
+            ),
+            const SizedBox(width: 12),
+            _buildCategoryCard(
+              'Camion',
+              Icons.local_shipping,
+              TransportCategory.camion,
+              Colors.green,
+            ),
+            const SizedBox(width: 12),
+            _buildCategoryCard(
+              'Autre',
+              Icons.directions_car,
+              TransportCategory.autre,
+              Colors.purple,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryCard(String title, IconData icon, TransportCategory category, Color color) {
+    final isSelected = _selectedCategory == category;
+    
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedCategory = category;
+            _selectedTransportService = null;
+            _selectedCamionService = null;
+            _selectedAutreService = null;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withOpacity(0.1) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? color : Colors.grey.shade300,
+              width: isSelected ? 2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
-            ),
+            ],
           ),
-          if (_selectedService != null)
-            IconButton(
-              onPressed: () {
-                setState(() {
-                  _selectedService = null;
-                  _resetForm();
-                });
-              },
-              icon: const Icon(Icons.close, color: Colors.black),
-            ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? color : Colors.grey.shade600,
+                size: 24,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  color: isSelected ? color : Colors.black,
+                  fontSize: 10,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildServiceSelection() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            'Quel service souhaitez-vous ?',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-            textAlign: TextAlign.center,
+    switch (_selectedCategory) {
+      case TransportCategory.transport:
+        return _buildTransportServices();
+      case TransportCategory.camion:
+        return _buildCamionServices();
+      case TransportCategory.autre:
+        return _buildAutreServices();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildTransportServices() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'Moyen de transport',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
           ),
-          const SizedBox(height: 32),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildServiceCard(
+                'Taxi',
+                Icons.local_taxi,
+                TransportService.taxi,
+                Colors.blue,
+                isExpanded: true,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildServiceCard(
+                'Moto-taxi',
+                Icons.motorcycle,
+                TransportService.motoTaxi,
+                Colors.orange,
+                isExpanded: true,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCamionServices() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.local_shipping,
+                  color: Colors.green,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Services de camion',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
           
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 1.2,
-            children: ServiceType.values.map((service) {
-              return _buildServiceCard(service);
-            }).toList(),
+          // Services Grid
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildCamionServiceCard(
+                        'Livraison',
+                        Icons.local_shipping,
+                        CamionService.livraison,
+                        Colors.green,
+                        'Transport de colis et marchandises',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildCamionServiceCard(
+                        'Déménagement',
+                        Icons.moving,
+                        CamionService.demenagement,
+                        Colors.blue,
+                        'Services de déménagement complet',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: _buildCamionServiceCard(
+                    'Poids lourd',
+                    Icons.local_shipping,
+                    CamionService.poidsLourd,
+                    Colors.red,
+                    'Transport de charges lourdes',
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildServiceCard(ServiceType service) {
+  Widget _buildCamionServiceCard(String title, IconData icon, CamionService service, Color color, String description) {
+    final isSelected = _selectedCamionService == service;
+    
     return GestureDetector(
       onTap: () {
         setState(() {
-          _selectedService = service;
+          _selectedCamionService = service;
         });
       },
       child: Container(
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          color: isSelected ? color.withOpacity(0.1) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: AppTheme.primaryColor.withOpacity(0.2),
-            width: 2,
+            color: isSelected ? color : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(
-                _getServiceIcon(service),
-                color: AppTheme.primaryColor,
-                size: 30,
-              ),
+            Icon(
+              icon,
+              color: isSelected ? color : Colors.grey.shade600,
+              size: 24,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
-              _getServiceName(service),
-              style: const TextStyle(
-                fontSize: 16,
+              title,
+              style: TextStyle(
+                color: isSelected ? color : Colors.black,
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: Colors.black,
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 4),
+            Text(
+              description,
+              style: const TextStyle(
+                color: Colors.grey,
+                fontSize: 9,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildBookingForm() {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
+  Widget _buildAutreServices() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text(
+          'Autre véhicule',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+        const SizedBox(height: 12),
+        Container(
+          height: 120,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildServiceCard(
+                'Yacht',
+                Icons.sailing,
+                AutreService.yacht,
+                Colors.cyan,
               ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Service Info
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    _getServiceIcon(_selectedService!),
-                    color: AppTheme.primaryColor,
-                    size: 20,
-                  ),
+              const SizedBox(width: 12),
+              _buildServiceCard(
+                'Voiture',
+                Icons.directions_car,
+                AutreService.voiture,
+                Colors.purple,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildServiceCard(String title, IconData icon, dynamic service, Color color, {bool isExpanded = false}) {
+    final isSelected = (_selectedCategory == TransportCategory.transport && _selectedTransportService == service) ||
+                     (_selectedCategory == TransportCategory.camion && _selectedCamionService == service) ||
+                     (_selectedCategory == TransportCategory.autre && _selectedAutreService == service);
+    
+    if (isExpanded) {
+      return Expanded(
+        child: GestureDetector(
+          onTap: () {
+            setState(() {
+              if (_selectedCategory == TransportCategory.transport) {
+                _selectedTransportService = service;
+              } else if (_selectedCategory == TransportCategory.camion) {
+                _selectedCamionService = service;
+              } else if (_selectedCategory == TransportCategory.autre) {
+                _selectedAutreService = service;
+              }
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isSelected ? color.withOpacity(0.1) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? color : Colors.grey.shade300,
+                width: isSelected ? 2 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
                 ),
-                const SizedBox(width: 12),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  color: isSelected ? color : Colors.grey.shade600,
+                  size: 24,
+                ),
+                const SizedBox(height: 6),
                 Text(
-                  _getServiceName(_selectedService!),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                  title,
+                  style: TextStyle(
+                    color: isSelected ? color : Colors.black,
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-            
-            const SizedBox(height: 24),
-            
-            // Departure
-            TextField(
-              controller: _departureController,
-              decoration: const InputDecoration(
-                labelText: 'Adresse de départ',
-                hintText: 'Entrez l\'adresse de départ',
-                prefixIcon: Icon(Icons.location_on_outlined),
-                suffixIcon: Icon(Icons.my_location),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Destination
-            TextField(
-              controller: _destinationController,
-              decoration: const InputDecoration(
-                labelText: 'Destination',
-                hintText: 'Entrez la destination',
-                prefixIcon: Icon(Icons.flag_outlined),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Date/Time Selection
-            Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isNow = true;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: _isNow ? AppTheme.primaryColor : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _isNow ? AppTheme.primaryColor : Colors.grey.shade300,
-                        ),
-                      ),
-                      child: Text(
-                        'Maintenant',
-                        style: TextStyle(
-                          color: _isNow ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isNow = false;
-                        _showDateTimePicker();
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: !_isNow ? AppTheme.primaryColor : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: !_isNow ? AppTheme.primaryColor : Colors.grey.shade300,
-                        ),
-                      ),
-                      child: Text(
-                        'Planifier',
-                        style: TextStyle(
-                          color: !_isNow ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Dynamic Fields
-            _buildDynamicFields(),
-            
-            const SizedBox(height: 24),
-            
-            // Calculation Results
-            if (_distance > 0)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  children: [
-                    _buildCalculationRow('Distance', '${_distance.toStringAsFixed(1)} km'),
-                    _buildCalculationRow('Temps estimé', _estimatedTime),
-                    _buildCalculationRow('Prix estimé', '$_estimatedPrice MAD', isPrice: true),
-                  ],
-                ),
-              ),
-            
-            const SizedBox(height: 24),
-            
-            // Find Driver Button
-            CustomButton(
-              text: 'Trouver un chauffeur',
-              onPressed: _calculateAndFindDriver,
-              height: 56,
-            ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildDynamicFields() {
-    switch (_selectedService) {
-      case ServiceType.taxi:
-        return Column(
-          children: [
-            TextField(
-              controller: _passengersController,
-              decoration: const InputDecoration(
-                labelText: 'Nombre de passagers',
-                hintText: '1-4 passagers',
-                prefixIcon: Icon(Icons.people_outline),
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
+      );
+    } else {
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            if (_selectedCategory == TransportCategory.transport) {
+              _selectedTransportService = service;
+            } else if (_selectedCategory == TransportCategory.camion) {
+              _selectedCamionService = service;
+            } else if (_selectedCategory == TransportCategory.autre) {
+              _selectedAutreService = service;
+            }
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withOpacity(0.1) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? color : Colors.grey.shade300,
+              width: isSelected ? 2 : 1,
             ),
-          ],
-        );
-      
-      case ServiceType.livraison:
-        return Column(
-          children: [
-            TextField(
-              controller: _packageTypeController,
-              decoration: const InputDecoration(
-                labelText: 'Type de colis',
-                hintText: 'Document, paquet, etc.',
-                prefixIcon: Icon(Icons.inventory_2_outlined),
-                border: OutlineInputBorder(),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _weightController,
-              decoration: const InputDecoration(
-                labelText: 'Poids (kg)',
-                hintText: '0.1 - 50 kg',
-                prefixIcon: Icon(Icons.scale_outlined),
-                border: OutlineInputBorder(),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? color : Colors.grey.shade600,
+                size: 20,
               ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: CheckboxListTile(
-                    title: const Text('Fragile'),
-                    value: _isFragile,
-                    onChanged: (value) {
-                      setState(() {
-                        _isFragile = value ?? false;
-                      });
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TextStyle(
+                  color: isSelected ? color : Colors.black,
+                  fontSize: 10,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
-              ],
-            ),
-          ],
-        );
-      
-      case ServiceType.camion:
-        return Column(
-          children: [
-            TextField(
-              controller: _truckSizeController,
-              decoration: const InputDecoration(
-                labelText: 'Taille du camion',
-                hintText: 'Petit, moyen, grand',
-                prefixIcon: Icon(Icons.local_shipping_outlined),
-                border: OutlineInputBorder(),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: CheckboxListTile(
-                    title: const Text('Aide au chargement'),
-                    value: _needHelp,
-                    onChanged: (value) {
-                      setState(() {
-                        _needHelp = value ?? false;
-                      });
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
-      
-      case ServiceType.yacht:
-        return Column(
-          children: [
-            TextField(
-              controller: _peopleController,
-              decoration: const InputDecoration(
-                labelText: 'Nombre de personnes',
-                hintText: '1-12 personnes',
-                prefixIcon: Icon(Icons.groups_outlined),
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _durationController,
-              decoration: const InputDecoration(
-                labelText: 'Durée (heures)',
-                hintText: '1-8 heures',
-                prefixIcon: Icon(Icons.schedule_outlined),
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-          ],
-        );
-      
-      case ServiceType.moto:
-        return Container(); // No additional fields for moto
-      
-      case null:
-        return Container();
+            ],
+          ),
+        ),
+      );
     }
   }
 
-  Widget _buildCalculationRow(String label, String value, {bool isPrice = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.black,
-              fontSize: 14,
+  Widget _buildDynamicForm() {
+    // Common fields for all services
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Departure and Destination
+        _buildLocationFields(),
+        
+        const SizedBox(height: 16),
+        
+        // Date/Time Selection
+        _buildDateTimeSelection(),
+        
+        const SizedBox(height: 16),
+        
+        // Service-specific fields
+        if (_selectedCategory == TransportCategory.transport)
+          _buildTransportFormFields(),
+        if (_selectedCategory == TransportCategory.camion)
+          _buildCamionFormFields(),
+        if (_selectedCategory == TransportCategory.autre)
+          _buildAutreFormFields(),
+        
+        const SizedBox(height: 16),
+        
+        // Price and Time Estimation
+        _buildEstimationSection(),
+      ],
+    );
+  }
+
+  Widget _buildLocationFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Itinéraire',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              TextField(
+                controller: _departureController,
+                decoration: const InputDecoration(
+                  hintText: 'Point de départ',
+                  prefixIcon: Icon(Icons.location_on, color: AppTheme.primaryColor),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.all(16),
+                ),
+              ),
+              const Divider(height: 1, color: Colors.grey),
+              TextField(
+                controller: _destinationController,
+                decoration: const InputDecoration(
+                  hintText: 'Destination',
+                  prefixIcon: Icon(Icons.flag, color: AppTheme.primaryColor),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.all(16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateTimeSelection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Quand ?',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isNow = true;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _isNow ? AppTheme.primaryColor : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _isNow ? AppTheme.primaryColor : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Text(
+                    'Maintenant',
+                    style: TextStyle(
+                      color: _isNow ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isNow = false;
+                  });
+                  _selectDateTime();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: !_isNow ? AppTheme.primaryColor : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: !_isNow ? AppTheme.primaryColor : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Text(
+                    _selectedDateTime != null 
+                        ? '${_selectedDateTime!.day}/${_selectedDateTime!.month}/${_selectedDateTime!.year} ${_selectedDateTime!.hour}:${_selectedDateTime!.minute.toString().padLeft(2, '0')}'
+                        : 'Programmer',
+                    style: TextStyle(
+                      color: !_isNow ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTransportFormFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Détails du transport',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _passengersController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Nombre de passagers',
+            prefixIcon: Icon(Icons.people, color: AppTheme.primaryColor),
+            border: OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCamionFormFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Détails de la livraison',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _packageTypeController,
+          decoration: const InputDecoration(
+            labelText: 'Type de colis',
+            prefixIcon: Icon(Icons.inventory_2, color: AppTheme.primaryColor),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _weightController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Poids (kg)',
+            prefixIcon: Icon(Icons.scale, color: AppTheme.primaryColor),
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Dropdown pour le diamètre du camion
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedTruckDiameter,
+              isExpanded: true,
+              hint: const Text(
+                'Sélectionner le diamètre du camion',
+                style: TextStyle(color: Colors.grey),
+              ),
+              icon: const Icon(Icons.arrow_drop_down),
+              items: _truckDiameters.map((Map<String, String> truck) {
+                return DropdownMenuItem<String>(
+                  value: truck['size'],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _getIconForTruck(truck['icon']!),
+                          color: AppTheme.primaryColor,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                truck['size']!,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                truck['description']!,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedTruckDiameter = newValue;
+                });
+              },
             ),
           ),
-          Text(
-            value,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: CheckboxListTile(
+                title: const Text('Fragile'),
+                value: _isFragile,
+                onChanged: (value) {
+                  setState(() {
+                    _isFragile = value!;
+                  });
+                },
+              ),
+            ),
+            Expanded(
+              child: CheckboxListTile(
+                title: const Text('Aide au chargement'),
+                value: _needHelp,
+                onChanged: (value) {
+                  setState(() {
+                    _needHelp = value!;
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAutreFormFields() {
+    if (_selectedAutreService == AutreService.yacht) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Détails de la réservation',
             style: TextStyle(
-              color: isPrice ? AppTheme.primaryColor : Colors.black,
+              color: Colors.black,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _durationController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Durée (heures)',
+              prefixIcon: Icon(Icons.access_time, color: AppTheme.primaryColor),
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _peopleController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Nombre de personnes',
+              prefixIcon: Icon(Icons.people, color: AppTheme.primaryColor),
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      );
+    } else {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Détails du véhicule',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _carTypeController,
+            decoration: const InputDecoration(
+              labelText: 'Type de voiture',
+              prefixIcon: Icon(Icons.directions_car, color: AppTheme.primaryColor),
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passengersController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Nombre de passagers',
+              prefixIcon: Icon(Icons.people, color: AppTheme.primaryColor),
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildEstimationSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          Column(
+            children: [
+              const Text(
+                'Distance',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${_distance.toStringAsFixed(1)} km',
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          Column(
+            children: [
+              const Text(
+                'Durée estimée',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$_estimatedTime min',
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          Column(
+            children: [
+              const Text(
+                'Prix estimé',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${_estimatedPrice.toStringAsFixed(2)} MAD',
+                style: const TextStyle(
+                  color: AppTheme.primaryColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  IconData _getServiceIcon(ServiceType service) {
-    switch (service) {
-      case ServiceType.taxi:
-        return Icons.local_taxi;
-      case ServiceType.moto:
-        return Icons.motorcycle;
-      case ServiceType.camion:
+  IconData _getIconForTruck(String iconName) {
+    switch (iconName) {
+      case 'local_shipping':
         return Icons.local_shipping;
-      case ServiceType.yacht:
-        return Icons.sailing;
-      case ServiceType.livraison:
-        return Icons.delivery_dining;
+      case 'moving':
+        return Icons.moving;
+      case 'settings':
+        return Icons.settings;
+      default:
+        return Icons.local_shipping;
     }
   }
 
-  String _getServiceName(ServiceType service) {
-    switch (service) {
-      case ServiceType.taxi:
-        return 'Taxi';
-      case ServiceType.moto:
-        return 'Moto';
-      case ServiceType.camion:
-        return 'Camion';
-      case ServiceType.yacht:
-        return 'Yacht';
-      case ServiceType.livraison:
-        return 'Livraison';
-    }
-  }
-
-  void _resetForm() {
-    _departureController.clear();
-    _destinationController.clear();
-    _passengersController.clear();
-    _packageTypeController.clear();
-    _weightController.clear();
-    _truckSizeController.clear();
-    _durationController.clear();
-    _peopleController.clear();
-    
-    _isFragile = false;
-    _needHelp = false;
-    _selectedDateTime = null;
-    _isNow = true;
-    
-    _estimatedPrice = 0.0;
-    _distance = 0.0;
-    _estimatedTime = '';
-  }
-
-  void _showDateTimePicker() {
-    showDatePicker(
+  Future<void> _selectDateTime() async {
+    final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: _selectedDateTime ?? DateTime.now(),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 30)),
-    ).then((date) {
-      if (date != null) {
-        showTimePicker(
-          context: context,
-          initialTime: TimeOfDay.now(),
-        ).then((time) {
-          if (time != null) {
-            setState(() {
-              _selectedDateTime = DateTime(
-                date.year,
-                date.month,
-                date.day,
-                time.hour,
-                time.minute,
-              );
-            });
-          }
+    );
+    
+    if (picked != null) {
+      final TimeOfDay? time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_selectedDateTime ?? DateTime.now()),
+      );
+      
+      if (time != null) {
+        setState(() {
+          _selectedDateTime = DateTime(
+            picked.year,
+            picked.month,
+            picked.day,
+            time.hour,
+            time.minute,
+          );
         });
       }
-    });
+    }
   }
 
-  void _calculateAndFindDriver() {
-    // TODO: Implement real calculation and navigation
-    setState(() {
-      _distance = 15.5;
-      _estimatedTime = '25 min';
-      
-      // Price calculation based on service type
-      switch (_selectedService) {
-        case ServiceType.taxi:
-          _estimatedPrice = _distance * 12 + 15;
-          break;
-        case ServiceType.moto:
-          _estimatedPrice = _distance * 8 + 10;
-          break;
-        case ServiceType.camion:
-          _estimatedPrice = _distance * 25 + 50;
-          break;
-        case ServiceType.yacht:
-          _estimatedPrice = _distance * 100 + 200;
-          break;
-        case ServiceType.livraison:
-          _estimatedPrice = _distance * 6 + 5;
-          break;
-        case null:
-          _estimatedPrice = 0.0;
-          break;
-      }
-    });
+  void _findDriver() {
+    // Validation
+    if (_departureController.text.isEmpty || _destinationController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez remplir les points de départ et de destination'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
     
-    // TODO: Navigate to driver search screen
+    if (_selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez sélectionner une catégorie de transport'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+    
+    // Service-specific validation
+    if (_selectedCategory == TransportCategory.transport && _selectedTransportService == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez sélectionner un moyen de transport'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+    
+    if (_selectedCategory == TransportCategory.camion) {
+      if (_selectedCamionService == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Veuillez sélectionner un service de camion'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+        return;
+      }
+      
+      if (_selectedTruckDiameter == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Veuillez sélectionner le diamètre du camion'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+        return;
+      }
+    }
+    
+    if (_selectedCategory == TransportCategory.autre && _selectedAutreService == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez sélectionner un type de véhicule'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+    
+    // Simulate finding driver and navigate to payment
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Recherche de chauffeur en cours...'),
+        content: Text('Chauffeurs disponibles !'),
         backgroundColor: AppTheme.primaryColor,
       ),
     );
+    
+    // Navigate to payment page after a short delay
+    Future.delayed(const Duration(seconds: 1), () {
+      Navigator.pushNamed(context, '/payment');
+    });
   }
 }
