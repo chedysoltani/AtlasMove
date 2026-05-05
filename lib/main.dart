@@ -10,6 +10,7 @@ import 'screens/client_dashboard.dart';
 import 'screens/booking_screen.dart';
 import 'screens/payment_screen.dart';
 import 'screens/otp_verification_screen.dart';
+import 'screens/profile_screen.dart';
 import 'examples/auth_example.dart';
 import 'screens/driver_main.dart';
 import 'screens/driver_dashboard.dart';
@@ -17,6 +18,8 @@ import 'screens/driver_rides.dart';
 import 'screens/driver_active_ride.dart';
 import 'screens/driver_earnings.dart';
 import 'screens/driver_profile.dart';
+import 'screens/driver_register_screen.dart';
+import 'screens/driver_register_test_screen.dart';
 import 'screens/signup_steps/signup_step1_personal.dart';
 import 'screens/signup_steps/signup_step2_documents.dart';
 import 'screens/signup_steps/signup_step3_vehicle.dart';
@@ -52,12 +55,13 @@ class AtlasMoveApp extends StatelessWidget {
           '/booking': (context) => const BookingScreen(),
           '/payment': (context) => const PaymentPage(),
           '/otp_verification': (context) {
-        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-        return OtpVerificationScreen(
-          email: args?['email'] ?? '',
-          sessionToken: args?['sessionToken'] ?? '',
-        );
-      },
+            final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+            return OtpVerificationScreen(
+              email: args?['email'] ?? '',
+              sessionToken: args?['sessionToken'] ?? '',
+            );
+          },
+          '/profile': (context) => const ProfileScreen(),
           '/test_auth': (context) => const AuthExample(),
           '/driver_main': (context) => const DriverMainScreen(),
           '/driver_dashboard': (context) => const DriverDashboard(),
@@ -65,6 +69,8 @@ class AtlasMoveApp extends StatelessWidget {
           '/driver_active_ride': (context) => const DriverActiveRideScreen(),
           '/driver_earnings': (context) => const DriverEarningsScreen(),
           '/driver_profile': (context) => const DriverProfileScreen(),
+          '/driver_register': (context) => const DriverRegisterScreen(),
+          '/driver_register_test': (context) => const DriverRegisterTestScreen(),
         },
       ),
     );

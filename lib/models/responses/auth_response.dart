@@ -27,7 +27,7 @@ class AuthResponse {
       final data = json['data'] as Map<String, dynamic>;
       return AuthResponse(
         user: User.fromMap(data['user'] ?? {}),
-        token: data['token'] ?? data['sessionToken'] ?? '',
+        token: data['accessToken'] ?? data['token'] ?? data['sessionToken'] ?? '',
         message: data['message'] ?? '',
         success: data['success'] ?? true,
         authStep: data['authStep'],
@@ -39,7 +39,7 @@ class AuthResponse {
     // Gérer la structure attendue (compatibilité)
     return AuthResponse(
       user: User.fromMap(json['user'] ?? {}),
-      token: json['token'] ?? '',
+      token: json['accessToken'] ?? json['token'] ?? '',
       message: json['message'] ?? '',
       success: json['success'] ?? false,
       authStep: json['authStep'],

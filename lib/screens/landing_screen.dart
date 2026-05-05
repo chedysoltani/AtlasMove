@@ -194,9 +194,20 @@ class LandingScreen extends StatelessWidget {
                     
                     CustomButton(
                       text: 'Devenir Livreur',
-                      onPressed: () => _navigateToAuth(context, 'delivery'),
+                      onPressed: () => Navigator.of(context).pushNamed('/driver_register'),
                       type: ButtonType.outline,
                       height: 56,
+                      width: double.infinity,
+                    ),
+                    
+                    const SizedBox(height: 8),
+                    
+                    // Bouton de test pour débogage
+                    CustomButton(
+                      text: '🧪 Test Inscription',
+                      onPressed: () => Navigator.of(context).pushNamed('/driver_register_test'),
+                      type: ButtonType.secondary,
+                      height: 40,
                       width: double.infinity,
                     ),
                     

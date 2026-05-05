@@ -42,6 +42,11 @@ class User {
   final String? avatar;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? profilePicture;
+  final String? gender;
+  final String? dateOfBirth;
+  final String? country;
+  final String? countryCode;
 
   // Livreur specific fields
   final VehicleType? vehicleType;
@@ -67,6 +72,11 @@ class User {
     this.permisImage,
     this.isVerified = false,
     this.isAvailable = false,
+    this.profilePicture,
+    this.gender,
+    this.dateOfBirth,
+    this.country,
+    this.countryCode,
   });
 
   User copyWith({
@@ -128,17 +138,24 @@ class User {
   factory User.fromMap(Map<String, dynamic> map) {
     return User(
       id: map['id'] ?? '',
-      firstName: map['firstName'] ?? '',
-      lastName: map['lastName'] ?? '',
+      firstName: map['first_name'] ?? map['firstName'] ?? '',
+      lastName: map['last_name'] ?? map['lastName'] ?? '',
       email: map['email'] ?? '',
       phone: map['phone'] ?? '',
-      role: UserRole.values.firstWhere(
-        (role) => role.name == map['role'],
-        orElse: () => UserRole.client,
-      ),
+      role: map['user_type'] == 'external' ? UserRole.client : 
+            map['user_type'] == 'delivery' ? UserRole.delivery :
+            UserRole.values.firstWhere(
+              (role) => role.name == map['role'],
+              orElse: () => UserRole.client,
+            ),
       avatar: map['avatar'],
-      createdAt: DateTime.parse(map['createdAt'] ?? DateTime.now().toIso8601String()),
-      updatedAt: DateTime.parse(map['updatedAt'] ?? DateTime.now().toIso8601String()),
+      createdAt: DateTime.parse(map['created_at'] ?? map['createdAt'] ?? DateTime.now().toIso8601String()),
+      updatedAt: DateTime.parse(map['updated_at'] ?? map['updatedAt'] ?? DateTime.now().toIso8601String()),
+      profilePicture: map['profile_picture'],
+      gender: map['gender'],
+      dateOfBirth: map['date_of_birth'] ?? map['dateOfBirth'],
+      country: map['country'],
+      countryCode: map['country_code'] ?? map['countryCode'],
       vehicleType: map['vehicleType'] != null
           ? VehicleType.values.firstWhere(
               (type) => type.name == map['vehicleType'],

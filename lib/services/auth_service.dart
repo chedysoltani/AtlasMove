@@ -1,7 +1,14 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../core/network/http_client.dart';
+import '../core/storage/token_storage.dart';
 import '../models/requests/register_request.dart';
+import '../models/requests/driver_register_request.dart';
 import '../models/responses/auth_response.dart';
 import '../models/responses/login_response.dart';
+import '../models/responses/driver_register_response.dart';
 
 /// Exception de validation personnalisée pour le service
 class ServiceValidationException implements Exception {
@@ -49,7 +56,17 @@ class AuthService {
       }
       
       if (isSuccess) {
-        return AuthResponse.fromJson(responseData);
+        final authResponse = AuthResponse.fromJson(responseData);
+        
+        // Sauvegarder les tokens si l'authentification est complète
+        if (authResponse.isComplete) {
+          await TokenStorage.saveAuthTokens(
+            accessToken: authResponse.token,
+            userId: authResponse.user.id,
+          );
+        }
+        
+        return authResponse;
       } else {
         throw AuthErrorResponse.fromJson(responseData, response.statusCode);
       }
@@ -143,7 +160,27 @@ class AuthService {
       }
       
       if (isSuccess) {
-        return AuthResponse.fromJson(responseData);
+        final authResponse = AuthResponse.fromJson(responseData);
+        
+        debugPrint('🔐 AuthResponse reçue dans login:');
+        debugPrint('  - Token: ${authResponse.token}');
+        debugPrint('  - User ID: ${authResponse.user.id}');
+        debugPrint('  - Is Complete: ${authResponse.isComplete}');
+        debugPrint('  - Requires OTP: ${authResponse.requiresOtp}');
+        
+        // Sauvegarder les tokens si l'authentification est complète
+        if (authResponse.isComplete) {
+          debugPrint('💾 Sauvegarde du token dans login...');
+          await TokenStorage.saveAuthTokens(
+            accessToken: authResponse.token,
+            userId: authResponse.user.id,
+          );
+          debugPrint('✅ Token sauvegardé avec succès depuis login');
+        } else {
+          debugPrint('⚠️ Authentification incomplète (OTP requis?), token non sauvegardé');
+        }
+        
+        return authResponse;
       } else {
         throw AuthErrorResponse.fromJson(responseData, response.statusCode);
       }
@@ -163,6 +200,9 @@ class AuthService {
     } catch (e) {
       // La déconnexion peut échouer côté serveur mais l'utilisateur peut quand même être déconnecté localement
       print('Erreur lors de la déconnexion: $e');
+    } finally {
+      // Toujours supprimer les tokens localement
+      await TokenStorage.clearTokens();
     }
   }
 
@@ -176,7 +216,17 @@ class AuthService {
       // Accepter les statuts 200, 201 (créé) et vérifier le contenu
       if ((response.statusCode == 200 || response.statusCode == 201) && 
           (responseData['success'] == true || responseData['user'] != null || responseData['token'] != null)) {
-        return AuthResponse.fromJson(responseData);
+        final authResponse = AuthResponse.fromJson(responseData);
+        
+        // Sauvegarder le nouveau token
+        if (authResponse.token.isNotEmpty) {
+          await TokenStorage.saveAuthTokens(
+            accessToken: authResponse.token,
+            userId: authResponse.user.id,
+          );
+        }
+        
+        return authResponse;
       } else {
         throw AuthErrorResponse.fromJson(responseData, response.statusCode);
       }
@@ -313,7 +363,17 @@ class AuthService {
       }
       
       if (isSuccess) {
-        return AuthResponse.fromJson(responseData);
+        final authResponse = AuthResponse.fromJson(responseData);
+        
+        // Sauvegarder les tokens si l'authentification est complète
+        if (authResponse.isComplete) {
+          await TokenStorage.saveAuthTokens(
+            accessToken: authResponse.token,
+            userId: authResponse.user.id,
+          );
+        }
+        
+        return authResponse;
       } else {
         throw AuthErrorResponse.fromJson(responseData, response.statusCode);
       }
@@ -399,6 +459,156 @@ class AuthService {
       rethrow;
     } catch (e) {
       throw NetworkException('Erreur lors du renvoi de l\'OTP: $e');
+    }
+  }
+
+  /// Inscription d'un nouveau livreur
+  static Future<DriverRegisterResponse> registerDriver(DriverRegisterRequest request) async {
+    try {
+      // Validation des données
+      final validationError = request.validate();
+      if (validationError != null) {
+        final errors = validationError.split('\n');
+        // Créer une réponse HTTP fictive pour ValidationException
+        final fakeResponse = HttpResponse(
+          statusCode: 422,
+          body: '{"errors": $errors}',
+          headers: {},
+        );
+        throw ValidationException(errors, fakeResponse);
+      }
+
+      debugPrint('🚚 Inscription livreur - Envoi des fichiers:');
+      debugPrint('  - ID Card: ${request.idCard?.path}');
+      debugPrint('  - Driving License: ${request.drivingLicense?.path}');
+      debugPrint('  - Vehicle Registration: ${request.vehicleRegistration?.path}');
+
+      // Préparer les données multipart avec les fichiers
+      final Map<String, dynamic> multipartData = Map<String, dynamic>.from(request.textFields);
+      
+      // Ajouter les fichiers au body
+      multipartData.addAll({
+        'id_card': request.idCard?.path,
+        'driving_license': request.drivingLicense?.path,
+        'vehicle_registration': request.vehicleRegistration?.path,
+      });
+
+      // Envoi de la requête multipart avec vrais fichiers
+      final response = await _postMultipartWithFiles(
+        '/auth/register/livreur',
+        fields: request.textFields,
+        files: request.files,
+      );
+
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      debugPrint('📄 Response Body: ${response.body}');
+
+      // Traitement de la réponse
+      final responseData = response.json;
+      
+      // Accepter les statuts 200, 201 (créé) pour l'inscription réussie
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final driverResponse = DriverRegisterResponse.fromJson(responseData);
+        
+        debugPrint('✅ Inscription livreur réussie:');
+        debugPrint('  - Message: ${driverResponse.message}');
+        debugPrint('  - User ID: ${driverResponse.user.id}');
+        debugPrint('  - Email: ${driverResponse.user.email}');
+        debugPrint('  - Role: ${driverResponse.user.role}');
+        
+        return driverResponse;
+      } else {
+        throw AuthErrorResponse.fromJson(responseData, response.statusCode);
+      }
+    } on ServiceValidationException {
+      rethrow;
+    } on ValidationException {
+      rethrow;
+    } on AuthErrorResponse {
+      rethrow;
+    } catch (e) {
+      throw NetworkException('Erreur lors de l\'inscription du livreur: $e');
+    }
+  }
+
+  /// Méthode personnalisée pour envoyer des requêtes multipart avec vrais fichiers
+  static Future<HttpResponse> _postMultipartWithFiles(
+    String endpoint, {
+    required Map<String, String> fields,
+    required Map<String, File> files,
+  }) async {
+    try {
+      final uri = Uri.parse('${HttpClient.baseUrl}$endpoint');
+      final token = await TokenStorage.getAccessToken();
+      
+      // Créer la requête multipart
+      final request = http.MultipartRequest('POST', uri);
+      
+      // Ajouter les headers (avec Authorization)
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      request.headers['User-Agent'] = 'AtlasMove/1.0 (Flutter)';
+      
+      // Ajouter les champs texte
+      fields.forEach((key, value) {
+        request.fields[key] = value;
+      });
+      
+      // Ajouter les fichiers réels
+      for (final entry in files.entries) {
+        final file = entry.value;
+        if (await file.exists()) {
+          final fileBytes = await file.readAsBytes();
+          final fileName = file.path.split('/').last;
+          final fileExtension = fileName.split('.').last.toLowerCase();
+          
+          // Déterminer le Content-Type selon l'extension
+          String contentType;
+          switch (fileExtension) {
+            case 'jpg':
+            case 'jpeg':
+              contentType = 'image/jpeg';
+              break;
+            case 'png':
+              contentType = 'image/png';
+              break;
+            default:
+              contentType = 'application/octet-stream';
+          }
+          
+          request.files.add(
+            http.MultipartFile.fromBytes(
+              entry.key,
+              fileBytes,
+              filename: fileName,
+              contentType: MediaType.parse(contentType),
+            ),
+          );
+          debugPrint('📁 Fichier ajouté: ${entry.key} -> $fileName (${fileBytes.length} bytes, $contentType)');
+        }
+      }
+      
+      debugPrint('🌐 API Request: POST $uri');
+      debugPrint('📋 Headers: ${request.headers}');
+      debugPrint('📦 Fields: ${request.fields}');
+      
+      // Envoyer la requête
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      final response = await http.Response.fromStream(streamedResponse)
+          .timeout(const Duration(seconds: 10));
+      
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      debugPrint('📄 Response Body: ${response.body}');
+      
+      return HttpResponse(
+        statusCode: response.statusCode,
+        body: response.body,
+        headers: response.headers,
+      );
+      
+    } catch (e) {
+      throw NetworkException('Erreur lors de l\'envoi multipart: $e');
     }
   }
 }

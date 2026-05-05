@@ -10,6 +10,8 @@ class ClientDashboard extends StatefulWidget {
 }
 
 class _ClientDashboardState extends State<ClientDashboard> {
+  int _currentIndex = 0;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -17,15 +19,15 @@ class _ClientDashboardState extends State<ClientDashboard> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Dashboard',
-          style: TextStyle(
+        title: Text(
+          _currentIndex == 0 ? 'Dashboard' : 'Profil',
+          style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w600,
           ),
         ),
         centerTitle: true,
-        actions: [
+        actions: _currentIndex == 0 ? [
           IconButton(
             onPressed: () {
               // TODO: Implémenter la déconnexion
@@ -37,14 +39,56 @@ class _ClientDashboardState extends State<ClientDashboard> {
             icon: const Icon(Icons.logout, color: Colors.black),
             tooltip: 'Déconnexion',
           ),
+        ] : null,
+      ),
+      body: _buildBody(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        backgroundColor: Colors.white,
+        selectedItemColor: AppTheme.primaryColor,
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Accueil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profil',
+          ),
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+    );
+  }
+
+  Widget _buildBody() {
+    if (_currentIndex == 0) {
+      return _buildDashboardContent();
+    } else {
+      // Navigation directe vers l'écran de profil
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushNamed(context, '/profile');
+        setState(() {
+          _currentIndex = 0; // Revenir à l'onglet Accueil
+        });
+      });
+      return const Center(child: CircularProgressIndicator());
+    }
+  }
+
+  Widget _buildDashboardContent() {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
               // Welcome Section
               Container(
                 width: double.infinity,
@@ -111,6 +155,46 @@ class _ClientDashboardState extends State<ClientDashboard> {
                     ),
                   ],
                 ),
+              ),
+              
+              const SizedBox(height: 20),
+              
+              // Quick Actions Section
+              Text(
+                '⚡ Actions rapides',
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Quick Actions Grid
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.2,
+                children: [
+                  _buildActionCard(
+                    context,
+                    '📦 Nouvelle course',
+                    'Demander une livraison',
+                    Icons.local_shipping,
+                    () => Navigator.pushNamed(context, '/booking'),
+                  ),
+                  _buildActionCard(
+                    context,
+                    '👤 Mon profil',
+                    'Gérer mes informations',
+                    Icons.person,
+                    () => Navigator.pushNamed(context, '/profile'),
+                  ),
+                ],
               ),
               
               const SizedBox(height: 20),
@@ -329,8 +413,7 @@ class _ClientDashboardState extends State<ClientDashboard> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildStatCard(
@@ -433,6 +516,64 @@ class _ClientDashboardState extends State<ClientDashboard> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCard(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 32,
+                color: AppTheme.primaryColor,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

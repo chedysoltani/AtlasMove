@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../storage/token_storage.dart';
 
 /// HTTP Client pour gérer toutes les requêtes API
 class HttpClient {
@@ -13,12 +14,23 @@ class HttpClient {
   static const Duration _receiveTimeout = Duration(seconds: 30);
   
   /// Headers par défaut pour toutes les requêtes
-  static Map<String, String> _defaultHeaders() {
-    return {
+  static Future<Map<String, String>> _defaultHeaders() async {
+    final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'User-Agent': 'AtlasMove/1.0 (Flutter)',
     };
+
+    // Ajouter le bearer token si disponible
+    final token = await TokenStorage.getAccessToken();
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+      debugPrint('🔑 Token trouvé et ajouté aux headers');
+    } else {
+      debugPrint('❌ Aucun token trouvé dans le stockage');
+    }
+
+    return headers;
   }
 
   /// GET Request
@@ -41,6 +53,7 @@ class HttpClient {
     Map<String, String>? headers,
     Map<String, dynamic>? body,
     Map<String, dynamic>? queryParams,
+    bool isMultipart = false,
   }) async {
     return _makeRequest(
       'POST',
@@ -48,6 +61,24 @@ class HttpClient {
       headers: headers,
       body: body,
       queryParams: queryParams,
+      isMultipart: isMultipart,
+    );
+  }
+
+  /// POST Request with multipart form data
+  static Future<HttpResponse> postMultipart(
+    String endpoint, {
+    Map<String, String>? headers,
+    Map<String, dynamic>? body,
+    Map<String, dynamic>? queryParams,
+  }) async {
+    return _makeRequest(
+      'POST',
+      endpoint,
+      headers: headers,
+      body: body,
+      queryParams: queryParams,
+      isMultipart: true,
     );
   }
 
@@ -88,29 +119,47 @@ class HttpClient {
     Map<String, String>? headers,
     Map<String, dynamic>? body,
     Map<String, dynamic>? queryParams,
+    bool isMultipart = false,
   }) async {
     try {
       // Construction de l'URL
       final uri = _buildUri(endpoint, queryParams);
       
       // Fusion des headers
+      final defaultHeaders = await _defaultHeaders();
       final finalHeaders = {
-        ..._defaultHeaders(),
+        ...defaultHeaders,
         ...?headers,
       };
 
       debugPrint('🌐 API Request: $method $uri');
       debugPrint('📋 Headers: $finalHeaders');
-      if (body != null) {
-        debugPrint('📦 Body: ${jsonEncode(body)}');
-      }
-
-      // Configuration de la requête
-      final request = http.Request(method, uri);
-      request.headers.addAll(finalHeaders);
       
-      if (body != null) {
-        request.body = jsonEncode(body);
+      // Configuration de la requête
+      var request;
+      
+      if (isMultipart) {
+        // Pour les requêtes multipart (upload de fichiers)
+        final multipartRequest = http.MultipartRequest(method, uri);
+        
+        // Ajouter les champs de formulaire
+        body?.forEach((key, value) {
+          if (value is String) {
+            multipartRequest.fields[key] = value;
+          }
+        });
+        
+        request = multipartRequest;
+        debugPrint('📦 Multipart Fields: ${multipartRequest.fields}');
+      } else {
+        // Pour les requêtes JSON normales
+        request = http.Request(method, uri);
+        request.headers.addAll(finalHeaders);
+        
+        if (body != null) {
+          request.body = jsonEncode(body);
+          debugPrint('📦 Body: ${jsonEncode(body)}');
+        }
       }
 
       // Envoi de la requête avec timeout
@@ -119,22 +168,22 @@ class HttpClient {
       // Lecture de la réponse
       final response = await http.Response.fromStream(streamedResponse)
           .timeout(_receiveTimeout);
-
+      
       debugPrint('📊 Response Status: ${response.statusCode}');
       debugPrint('📄 Response Body: ${response.body}');
-
+      
       // Création de la réponse structurée
       final httpResponse = HttpResponse(
         statusCode: response.statusCode,
         body: response.body,
         headers: response.headers,
       );
-
+      
       // Gestion des erreurs HTTP
       if (response.statusCode >= 400) {
         throw _handleHttpError(httpResponse);
       }
-
+      
       return httpResponse;
     } on SocketException {
       debugPrint('❌ Network Error: No Internet Connection');
@@ -179,7 +228,10 @@ class HttpClient {
         case 404:
           return NotFoundException(message, response);
         case 422:
-          return ValidationException(errorData['errors'] ?? message, response);
+          final errors = errorData['errors'] is List ? 
+            (errorData['errors'] as List).map((e) => e.toString()).toList() : 
+            [errorData['message']?.toString() ?? 'Erreur de validation'];
+          return ValidationException(errors.join(', '), response);
         case 429:
           return TooManyRequestsException(message, response);
         case 500:
