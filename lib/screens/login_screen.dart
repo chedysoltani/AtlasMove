@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as provider_pkg;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
+import '../providers/auth_provider.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
@@ -76,6 +80,27 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
 
+        // Mettre à jour l'AuthProvider avec le vrai token
+        if (mounted) {
+          print('DEBUG: response.user = ${response.user.toString()}');
+          print('DEBUG: response.user.role = ${response.user.role}');
+          print('DEBUG: response.user.firstName = ${response.user.firstName}');
+          print('DEBUG: response.user.lastName = ${response.user.lastName}');
+          print('DEBUG: response.user.fullName = ${response.user.fullName}');
+          
+          final authProvider = provider_pkg.Provider.of<AuthProvider>(context, listen: false);
+          print('DEBUG: Avant setUser - AuthProvider.user = ${authProvider.currentUser?.fullName}');
+          
+          authProvider.setUser(response.user);
+          authProvider.setToken(response.token);
+          
+          // Sauvegarder le token dans SharedPreferences pour les services Riverpod
+          _saveTokenToPreferences(response.token);
+          
+          print('DEBUG: Après setUser - AuthProvider.user = ${authProvider.currentUser?.fullName}');
+          print('DEBUG: AuthProvider.token = ${authProvider.token}');
+        }
+
         // Rediriger selon le rôle de l'utilisateur
         if (mounted) {
           if (response.user.role == UserRole.client) {
@@ -129,6 +154,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _navigateToSignup() {
     Navigator.pushNamed(context, '/signup');
+  }
+
+  Future<void> _saveTokenToPreferences(String token) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('access_token', token);
+      print('DEBUG: Token sauvegardé dans SharedPreferences: $token');
+    } catch (e) {
+      print('DEBUG: Erreur sauvegarde token: $e');
+    }
   }
 
   @override

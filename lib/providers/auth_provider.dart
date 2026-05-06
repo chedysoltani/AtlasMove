@@ -6,45 +6,30 @@ class AuthProvider extends ChangeNotifier {
   User? _currentUser;
   bool _isLoading = false;
   String? _errorMessage;
+  String? _token;
 
   // Getters
   User? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _currentUser != null;
+  String? get token => _token;
 
-  // Login
-  Future<bool> login(String email, String password, UserRole role) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      // Simuler un appel API
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Créer un utilisateur fictif pour la démo
-      final user = User(
-        id: 'user_${DateTime.now().millisecondsSinceEpoch}',
-        firstName: 'Jean',
-        lastName: 'Dupont',
-        email: email,
-        phone: '+33612345678',
-        role: role,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        isVerified: role == UserRole.delivery,
-        isAvailable: role == UserRole.delivery,
-      );
-
-      _currentUser = user;
-      _setLoading(false);
-      return true;
-    } catch (e) {
-      _setError('Erreur de connexion: ${e.toString()}');
-      _setLoading(false);
-      return false;
-    }
+  // Méthodes pour mettre à jour l'utilisateur et le token
+  void setUser(User user) {
+    _currentUser = user;
+    notifyListeners();
   }
+
+  void setToken(String token) {
+    _token = token;
+    notifyListeners();
+  }
+
+  // Login - Supprimé car nous utilisons AuthService.login() qui retourne les vraies données de l'API
+  // Future<bool> login(String email, String password, UserRole role) async {
+  //   // Cette méthode est supprimée car nous utilisons les vraies données de l'API via AuthService
+  // }
 
   // Signup
   Future<bool> signup(SignupRequest request) async {
@@ -74,6 +59,7 @@ class AuthProvider extends ChangeNotifier {
       );
 
       _currentUser = user;
+      _token = 'demo_token_${user.id}'; // Token simulé pour la démo
       _setLoading(false);
       return true;
     } catch (e) {
@@ -93,6 +79,7 @@ class AuthProvider extends ChangeNotifier {
       await Future.delayed(const Duration(milliseconds: 500));
 
       _currentUser = null;
+      _token = null;
       _setLoading(false);
     } catch (e) {
       _setError('Erreur de déconnexion: ${e.toString()}');

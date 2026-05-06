@@ -25,8 +25,26 @@ class AuthResponse {
     // Gérer la structure de réponse réelle de l'API
     if (json.containsKey('data')) {
       final data = json['data'] as Map<String, dynamic>;
+      
+      // Créer l'utilisateur à partir des champs directs de l'API
+      final email = data['email'] ?? '';
+      final nameParts = email.split('@');
+      final firstName = data['first_name'] ?? nameParts[0];
+      final lastName = data['last_name'] ?? '';
+      
+      final userMap = {
+        'id': data['id'] ?? email,
+        'first_name': firstName,
+        'last_name': lastName,
+        'email': email,
+        'phone': data['phone'] ?? '',
+        'role': data['role'] ?? 'client',
+        'created_at': data['created_at'] ?? DateTime.now().toIso8601String(),
+        'updated_at': data['updated_at'] ?? DateTime.now().toIso8601String(),
+      };
+      
       return AuthResponse(
-        user: User.fromMap(data['user'] ?? {}),
+        user: User.fromMap(userMap),
         token: data['accessToken'] ?? data['token'] ?? data['sessionToken'] ?? '',
         message: data['message'] ?? '',
         success: data['success'] ?? true,

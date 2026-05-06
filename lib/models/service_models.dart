@@ -1,0 +1,427 @@
+class Service {
+  final String id;
+  final String name;
+  final String? description;
+  final String categoryId;
+  final ServiceCategory? category;
+  final String transportType;
+  final String pricingModel;
+  final bool isActive;
+  final bool requiresDocument;
+  final String? requiredDocumentsDescription;
+  final String? documentUrl;
+  final double? basePrice;
+  final double? pricePerKm;
+  final double? pricePerMinute;
+  final double? minimumFare;
+  final String? currency;
+  final int? maxCapacity;
+  final int sortOrder;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  Service({
+    required this.id,
+    required this.name,
+    this.description,
+    required this.categoryId,
+    this.category,
+    required this.transportType,
+    required this.pricingModel,
+    required this.isActive,
+    this.requiresDocument = false,
+    this.requiredDocumentsDescription,
+    this.documentUrl,
+    this.basePrice,
+    this.pricePerKm,
+    this.pricePerMinute,
+    this.minimumFare,
+    this.currency,
+    this.maxCapacity,
+    this.sortOrder = 0,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory Service.fromJson(Map<String, dynamic> json) {
+  print('DEBUG: Service.fromJson - parsing service with keys: ${json.keys.toList()}');
+
+  // Helper function pour parser les champs en toute sécurité
+  T? safeParse<T>(String key, T Function(String) parser) {
+    final value = json[key];
+    if (value == null) {
+      print('DEBUG: Service.fromJson - $key is null');
+      return null;
+    }
+    try {
+      return parser(value.toString());
+    } catch (e) {
+      print('DEBUG: Service.fromJson - Error parsing $key: $value -> $e');
+      return null;
+    }
+  }
+
+  final categoryJson = json['category'];
+
+  return Service(
+    id: json['id'] ?? '',
+    name: json['name'] ?? '',
+    description: json['description'],
+    categoryId: json['category_id'] ?? '',
+
+    // ✅ FIX CATEGORY
+    category: categoryJson != null
+        ? ServiceCategory.fromJson(categoryJson)
+        : null,
+
+    // ✅ FIX TRANSPORT TYPE
+    transportType: categoryJson != null
+        ? categoryJson['transport_type'] ?? ''
+        : '',
+
+    pricingModel: json['pricing_model'] ?? '',
+    isActive: json['is_active'] ?? true,
+    requiresDocument: json['requires_document'] ?? false,
+    requiredDocumentsDescription: json['required_documents_description'],
+    documentUrl: json['document_url'],
+
+    basePrice: safeParse<double>('base_price', double.parse),
+    pricePerKm: safeParse<double>('price_per_km', double.parse),
+    pricePerMinute: safeParse<double>('price_per_minute', double.parse),
+    minimumFare: safeParse<double>('minimum_fare', double.parse),
+
+    currency: json['currency'] ?? 'TND',
+    maxCapacity: safeParse<int>('max_capacity', int.parse),
+    sortOrder: safeParse<int>('sort_order', int.parse) ?? 0,
+
+    // ✅ FIX DATES (anti-crash)
+    createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+    updatedAt: DateTime.tryParse(json['updated_at'] ?? '') ?? DateTime.now(),
+  );
+}
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'category_id': categoryId,
+      'category_name': category?.name,
+      'transport_type': transportType,
+      'pricing_model': pricingModel,
+      'is_active': isActive,
+      'requires_document': requiresDocument,
+      'document_url': documentUrl,
+      'base_price': basePrice,
+      'currency': currency,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+}
+
+class ServiceCategory {
+  final String id;
+  final String name;
+  final String? description;
+  final String? iconUrl;
+  final String transportType;
+  final String status;
+  final bool isActive;
+  final int sortOrder;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  ServiceCategory({
+    required this.id,
+    required this.name,
+    this.description,
+    this.iconUrl,
+    required this.transportType,
+    required this.status,
+    required this.isActive,
+    required this.sortOrder,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory ServiceCategory.fromJson(Map<String, dynamic> json) {
+    print('DEBUG: ServiceCategory.fromJson - parsing category with keys: ${json.keys.toList()}');
+    
+    return ServiceCategory(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      description: json['description'] as String?,
+      iconUrl: json['icon_url'] as String?,
+      transportType: json['transport_type'] as String,
+      status: json['status'] as String? ?? 'active',
+      isActive: json['is_active'] as bool? ?? true,
+      sortOrder: json['sort_order'] as int? ?? 0,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'icon_url': iconUrl,
+      'transport_type': transportType,
+      'status': status,
+      'is_active': isActive,
+      'sort_order': sortOrder,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+}
+
+class ServiceAssignment {
+  final String id;
+  final String serviceId;
+  final String serviceName;
+  final String driverId;
+  final String status;
+  final String? documentUrl;
+  final String? rejectionReason;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? approvedAt;
+  final DateTime? rejectedAt;
+
+  ServiceAssignment({
+    required this.id,
+    required this.serviceId,
+    required this.serviceName,
+    required this.driverId,
+    required this.status,
+    this.documentUrl,
+    this.rejectionReason,
+    required this.createdAt,
+    required this.updatedAt,
+    this.approvedAt,
+    this.rejectedAt,
+  });
+
+  factory ServiceAssignment.fromJson(Map<String, dynamic> json) {
+    return ServiceAssignment(
+      id: json['id'] as String,
+      serviceId: json['service_id'] as String,
+      serviceName: json['service_name'] as String,
+      driverId: json['driver_id'] as String,
+      status: json['status'] as String,
+      documentUrl: json['document_url'] as String?,
+      rejectionReason: json['rejection_reason'] as String?,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
+      approvedAt: json['approved_at'] != null 
+          ? DateTime.parse(json['approved_at'] as String) 
+          : null,
+      rejectedAt: json['rejected_at'] != null 
+          ? DateTime.parse(json['rejected_at'] as String) 
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'service_id': serviceId,
+      'service_name': serviceName,
+      'driver_id': driverId,
+      'status': status,
+      'document_url': documentUrl,
+      'rejection_reason': rejectionReason,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+      'approved_at': approvedAt?.toIso8601String(),
+      'rejected_at': rejectedAt?.toIso8601String(),
+    };
+  }
+
+  bool get isPending => status == 'PENDING';
+  bool get isApproved => status == 'APPROVED';
+  bool get isRejected => status == 'REJECTED';
+  bool get isActive => isApproved && (rejectedAt == null);
+}
+
+class PaginatedServicesResponse {
+  final List<Service> data;
+  final PaginationMeta meta;
+
+  PaginatedServicesResponse({
+    required this.data,
+    required this.meta,
+  });
+
+  factory PaginatedServicesResponse.fromJson(Map<String, dynamic> json) {
+    print('DEBUG: PaginatedServicesResponse.fromJson - json: $json');
+    
+    // La réponse API a la structure: {data: {data: [...], total: X}}
+    final responseData = json['data'] as Map<String, dynamic>;
+    print('DEBUG: responseData: $responseData');
+    
+    final servicesList = responseData['data'] as List;
+    print('DEBUG: servicesList type: ${servicesList.runtimeType}, length: ${servicesList.length}');
+    
+    final total = responseData['total'] as int;
+    print('DEBUG: total: $total');
+    
+    final services = servicesList
+        .map((item) {
+          print('DEBUG: Parsing service item: $item');
+          return Service.fromJson(item as Map<String, dynamic>);
+        })
+        .toList();
+    
+    print('DEBUG: Services parsed count: ${services.length}');
+    
+    return PaginatedServicesResponse(
+      data: services,
+      meta: PaginationMeta(
+        currentPage: 1,
+        totalPages: (total / 10).ceil(),
+        totalItems: total,
+        itemsPerPage: 10,
+        hasNextPage: services.length >= 10,
+        hasPreviousPage: false,
+      ),
+    );
+  }
+}
+
+class PaginatedAssignmentsResponse {
+  final List<ServiceAssignment> data;
+  final PaginationMeta meta;
+
+  PaginatedAssignmentsResponse({
+    required this.data,
+    required this.meta,
+  });
+
+  factory PaginatedAssignmentsResponse.fromJson(Map<String, dynamic> json) {
+    return PaginatedAssignmentsResponse(
+      data: (json['data'] as List)
+          .map((item) => ServiceAssignment.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      meta: PaginationMeta.fromJson(json['meta'] as Map<String, dynamic>),
+    );
+  }
+}
+
+class PaginationMeta {
+  final int currentPage;
+  final int totalPages;
+  final int totalItems;
+  final int itemsPerPage;
+  final bool hasNextPage;
+  final bool hasPreviousPage;
+
+  PaginationMeta({
+    required this.currentPage,
+    required this.totalPages,
+    required this.totalItems,
+    required this.itemsPerPage,
+    required this.hasNextPage,
+    required this.hasPreviousPage,
+  });
+
+  factory PaginationMeta.fromJson(Map<String, dynamic> json) {
+    return PaginationMeta(
+      currentPage: json['current_page'] as int,
+      totalPages: json['total_pages'] as int,
+      totalItems: json['total_items'] as int,
+      itemsPerPage: json['items_per_page'] as int,
+      hasNextPage: json['has_next_page'] as bool,
+      hasPreviousPage: json['has_previous_page'] as bool,
+    );
+  }
+}
+
+class ServiceCatalogue {
+  final List<ServiceCategoryWithServices> data;
+  final int total;
+
+  ServiceCatalogue({
+    required this.data,
+    required this.total,
+  });
+
+  factory ServiceCatalogue.fromJson(Map<String, dynamic> json) {
+    final data = (json['data'] as List)
+        .map((item) => ServiceCategoryWithServices.fromJson(item as Map<String, dynamic>))
+        .toList();
+
+    return ServiceCatalogue(
+      data: data,
+      total: json['total'] as int? ?? data.length,
+    );
+  }
+}
+
+class ServiceCategoryWithServices {
+  final String id;
+  final String name;
+  final String? description;
+  final String? iconUrl;
+  final String transportType;
+  final String status;
+  final bool isActive;
+  final int sortOrder;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final List<Service> services;
+
+  ServiceCategoryWithServices({
+    required this.id,
+    required this.name,
+    this.description,
+    this.iconUrl,
+    required this.transportType,
+    required this.status,
+    required this.isActive,
+    required this.sortOrder,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.services,
+  });
+
+  factory ServiceCategoryWithServices.fromJson(Map<String, dynamic> json) {
+    final services = (json['services'] as List?)
+        ?.map((item) => Service.fromJson(item as Map<String, dynamic>))
+        .toList() ?? [];
+
+    return ServiceCategoryWithServices(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      description: json['description'] as String?,
+      iconUrl: json['icon_url'] as String?,
+      transportType: json['transport_type'] as String,
+      status: json['status'] as String? ?? 'active',
+      isActive: json['is_active'] as bool? ?? true,
+      sortOrder: json['sort_order'] as int? ?? 0,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
+      services: services,
+    );
+  }
+}
+
+class AssignmentRequest {
+  final String serviceId;
+  final String? documentUrl;
+
+  AssignmentRequest({
+    required this.serviceId,
+    this.documentUrl,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'service_id': serviceId,
+      if (documentUrl != null) 'document_url': documentUrl,
+    };
+  }
+}

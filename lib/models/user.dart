@@ -144,6 +144,7 @@ class User {
       phone: map['phone'] ?? '',
       role: map['user_type'] == 'external' ? UserRole.client : 
             map['user_type'] == 'delivery' ? UserRole.delivery :
+            map['role'] == 'livreur' ? UserRole.delivery :
             UserRole.values.firstWhere(
               (role) => role.name == map['role'],
               orElse: () => UserRole.client,

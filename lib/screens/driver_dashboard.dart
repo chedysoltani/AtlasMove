@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
+import '../providers/auth_provider.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -18,6 +20,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
   final double _totalEarnings = 12450.75;
   final double _todayEarnings = 325.50;
   final int _todayRides = 8;
+
+  @override
+  void initState() {
+    super.initState();
+    // Debug: Vérifier le token du livreur
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      print('DEBUG: Token livreur = ${authProvider.token}');
+      print('DEBUG: User livreur = ${authProvider.currentUser?.fullName}');
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -436,6 +449,22 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 text: 'Revenus',
                 onPressed: () {
                   Navigator.pushNamed(context, '/driver_earnings');
+                },
+                height: 44,
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 12),
+        
+        Row(
+          children: [
+            Expanded(
+              child: CustomButton(
+                text: 'Services',
+                onPressed: () {
+                  Navigator.pushNamed(context, '/services');
                 },
                 height: 44,
               ),
