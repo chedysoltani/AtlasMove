@@ -464,7 +464,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
               child: CustomButton(
                 text: 'Services',
                 onPressed: () {
-                  Navigator.pushNamed(context, '/services');
+                  Navigator.pushNamed(context, '/services_catalogue');
                 },
                 height: 44,
               ),

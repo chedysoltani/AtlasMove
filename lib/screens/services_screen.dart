@@ -45,7 +45,7 @@ void initState() {
     // Debug: Vérifier le token dans les services
    
 
-    final servicesAsync = ref.watch(servicesProvider);
+    final servicesState = ref.watch(servicesProvider);
     final servicesNotifier = ref.read(servicesProvider.notifier);
 
     return Scaffold(
@@ -78,47 +78,18 @@ void initState() {
       ),
       body: RefreshIndicator(
         onRefresh: () async => await servicesNotifier.refresh(),
-        child: servicesAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
-                const SizedBox(height: 16),
-                Text(
-                  'Erreur de chargement',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.red.shade600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  error.toString(),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 16),
-                CustomButton(
-                  text: 'Réessayer',
-                  onPressed: () => servicesNotifier.refresh(),
-                ),
-              ],
-            ),
-          ),
-          data: (servicesState) {
-  print("UI rebuild -> services count: ${servicesState.services.length}");
-  return _buildServicesList(servicesState);
-},
-        ),
+        child: _buildServicesList(servicesState),
       ),
     );
   }
 
   
   Widget _buildServicesList(ServicesState state) {
+    // Afficher le loader pendant le chargement initial
+    if (state.isLoading && state.services.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     if (state.error != null) {
       return Center(
         child: Column(

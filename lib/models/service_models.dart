@@ -206,23 +206,52 @@ class ServiceAssignment {
   });
 
   factory ServiceAssignment.fromJson(Map<String, dynamic> json) {
-    return ServiceAssignment(
-      id: json['id'] as String,
-      serviceId: json['service_id'] as String,
-      serviceName: json['service_name'] as String,
-      driverId: json['driver_id'] as String,
-      status: json['status'] as String,
-      documentUrl: json['document_url'] as String?,
-      rejectionReason: json['rejection_reason'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
-      approvedAt: json['approved_at'] != null 
-          ? DateTime.parse(json['approved_at'] as String) 
-          : null,
-      rejectedAt: json['rejected_at'] != null 
-          ? DateTime.parse(json['rejected_at'] as String) 
-          : null,
-    );
+    // La réponse est dans {data: {message: "...", data: {...}}}
+    final data = json['data'] as Map<String, dynamic>;
+    final assignmentData = data['data'] as Map<String, dynamic>;
+    
+    print('DEBUG: ServiceAssignment.fromJson - data keys: ${data.keys.toList()}');
+    print('DEBUG: ServiceAssignment.fromJson - assignmentData keys: ${assignmentData.keys.toList()}');
+    print('DEBUG: ServiceAssignment.fromJson - assignmentData: $assignmentData');
+    
+    // Parsing sécurisé avec logs pour chaque champ
+    try {
+      final id = assignmentData['id']?.toString() ?? '';
+      final serviceId = assignmentData['service_id']?.toString() ?? '';
+      final serviceName = assignmentData['service_name']?.toString() ?? 'Service inconnu';
+      final driverId = assignmentData['livreur_id']?.toString() ?? '';
+      final status = assignmentData['status']?.toString() ?? '';
+      final documentUrl = assignmentData['document_url']?.toString() ?? '';
+      final rejectionReason = assignmentData['rejection_reason']?.toString();
+      final createdAt = DateTime.parse(assignmentData['created_at']?.toString() ?? '');
+      final updatedAt = DateTime.parse(assignmentData['updated_at']?.toString() ?? '');
+      final approvedAt = assignmentData['approved_at'] != null 
+          ? DateTime.parse(assignmentData['approved_at'].toString()) 
+          : null;
+      final rejectedAt = assignmentData['rejected_at'] != null 
+          ? DateTime.parse(assignmentData['rejected_at'].toString()) 
+          : null;
+      
+      print('DEBUG: ServiceAssignment.fromJson - Tous les champs parsés avec succès');
+      
+      return ServiceAssignment(
+        id: id,
+        serviceId: serviceId,
+        serviceName: serviceName,
+        driverId: driverId,
+        status: status,
+        documentUrl: documentUrl.isEmpty ? null : documentUrl,
+        rejectionReason: rejectionReason,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        approvedAt: approvedAt,
+        rejectedAt: rejectedAt,
+      );
+    } catch (e) {
+      print('DEBUG: ServiceAssignment.fromJson - Erreur parsing: $e');
+      print('DEBUG: ServiceAssignment.fromJson - assignmentData qui cause l\'erreur: $assignmentData');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -350,13 +379,32 @@ class ServiceCatalogue {
   });
 
   factory ServiceCatalogue.fromJson(Map<String, dynamic> json) {
-    final data = (json['data'] as List)
+    print('DEBUG: ServiceCatalogue.fromJson - json keys: ${json.keys.toList()}');
+    
+    // La réponse de l'API a la structure: {data: {data: [...], total: 5}}
+    final dataWrapper = json['data'] as Map<String, dynamic>?;
+    print('DEBUG: ServiceCatalogue.fromJson - dataWrapper: $dataWrapper');
+    
+    final dataList = dataWrapper?['data'] as List? ?? json['data'] as List?;
+    print('DEBUG: ServiceCatalogue.fromJson - dataList length: ${dataList?.length}');
+    
+    if (dataList == null) {
+      print('DEBUG: ServiceCatalogue.fromJson - dataList is null');
+      return ServiceCatalogue(
+        data: [],
+        total: 0,
+      );
+    }
+
+    final data = dataList
         .map((item) => ServiceCategoryWithServices.fromJson(item as Map<String, dynamic>))
         .toList();
 
+    print('DEBUG: ServiceCatalogue.fromJson - parsed ${data.length} categories');
+
     return ServiceCatalogue(
       data: data,
-      total: json['total'] as int? ?? data.length,
+      total: dataWrapper?['total'] as int? ?? json['total'] as int? ?? data.length,
     );
   }
 }
@@ -421,7 +469,7 @@ class AssignmentRequest {
   Map<String, dynamic> toJson() {
     return {
       'service_id': serviceId,
-      if (documentUrl != null) 'document_url': documentUrl,
+      'document_url': documentUrl, // Envoyer null explicitement
     };
   }
 }

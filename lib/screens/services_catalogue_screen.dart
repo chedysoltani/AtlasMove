@@ -8,18 +8,28 @@ import '../providers/auth_provider.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 
-class ServicesCatalogueScreen extends ConsumerWidget {
+class ServicesCatalogueScreen extends ConsumerStatefulWidget {
   const ServicesCatalogueScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ServicesCatalogueScreen> createState() => _ServicesCatalogueScreenState();
+}
+
+class _ServicesCatalogueScreenState extends ConsumerState<ServicesCatalogueScreen> {
+  bool _initialized = false;
+
+  @override
+  Widget build(BuildContext context) {
     final catalogueAsync = ref.watch(catalogueProvider);
     final catalogueNotifier = ref.read(catalogueProvider.notifier);
 
-    // Rafraîchir les données au chargement
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      catalogueNotifier.fetchCatalogue();
-    });
+    // Rafraîchir les données une seule fois au chargement
+    if (!_initialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        catalogueNotifier.fetchCatalogue();
+      });
+      _initialized = true;
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -510,7 +520,13 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
   }
 
   Future<void> _assignToService() async {
+    print('DEBUG: CATALOGUE - Début de l\'affectation');
+    print('DEBUG: CATALOGUE - Service: ${widget.service.name} (ID: ${widget.service.id})');
+    print('DEBUG: CATALOGUE - Requires document: ${widget.service.requiresDocument}');
+    print('DEBUG: CATALOGUE - Document URL: $_documentUrl');
+    
     if (widget.service.requiresDocument && _documentUrl == null) {
+      print('DEBUG: CATALOGUE - Document requis mais non fourni');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Veuillez télécharger un document'),
@@ -523,12 +539,17 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
     setState(() => _isLoading = true);
 
     try {
+      print('DEBUG: CATALOGUE - Récupération du token...');
       final token = provider_pkg.Provider.of<AuthProvider>(context, listen: false).token ?? '';
+      print('DEBUG: CATALOGUE - Token récupéré: ${token.isNotEmpty ? "présent (${token.length} chars)" : "vide"}');
+      
+      print('DEBUG: CATALOGUE - Appel de ServiceApi.assignToService...');
       await ServiceApi.assignToService(
         token: token,
         serviceId: widget.service.id,
         documentUrl: _documentUrl,
       );
+      print('DEBUG: CATALOGUE - Affectation réussie');
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -540,6 +561,10 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
         );
       }
     } catch (e) {
+      print('DEBUG: CATALOGUE - Erreur lors de l\'affectation: $e');
+      print('DEBUG: CATALOGUE - Type d\'erreur: ${e.runtimeType}');
+      print('DEBUG: CATALOGUE - Stack trace: ${StackTrace.current}');
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -550,6 +575,7 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       }
     } finally {
       setState(() => _isLoading = false);
+      print('DEBUG: CATALOGUE - Fin de l\'affectation (isLoading = false)');
     }
   }
 }

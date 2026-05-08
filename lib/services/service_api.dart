@@ -38,6 +38,8 @@ class ServiceApi {
       final uri = Uri.parse('$_baseUrl/api/v1/services');
       
       print('DEBUG: API URL: $uri');
+      print('DEBUG: Token brut: "$token"');
+      print('DEBUG: Token length: ${token.length}');
       print('DEBUG: API Headers: ${_getHeaders(token)}');
 
       final response = await http.get(
@@ -80,20 +82,28 @@ class ServiceApi {
 
   static Future<ServiceCatalogue> getCatalogue({required String token}) async {
     try {
-      final uri = Uri.parse('$_baseUrl/services/catalogue');
+      final uri = Uri.parse('$_baseUrl/api/v1/services/catalogue');
+      print('DEBUG: Appel API getCatalogue...');
+      print('DEBUG: API URL: $uri');
+      print('DEBUG: Token: ${token.isEmpty ? 'vide' : 'présent'}');
 
       final response = await http.get(
         uri,
         headers: _getHeaders(token),
       ).timeout(_timeout);
 
+      print('DEBUG: Response status: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
+        print('DEBUG: Response data keys: ${data.keys.toList()}');
         return ServiceCatalogue.fromJson(data);
       } else {
+        print('DEBUG: API Error: ${response.body}');
         throw _handleApiError(response);
       }
     } catch (e) {
+      print('DEBUG: Exception getCatalogue: $e');
       throw _handleException(e);
     }
   }
@@ -104,26 +114,57 @@ class ServiceApi {
     String? documentUrl,
   }) async {
     try {
-      final uri = Uri.parse('$_baseUrl/services/assignments/me');
+      final uri = Uri.parse('$_baseUrl/api/v1/services/assignments/me'); // URL actuelle
+      // Alternative: Uri.parse('$_baseUrl/services/assignments/me');
+      
+      print('DEBUG: AFFECTATION - Début de l\'affectation');
+      print('DEBUG: AFFECTATION - Token: ${token.isNotEmpty ? "présent (${token.length} chars)" : "vide"}');
+      print('DEBUG: AFFECTATION - Service ID: $serviceId');
+      print('DEBUG: AFFECTATION - Document URL: $documentUrl');
+      print('DEBUG: AFFECTATION - API URL: $uri');
+      
+      // Test rapide: vérifier si le token est valide avec une autre API
+      try {
+        final testUri = Uri.parse('$_baseUrl/api/v1/services');
+        final testResponse = await http.get(
+          testUri,
+          headers: _getHeaders(token),
+        ).timeout(const Duration(seconds: 5));
+        print('DEBUG: AFFECTATION - Test token valide: ${testResponse.statusCode == 200 ? "OUI" : "NON"} (${testResponse.statusCode})');
+      } catch (e) {
+        print('DEBUG: AFFECTATION - Erreur test token: $e');
+      }
       
       final request = AssignmentRequest(
         serviceId: serviceId,
         documentUrl: documentUrl,
       );
+      
+      final requestBody = request.toJson();
+      final jsonBody = json.encode(requestBody);
+      print('DEBUG: AFFECTATION - Request body: $requestBody');
+      print('DEBUG: AFFECTATION - JSON body: $jsonBody');
+      print('DEBUG: AFFECTATION - Headers: ${_getHeaders(token)}');
 
       final response = await http.post(
         uri,
         headers: _getHeaders(token),
-        body: json.encode(request.toJson()),
+        body: jsonBody,
       ).timeout(_timeout);
+
+      print('DEBUG: AFFECTATION - Response status: ${response.statusCode}');
+      print('DEBUG: AFFECTATION - Response body: ${response.body}');
 
       if (response.statusCode == 201) {
         final data = json.decode(response.body) as Map<String, dynamic>;
+        print('DEBUG: AFFECTATION - Succès: $data');
         return ServiceAssignment.fromJson(data);
       } else {
+        print('DEBUG: AFFECTATION - Erreur API: ${response.statusCode} - ${response.body}');
         throw _handleApiError(response);
       }
     } catch (e) {
+      print('DEBUG: AFFECTATION - Exception: $e');
       throw _handleException(e);
     }
   }

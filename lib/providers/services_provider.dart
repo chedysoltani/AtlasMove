@@ -30,70 +30,16 @@ class TokenNotifier extends AsyncNotifier<String?> {
   }
 }
 
-// Provider pour les services avec pagination
-final servicesProvider = AsyncNotifierProvider<ServicesAsyncNotifier, ServicesState>(() {
-  return ServicesAsyncNotifier();
+// Provider pour les services
+final servicesProvider = StateNotifierProvider<ServicesNotifier, ServicesState>((ref) {
+  final prefs = SharedPreferences.getInstance();
+  prefs.then((prefs) {
+    final token = prefs.getString('access_token') ?? '';
+    return ServicesNotifier(token);
+  });
+  return ServicesNotifier('');
 });
 
-class ServicesAsyncNotifier extends AsyncNotifier<ServicesState> {
-  late ServicesNotifier _servicesNotifier;
-
-  @override
-  ServicesState build() {
-    _servicesNotifier = ServicesNotifier('');
-    // Récupérer le token et réinitialiser le notifier
-    _initializeWithToken();
-    return ServicesState();
-  }
-
-  Future<void> _initializeWithToken() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token') ?? '';
-      print('DEBUG: Token récupéré pour services: $token');
-      
-      // Ne charger les services que si le token n'est pas vide
-      if (token.isEmpty) {
-        print('DEBUG: Token vide, pas de chargement des services');
-        _servicesNotifier = ServicesNotifier('');
-        state = AsyncValue.data(ServicesState());
-        return;
-      }
-      
-      // Créer un nouveau notifier avec le vrai token
-      _servicesNotifier = ServicesNotifier(token);
-      
-      // Mettre à jour l'état initial
-      state = AsyncValue.data(ServicesState());
-      
-      // Charger les services
-      print('DEBUG: Chargement des services avec token...');
-      await _servicesNotifier.fetchServices(reset: true);
-      print('DEBUG: Services chargés, mise à jour de l\'état...');
-      state = AsyncValue.data(_servicesNotifier.state);
-      print('DEBUG: État mis à jour - Services count: ${_servicesNotifier.state.services.length}');
-      print('DEBUG: État mis à jour - Error: ${_servicesNotifier.state.error}');
-    } catch (e, stack) {
-      print('DEBUG: Erreur lors du chargement des services: $e');
-      state = AsyncValue.error(e, stack);
-    }
-  }
-
-  // Déléguer les méthodes au ServicesNotifier interne
-  Future<void> fetchServices({bool reset = false}) async {
-    await _servicesNotifier.fetchServices(reset: reset);
-    // Mettre à jour l'état avec le nouvel état du ServicesNotifier
-    state = AsyncValue.data(_servicesNotifier.state);
-  }
-
-  Future<void> refresh() async {
-    await _servicesNotifier.refresh();
-    // Mettre à jour l'état avec le nouvel état du ServicesNotifier
-    state = AsyncValue.data(_servicesNotifier.state);
-  }
-
-  ServicesState get currentState => _servicesNotifier.state;
-}
 
 // Provider pour le catalogue
 final catalogueProvider = AsyncNotifierProvider<CatalogueNotifier, ServiceCatalogue>(() {
@@ -101,20 +47,48 @@ final catalogueProvider = AsyncNotifierProvider<CatalogueNotifier, ServiceCatalo
 });
 
 class CatalogueNotifier extends AsyncNotifier<ServiceCatalogue> {
+  bool _isLoading = false;
+
   @override
   ServiceCatalogue build() {
     return ServiceCatalogue(data: [], total: 0);
   }
 
   Future<void> fetchCatalogue() async {
-    state = const AsyncValue.loading();
+    // Éviter les appels multiples
+    if (_isLoading) {
+      print('DEBUG: fetchCatalogue - déjà en cours, ignore');
+      return;
+    }
+
+    _isLoading = true;
+    
+    // Ne pas effacer les données existantes pendant le chargement
+    if (state.value == null || state.value!.data.isEmpty) {
+      state = const AsyncValue.loading();
+    }
+    
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token') ?? '';
+      print('DEBUG: fetchCatalogue - token: ${token.isEmpty ? 'vide' : 'présent'}');
+      
       final catalogue = await ServiceApi.getCatalogue(token: token);
+      print('DEBUG: Catalogue récupéré - categories count: ${catalogue.data.length}');
+      print('DEBUG: Catalogue récupéré - total: ${catalogue.total}');
+      
       state = AsyncValue.data(catalogue);
     } catch (e, stack) {
+      print('DEBUG: Erreur fetchCatalogue: $e');
+      // Ne pas effacer les données existantes en cas d'erreur
+      if (state.value != null && state.value!.data.isNotEmpty) {
+        print('DEBUG: Conservation des données existantes malgré l\'erreur');
+        // Garder les données existantes mais marquer l'erreur
+        return;
+      }
       state = AsyncValue.error(e, stack);
+    } finally {
+      _isLoading = false;
     }
   }
 }
@@ -205,11 +179,13 @@ class ServicesNotifier extends StateNotifier<ServicesState> {
   final String _token;
   final List<String> _transportTypes = ['taxi', 'moto', 'livraison', 'van', 'voiture'];
   final List<String> _pricingModels = ['fixed', 'hourly', 'distance', 'commission'];
+  bool isInitialized = false;
 
   ServicesNotifier(this._token) : super(ServicesState()) {
     if (_token.isNotEmpty) {
       _initialize();
     }
+    isInitialized = true;
   }
 
   Future<void> _initialize() async {
