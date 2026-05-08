@@ -23,6 +23,14 @@ class _CreateRideOSMScreenState extends ConsumerState<CreateRideOSMScreen> {
     // Initialiser la carte au démarrage
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(mapProvider.notifier).initializeMap();
+      // Set map as ready after a short delay
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          setState(() {
+            _isMapReady = true;
+          });
+        }
+      });
     });
   }
 
@@ -73,11 +81,6 @@ class _CreateRideOSMScreenState extends ConsumerState<CreateRideOSMScreen> {
         maxZoom: 18.0,
         interactiveFlags: InteractiveFlag.all,
       ),
-      onMapReady: () {
-        setState(() {
-          _isMapReady = true;
-        });
-      },
       children: [
         // Tile layer OpenStreetMap
         TileLayer(

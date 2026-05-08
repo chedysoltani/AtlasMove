@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../providers/map_provider.dart';
+import '../providers/services_provider.dart';
+import '../models/service_models.dart';
 import '../widgets/loading_widget.dart';
 import '../widgets/error_widget.dart';
 import '../services/location_service.dart';
@@ -15,6 +17,9 @@ class CreateRideScreen extends ConsumerStatefulWidget {
 
 class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   bool _isMapReady = false;
+  ServiceCategoryWithServices? _selectedCategory;
+  Service? _selectedService;
+  bool _servicesExpanded = false;
 
   @override
   void initState() {
@@ -22,6 +27,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     // Initialiser la carte au démarrage
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(mapProvider.notifier).initializeMap();
+      // Charger le catalogue des services
+      ref.read(catalogueProvider.notifier).fetchCatalogue();
     });
   }
 
@@ -251,11 +258,16 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   }
 
   Widget _buildBottomSheet() {
+    final catalogueAsync = ref.watch(catalogueProvider);
+    
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
       child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: const BorderRadius.only(
@@ -286,6 +298,11 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               ),
               
               const SizedBox(height: 20),
+              
+              // Service Selection Section
+              _buildServiceSelection(catalogueAsync),
+              
+              const SizedBox(height: 16),
               
               // Destination input
               Container(
@@ -326,31 +343,27 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Implémenter la logique de création de course
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Fonctionnalité de création de course bientôt disponible!'),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
-                  },
+                  onPressed: _selectedService != null ? _createRide : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
+                    backgroundColor: _selectedService != null 
+                        ? Theme.of(context).primaryColor 
+                        : Colors.grey[300],
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     elevation: 2,
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.directions_car, size: 20),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
-                        'Créer une course',
-                        style: TextStyle(
+                        _selectedService != null 
+                            ? 'Créer une course - ${_selectedService!.name}'
+                            : 'Sélectionnez un service',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
@@ -364,6 +377,301 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildServiceSelection(AsyncValue<ServiceCatalogue> catalogueAsync) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Sélectionner un service',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
+          ),
+        ),
+        const SizedBox(height: 12),
+        catalogueAsync.when(
+          loading: () => Container(
+            height: 120,
+            child: const Center(child: CircularProgressIndicator()),
+          ),
+          error: (error, stack) => Container(
+            height: 120,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, color: Colors.grey[400]),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Erreur de chargement',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                  TextButton(
+                    onPressed: () => ref.read(catalogueProvider.notifier).fetchCatalogue(),
+                    child: const Text('Réessayer'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          data: (catalogue) => Column(
+            children: [
+              _buildCategoriesList(catalogue),
+              if (_servicesExpanded) _buildServicesList(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoriesList(ServiceCatalogue catalogue) {
+    final categories = catalogue.data;
+    
+    if (categories.isEmpty) {
+      return Container(
+        height: 120,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.category_outlined, color: Colors.grey[300]),
+              const SizedBox(height: 8),
+              Text(
+                'Aucun service disponible',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 120,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          final category = categories[index];
+          final isSelected = _selectedCategory?.id == category.id;
+          
+          return Container(
+            margin: const EdgeInsets.only(right: 12),
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (isSelected) {
+                    _selectedCategory = null;
+                    _selectedService = null;
+                    _servicesExpanded = false;
+                  } else {
+                    _selectedCategory = category;
+                    _selectedService = null;
+                    _servicesExpanded = true;
+                  }
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected ? Theme.of(context).primaryColor : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isSelected ? Theme.of(context).primaryColor : Colors.grey[300]!,
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _getCategoryIcon(category.name),
+                      color: isSelected ? Colors.white : Colors.grey[600],
+                      size: 24,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      category.name,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (category.services.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${category.services.length}',
+                        style: TextStyle(
+                          color: isSelected ? Colors.white70 : Colors.grey[600],
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildServicesList() {
+    if (_selectedCategory == null || !_servicesExpanded) {
+      return const SizedBox.shrink();
+    }
+
+    final services = _selectedCategory!.services;
+    
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Services disponibles',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...services.map((service) => _buildServiceItem(service)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceItem(Service service) {
+    final isSelected = _selectedService?.id == service.id;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: GestureDetector(
+        onTap: service.isActive ? () {
+          setState(() {
+            _selectedService = service;
+          });
+        } : null,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.1) : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? Theme.of(context).primaryColor : Colors.grey[300]!,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      service.name,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: service.isActive ? Colors.black : Colors.grey,
+                      ),
+                    ),
+                    if (service.description != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        service.description!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Row(
+                children: [
+                  if (service.basePrice != null) ...[
+                    Text(
+                      '${service.basePrice!.toStringAsFixed(2)} ${service.currency}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Icon(
+                    isSelected ? Icons.check_circle : Icons.circle_outlined,
+                    color: isSelected ? Theme.of(context).primaryColor : Colors.grey[400],
+                    size: 20,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _getCategoryIcon(String categoryName) {
+    final name = categoryName.toLowerCase();
+    
+    if (name.contains('taxi') || name.contains('transport')) {
+      return Icons.local_taxi;
+    } else if (name.contains('livraison') || name.contains('delivery')) {
+      return Icons.delivery_dining;
+    } else if (name.contains('moto')) {
+      return Icons.motorcycle;
+    } else if (name.contains('van') || name.contains('camion')) {
+      return Icons.local_shipping;
+    } else if (name.contains('course') || name.contains('ride')) {
+      return Icons.directions_car;
+    } else if (name.contains('urgence') || name.contains('emergency')) {
+      return Icons.emergency;
+    } else if (name.contains('premium') || name.contains('luxury')) {
+      return Icons.star;
+    } else {
+      return Icons.category;
+    }
+  }
+
+  void _createRide() {
+    if (_selectedService == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez sélectionner un service'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // TODO: Implémenter la logique de création de course
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Course créée avec le service: ${_selectedService!.name}'),
+        backgroundColor: Colors.green,
       ),
     );
   }
