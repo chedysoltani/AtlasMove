@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'dart:math' as math;
 import '../providers/map_provider.dart';
 import '../providers/services_provider.dart';
 import '../models/service_models.dart';
 import '../widgets/loading_widget.dart';
 import '../widgets/error_widget.dart';
 import '../services/location_service.dart';
+import '../services/geocoding_service.dart';
 
 class CreateRideScreen extends ConsumerStatefulWidget {
   const CreateRideScreen({super.key});
@@ -20,6 +22,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   ServiceCategoryWithServices? _selectedCategory;
   Service? _selectedService;
   bool _servicesExpanded = false;
+  final TextEditingController _destinationController = TextEditingController();
+  final FocusNode _destinationFocusNode = FocusNode();
+  LatLng? _destinationCoordinates;
+  List<String> _addressSuggestions = [];
+  bool _isSearching = false;
+  double? _estimatedDistance;
+  String? _estimatedDuration;
+  bool _showRouteInfo = false;
 
   @override
   void initState() {
@@ -30,6 +40,197 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       // Charger le catalogue des services
       ref.read(catalogueProvider.notifier).fetchCatalogue();
     });
+    
+    _destinationController.addListener(_onDestinationChanged);
+  }
+  
+  @override
+  void dispose() {
+    _destinationController.removeListener(_onDestinationChanged);
+    _destinationController.dispose();
+    _destinationFocusNode.dispose();
+    super.dispose();
+  }
+  
+  void _onDestinationChanged() {
+    final query = _destinationController.text;
+    if (query.length >= 3) {
+      _searchAddresses(query);
+    } else {
+      setState(() {
+        _addressSuggestions = [];
+      });
+    }
+  }
+  
+  Future<void> _searchAddresses(String query) async {
+    print('DEBUG: Searching addresses for query: "$query"');
+    setState(() {
+      _isSearching = true;
+      _addressSuggestions = []; // Clear previous suggestions
+    });
+    
+    try {
+      final suggestions = await GeocodingService.searchAddressSuggestions(query);
+      print('DEBUG: Found ${suggestions.length} suggestions');
+      for (var suggestion in suggestions) {
+        print('DEBUG: Suggestion: $suggestion');
+      }
+      
+      if (mounted) {
+        setState(() {
+          _addressSuggestions = suggestions;
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      print('DEBUG: Error searching addresses: $e');
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+        });
+      }
+    }
+  }
+  
+  Future<void> _selectDestination(String address) async {
+    setState(() {
+      _isSearching = true;
+      _addressSuggestions = [];
+    });
+    
+    _destinationController.text = address;
+    _destinationFocusNode.unfocus();
+    
+    try {
+      final coordinates = await GeocodingService.getAddressCoordinates(address);
+      if (coordinates != null && mounted) {
+        final latLng = LatLng(coordinates.latitude, coordinates.longitude);
+        setState(() {
+          _destinationCoordinates = latLng;
+          _isSearching = false;
+        });
+        
+        // Centrer la carte sur la destination
+        final mapState = ref.read(mapProvider);
+        if (mapState.mapController != null) {
+          mapState.mapController!.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(target: latLng, zoom: 15),
+            ),
+          );
+        }
+        
+        // Calculer l'itinéraire si on a la position actuelle
+        if (mapState.currentPosition != null) {
+          await _calculateRoute(mapState.currentPosition!, latLng);
+        }
+      } else if (mounted) {
+        setState(() {
+          _isSearching = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Adresse non trouvée')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de la recherche de l\'adresse')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _calculateRoute(LatLng start, LatLng end) async {
+    // Pour l'instant, calcul simple de distance
+    final distance = _calculateDistance(start, end);
+    final duration = _estimateDuration(distance);
+    
+    if (mounted) {
+      setState(() {
+        _estimatedDistance = distance;
+        _estimatedDuration = duration;
+        _showRouteInfo = true;
+      });
+    }
+    
+    // Ajouter les marqueurs et la polyline
+    _addRouteElements(start, end);
+  }
+  
+  double _calculateDistance(LatLng start, LatLng end) {
+    const double earthRadius = 6371; // en kilomètres
+    
+    final double lat1Rad = start.latitude * (math.pi / 180);
+    final double lon1Rad = start.longitude * (math.pi / 180);
+    final double lat2Rad = end.latitude * (math.pi / 180);
+    final double lon2Rad = end.longitude * (math.pi / 180);
+    
+    final double dLat = lat2Rad - lat1Rad;
+    final double dLon = lon2Rad - lon1Rad;
+    
+    final double a = math.pow(math.sin(dLat / 2), 2) +
+        math.cos(lat1Rad) * math.cos(lat2Rad) *
+        math.pow(math.sin(dLon / 2), 2);
+    final double c = 2 * math.asin(math.sqrt(a));
+    
+    return earthRadius * c;
+  }
+  
+  String _estimateDuration(double distanceKm) {
+    // Estimation simple: 30 km/h en ville
+    final minutes = (distanceKm / 30 * 60).round();
+    if (minutes < 60) {
+      return '$minutes min';
+    } else {
+      final hours = minutes ~/ 60;
+      final remainingMinutes = minutes % 60;
+      return '${hours}h ${remainingMinutes}min';
+    }
+  }
+  
+  void _addRouteElements(LatLng start, LatLng end) {
+    final mapNotifier = ref.read(mapProvider.notifier);
+    final mapState = ref.read(mapProvider);
+    
+    // Effacer les marqueurs précédents sauf la position actuelle
+    final currentMarkers = mapState.markers.where(
+      (m) => m.markerId.value == 'current_position'
+    ).toSet();
+    
+    // Marqueur de départ (pickup)
+    final pickupMarker = Marker(
+      markerId: const MarkerId('pickup'),
+      position: start,
+      infoWindow: const InfoWindow(title: 'Point de départ'),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+    );
+    
+    // Marqueur de destination
+    final destinationMarker = Marker(
+      markerId: const MarkerId('destination'),
+      position: end,
+      infoWindow: const InfoWindow(title: 'Destination'),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+    );
+    
+    // Polyline simple (ligne droite entre les points)
+    final routePolyline = Polyline(
+      polylineId: const PolylineId('route'),
+      points: [start, end],
+      color: Theme.of(context).primaryColor,
+      width: 4,
+    );
+    
+    // Mettre à jour les marqueurs et polylines
+    mapNotifier.state = mapState.copyWith(
+      markers: {...currentMarkers, pickupMarker, destinationMarker},
+      polylines: {routePolyline},
+    );
   }
 
   @override
@@ -284,9 +485,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         ),
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
               // Indicateur de drag
               Container(
                 width: 40,
@@ -304,39 +506,161 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               
               const SizedBox(height: 16),
               
-              // Destination input
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[200]!),
-                ),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Où allez-vous ?',
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                    suffixIcon: Container(
-                      margin: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.directions_car,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+              // Destination input with suggestions
+              Column(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[200]!),
                     ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                    child: TextField(
+                      controller: _destinationController,
+                      focusNode: _destinationFocusNode,
+                      decoration: InputDecoration(
+                        hintText: 'Où allez-vous ?',
+                        prefixIcon: _isSearching 
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : const Icon(Icons.search, color: Colors.grey),
+                        suffixIcon: Container(
+                          margin: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.directions_car,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  
+                  // Address suggestions
+                  if (_addressSuggestions.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[200]!),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        itemCount: _addressSuggestions.length,
+                        separatorBuilder: (context, index) => Divider(
+                          height: 1,
+                          color: Colors.grey[200]!,
+                        ),
+                        itemBuilder: (context, index) {
+                          final suggestion = _addressSuggestions[index];
+                          return ListTile(
+                            dense: true,
+                            leading: Icon(
+                              Icons.location_on, 
+                              size: 20,
+                              color: Theme.of(context).primaryColor,
+                            ),
+                            title: Text(
+                              suggestion,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              'Appuyer pour sélectionner',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            onTap: () => _selectDestination(suggestion),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                  
+                  // Route information
+                  if (_showRouteInfo && _estimatedDistance != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.directions,
+                            color: Theme.of(context).primaryColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${_estimatedDistance!.toStringAsFixed(1)} km',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (_estimatedDuration != null)
+                                  Text(
+                                    _estimatedDuration!,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
               ),
               
               const SizedBox(height: 16),
+              
+              // Test button for debugging
+             
+              
+              const SizedBox(height: 8),
               
               // Bouton créer course
               SizedBox(
@@ -378,6 +702,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 
