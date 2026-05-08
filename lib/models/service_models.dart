@@ -206,31 +206,84 @@ class ServiceAssignment {
   });
 
   factory ServiceAssignment.fromJson(Map<String, dynamic> json) {
-    // La réponse est dans {data: {message: "...", data: {...}}}
-    final data = json['data'] as Map<String, dynamic>;
-    final assignmentData = data['data'] as Map<String, dynamic>;
-    
-    print('DEBUG: ServiceAssignment.fromJson - data keys: ${data.keys.toList()}');
-    print('DEBUG: ServiceAssignment.fromJson - assignmentData keys: ${assignmentData.keys.toList()}');
-    print('DEBUG: ServiceAssignment.fromJson - assignmentData: $assignmentData');
-    
-    // Parsing sécurisé avec logs pour chaque champ
     try {
+      // Gérer les deux structures possibles :
+      // 1. Assignement actuel: {data: {message: "...", data: {...}}}
+      // 2. Historique: {data: {id: ..., service: {...}}}
+      final data = json['data'] as Map<String, dynamic>?;
+      if (data == null) {
+        print('DEBUG: ServiceAssignment.fromJson - data est null');
+        throw Exception('data est null');
+      }
+      
+      // Vérifier si les données sont dans data.data (assignement actuel) ou directement dans data (historique)
+      Map<String, dynamic>? assignmentData;
+      
+      if (data.containsKey('data') && data['data'] is Map<String, dynamic>) {
+        // Structure assignement actuel: {data: {data: {...}}}
+        assignmentData = data['data'] as Map<String, dynamic>;
+        print('DEBUG: ServiceAssignment.fromJson - Structure assignement actuel détectée');
+      } else if (data.containsKey('id')) {
+        // Structure historique: {data: {id: ..., service: {...}}}
+        assignmentData = data;
+        print('DEBUG: ServiceAssignment.fromJson - Structure historique détectée');
+      } else {
+        print('DEBUG: ServiceAssignment.fromJson - Structure non reconnue: ${data.keys.toList()}');
+        throw Exception('Structure de réponse non reconnue');
+      }
+      
+      // assignmentData ne peut pas être null ici grâce à la logique ci-dessus
+      
+      print('DEBUG: ServiceAssignment.fromJson - assignmentData keys: ${assignmentData.keys.toList()}');
+      
+      // Parsing sécurisé avec gestion complète des null
       final id = assignmentData['id']?.toString() ?? '';
       final serviceId = assignmentData['service_id']?.toString() ?? '';
-      final serviceName = assignmentData['service_name']?.toString() ?? 'Service inconnu';
+      
+      // Parsing du service avec null safety
+      String serviceName = 'Service inconnu';
+      final service = assignmentData['service'];
+      if (service is Map<String, dynamic>) {
+        serviceName = service['name']?.toString() ?? 'Service inconnu';
+      }
+      
       final driverId = assignmentData['livreur_id']?.toString() ?? '';
       final status = assignmentData['status']?.toString() ?? '';
-      final documentUrl = assignmentData['document_url']?.toString() ?? '';
+      final documentUrl = assignmentData['document_url']?.toString();
       final rejectionReason = assignmentData['rejection_reason']?.toString();
-      final createdAt = DateTime.parse(assignmentData['created_at']?.toString() ?? '');
-      final updatedAt = DateTime.parse(assignmentData['updated_at']?.toString() ?? '');
-      final approvedAt = assignmentData['approved_at'] != null 
-          ? DateTime.parse(assignmentData['approved_at'].toString()) 
-          : null;
-      final rejectedAt = assignmentData['rejected_at'] != null 
-          ? DateTime.parse(assignmentData['rejected_at'].toString()) 
-          : null;
+      
+      // Parsing des dates avec gestion des erreurs
+      DateTime createdAt = DateTime.now();
+      try {
+        createdAt = DateTime.parse(assignmentData['created_at']?.toString() ?? '');
+      } catch (e) {
+        print('DEBUG: ServiceAssignment.fromJson - Erreur parsing created_at: $e');
+      }
+      
+      DateTime updatedAt = DateTime.now();
+      try {
+        updatedAt = DateTime.parse(assignmentData['updated_at']?.toString() ?? '');
+      } catch (e) {
+        print('DEBUG: ServiceAssignment.fromJson - Erreur parsing updated_at: $e');
+      }
+      
+      DateTime? approvedAt;
+      try {
+        if (assignmentData['approved_at'] != null) {
+          approvedAt = DateTime.parse(assignmentData['approved_at'].toString());
+        }
+      } catch (e) {
+        print('DEBUG: ServiceAssignment.fromJson - Erreur parsing approved_at: $e');
+      }
+      
+      DateTime? rejectedAt;
+      try {
+        if (assignmentData['rejected_at'] != null) {
+          rejectedAt = DateTime.parse(assignmentData['rejected_at'].toString());
+        }
+      } catch (e) {
+        print('DEBUG: ServiceAssignment.fromJson - Erreur parsing rejected_at: $e');
+      }
       
       print('DEBUG: ServiceAssignment.fromJson - Tous les champs parsés avec succès');
       
@@ -240,7 +293,7 @@ class ServiceAssignment {
         serviceName: serviceName,
         driverId: driverId,
         status: status,
-        documentUrl: documentUrl.isEmpty ? null : documentUrl,
+        documentUrl: documentUrl?.isEmpty ?? true ? null : documentUrl,
         rejectionReason: rejectionReason,
         createdAt: createdAt,
         updatedAt: updatedAt,
@@ -249,7 +302,7 @@ class ServiceAssignment {
       );
     } catch (e) {
       print('DEBUG: ServiceAssignment.fromJson - Erreur parsing: $e');
-      print('DEBUG: ServiceAssignment.fromJson - assignmentData qui cause l\'erreur: $assignmentData');
+      print('DEBUG: ServiceAssignment.fromJson - json reçu: $json');
       rethrow;
     }
   }

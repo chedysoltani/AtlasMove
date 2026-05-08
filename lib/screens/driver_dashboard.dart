@@ -469,6 +469,17 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 height: 44,
               ),
             ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: CustomButton(
+                text: 'Historique',
+                onPressed: () {
+                  Navigator.pushNamed(context, '/services_assignments');
+                },
+                height: 44,
+                type: ButtonType.secondary,
+              ),
+            ),
           ],
         ),
       ],

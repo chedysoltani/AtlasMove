@@ -200,24 +200,97 @@ class ServiceApi {
     }
   }
 
-  static Future<ServiceAssignment?> getCurrentAssignment({required String token}) async {
+  static Future<List<ServiceAssignment>> getAssignmentsHistory({
+    required String token,
+  }) async {
     try {
-      final uri = Uri.parse('$_baseUrl/services/assignments/me/current');
-
+      final uri = Uri.parse('$_baseUrl/api/v1/services/assignments/me');
+      
+      print('DEBUG: HISTORY - Récupération de l\'historique des assignements');
+      print('DEBUG: HISTORY - URL: $uri');
+      
       final response = await http.get(
         uri,
         headers: _getHeaders(token),
       ).timeout(_timeout);
 
+      print('DEBUG: HISTORY - Response status: ${response.statusCode}');
+      print('DEBUG: HISTORY - Response body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        return ServiceAssignment.fromJson(data);
+        print('DEBUG: HISTORY - Structure de la réponse: ${data.keys.toList()}');
+        
+        // La réponse peut être directement une liste ou dans data.data
+        List<dynamic> assignmentsData;
+        if (data['data'] is List) {
+          assignmentsData = data['data'] as List;
+        } else if (data['data'] is Map && data['data']['data'] is List) {
+          assignmentsData = data['data']['data'] as List;
+        } else {
+          assignmentsData = [];
+        }
+        
+        final assignments = assignmentsData.map((item) {
+          // Créer la structure attendue par ServiceAssignment.fromJson
+          Map<String, dynamic> assignmentData;
+          if (item is Map<String, dynamic>) {
+            assignmentData = {'data': item};
+            print('DEBUG: HISTORY - Parsing assignment: ${item.keys.toList()}');
+          } else {
+            assignmentData = {'data': item};
+            print('DEBUG: HISTORY - Assignment item is not Map: ${item.runtimeType}');
+          }
+          return ServiceAssignment.fromJson(assignmentData);
+        }).toList();
+        
+        print('DEBUG: HISTORY - ${assignments.length} assignements récupérés');
+        return assignments;
+      } else {
+        throw _handleApiError(response);
+      }
+    } catch (e) {
+      print('DEBUG: HISTORY - Erreur: $e');
+      throw _handleException(e);
+    }
+  }
+
+  // API pour l'assignement actuel approuvé
+  static Future<ServiceAssignment?> getCurrentAssignment({
+    required String token,
+  }) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/api/v1/services/assignments/me/current');
+      
+      print('DEBUG: CURRENT - Récupération de l\'assignement actuel');
+      print('DEBUG: CURRENT - URL: $uri');
+      
+      final response = await http.get(
+        uri,
+        headers: _getHeaders(token),
+      ).timeout(_timeout);
+
+      print('DEBUG: CURRENT - Response status: ${response.statusCode}');
+      print('DEBUG: CURRENT - Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final assignment = ServiceAssignment.fromJson(data);
+        print('DEBUG: CURRENT - Assignement actuel trouvé: ${assignment.id}');
+        return assignment;
       } else if (response.statusCode == 404) {
+        // Pas d'assignement actif
+        print('DEBUG: CURRENT - Aucun assignement actif');
         return null;
       } else {
         throw _handleApiError(response);
       }
     } catch (e) {
+      print('DEBUG: CURRENT - Erreur: $e');
+      // Si l'erreur est "No active assignment", retourner null
+      if (e.toString().contains('No active assignment')) {
+        return null;
+      }
       throw _handleException(e);
     }
   }

@@ -552,13 +552,24 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       print('DEBUG: CATALOGUE - Affectation réussie');
 
       if (mounted) {
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(); // Fermer le dialogue
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Demande envoyée avec succès'),
+            content: Text('✅ Assignement enregistré avec succès !\nVotre demande est en attente d\'approbation par l\'administrateur.'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
           ),
         );
+        
+        // Rediriger vers le dashboard après un court délai
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/driver_dashboard',
+              (route) => false,
+            );
+          }
+        });
       }
     } catch (e) {
       print('DEBUG: CATALOGUE - Erreur lors de l\'affectation: $e');
