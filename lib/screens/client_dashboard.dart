@@ -182,10 +182,10 @@ class _ClientDashboardState extends State<ClientDashboard> {
                 children: [
                   _buildActionCard(
                     context,
-                    '📦 Nouvelle course',
-                    'Demander une livraison',
-                    Icons.local_shipping,
-                    () => Navigator.pushNamed(context, '/booking'),
+                    '� Créer une course',
+                    'Réserver un trajet',
+                    Icons.directions_car,
+                    () => Navigator.pushNamed(context, '/create_ride'),
                   ),
                   _buildActionCard(
                     context,
@@ -390,9 +390,9 @@ class _ClientDashboardState extends State<ClientDashboard> {
                 children: [
                   Expanded(
                     child: CustomButton(
-                      text: 'Course',
+                      text: '🚗 Créer une course',
                       onPressed: () {
-                        Navigator.pushNamed(context, '/booking');
+                        Navigator.pushNamed(context, '/create_ride');
                       },
                       height: 48,
                     ),

@@ -28,6 +28,7 @@ import 'providers/auth_provider.dart';
 import 'screens/services_screen.dart';
 import 'screens/services_catalogue_screen.dart';
 import 'screens/services_assignments_screen.dart';
+import 'screens/create_ride_screen.dart';
 
 void main() {
   runApp(const AtlasMoveApp());
@@ -79,6 +80,7 @@ class AtlasMoveApp extends StatelessWidget {
             '/services': (context) => const ServicesScreen(),
             '/services_catalogue': (context) => const ServicesCatalogueScreen(),
             '/services_assignments': (context) => const ServicesAssignmentsScreen(),
+            '/create_ride': (context) => const CreateRideScreen(),
           },
         ),
       ),
