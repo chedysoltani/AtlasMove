@@ -129,6 +129,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   ServiceCategoryWithServices? _selectedCategory;
   Service? _selectedService;
   bool _servicesExpanded = false;
+  bool _serviceSectionExpanded = false;
   final TextEditingController _destinationController = TextEditingController();
   final FocusNode _destinationFocusNode = FocusNode();
   LatLng? _destinationCoordinates;
@@ -139,6 +140,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   bool _showRouteInfo = false;
   Timer? _debounceTimer;
   bool _showRouteEstimation = false;
+  double _sheetHeight = 0.35;
 
   @override
   void initState() {
@@ -341,6 +343,22 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         backgroundColor: _AppColors.green,
       ),
     );
+  }
+
+  void _onServiceSelected() {
+    if (_destinationCoordinates != null && _selectedService != null) {
+      setState(() {
+        _serviceSectionExpanded = true;
+        _sheetHeight = 0.65;
+      });
+    }
+  }
+
+  void _collapseServiceSection() {
+    setState(() {
+      _serviceSectionExpanded = false;
+      _sheetHeight = 0.35;
+    });
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -612,68 +630,103 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   // ── Bottom Sheet ───────────────────────────────────────────────────────────
   Widget _buildBottomSheet() {
     final catalogueAsync = ref.watch(catalogueProvider);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final targetHeight = screenHeight * (_serviceSectionExpanded ? _sheetHeight : 0.35);
 
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
-      child: Container(
-        constraints:
-            BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.65),
-        decoration: const BoxDecoration(
-          color: _AppColors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 24,
-              offset: Offset(0, -6),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Drag handle
-            Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 0),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: _AppColors.gray200,
-                borderRadius: BorderRadius.circular(2),
+      child: GestureDetector(
+        onVerticalDragUpdate: (details) {
+          if (_destinationCoordinates != null && _selectedService != null) {
+            if (details.primaryDelta! < -10) {
+              _onServiceSelected();
+            } else if (details.primaryDelta! > 10 && _serviceSectionExpanded) {
+              _collapseServiceSection();
+            }
+          }
+        },
+        onVerticalDragEnd: (details) {
+          if (_destinationCoordinates != null && _selectedService != null) {
+            if (details.velocity.pixelsPerSecond.dy < -500) {
+              _onServiceSelected();
+            } else if (details.velocity.pixelsPerSecond.dy > 500 && _serviceSectionExpanded) {
+              _collapseServiceSection();
+            }
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          height: targetHeight,
+          decoration: const BoxDecoration(
+            color: _AppColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x1A000000),
+                blurRadius: 24,
+                offset: Offset(0, -6),
               ),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Destination input ──────────────────────────────────
-                    _buildDestinationInput(),
-
-                    // ── Route info inline (after destination selected) ─────
-                    if (_showRouteInfo && _estimatedDistance != null)
-                      _buildRouteInlineBadge(),
-
-                    const SizedBox(height: 14),
-                    const _Divider(),
-                    const SizedBox(height: 14),
-
-                    // ── Service selection ──────────────────────────────────
-                    _buildServiceSelection(catalogueAsync),
-
-                    const SizedBox(height: 14),
-                  ],
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 0),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _serviceSectionExpanded ? _AppColors.accent : _AppColors.gray200,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
+              if (_serviceSectionExpanded && _destinationCoordinates != null && _selectedService != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Glissez vers le bas pour voir le trajet',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _AppColors.gray400,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Destination input ──────────────────────────────────
+                      _buildDestinationInput(),
 
-            // ── CTA Button ─────────────────────────────────────────────────
-            _buildCtaButton(),
-          ],
+                      // ── Route info inline (after destination selected) ─────
+                      if (_showRouteInfo && _estimatedDistance != null)
+                        _buildRouteInlineBadge(),
+
+                      const SizedBox(height: 14),
+                      const _Divider(),
+                      const SizedBox(height: 14),
+
+                      // ── Service selection ──────────────────────────────────
+                      _buildServiceSelection(catalogueAsync),
+
+                      const SizedBox(height: 14),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── CTA Button ─────────────────────────────────────────────────
+              _buildCtaButton(),
+            ],
+          ),
         ),
       ),
     );
@@ -1051,7 +1104,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
     return GestureDetector(
       onTap: service.isActive
-          ? () => setState(() => _selectedService = service)
+          ? () {
+              setState(() => _selectedService = service);
+              _onServiceSelected();
+            }
           : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
