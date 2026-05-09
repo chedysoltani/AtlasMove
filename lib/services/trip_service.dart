@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/trip_models.dart';
 import '../core/network/http_client.dart';
@@ -78,6 +79,73 @@ class TripService {
       );
     } finally {
       debugPrint('=== TripService.createTrip() END ===');
+    }
+  }
+
+  static Future<List<AvailableTrip>> getAvailableTrips({
+    required double latitude,
+    required double longitude,
+    double radiusKm = 20,
+  }) async {
+    debugPrint('=== TripService.getAvailableTrips() START ===');
+    debugPrint('Params: lat=$latitude, lng=$longitude, radius=$radiusKm');
+    
+    try {
+      final queryParams = {
+        'latitude': latitude.toString(),
+        'longitude': longitude.toString(),
+        'radius_km': radiusKm.toString(),
+      };
+      
+      final response = await HttpClient.get('/l/trips/available', queryParams: queryParams);
+      
+      debugPrint('Status Code: ${response.statusCode}');
+      
+      if (response.isSuccess) {
+        // Le backend renvoie probablement le tableau directement ou dans un objet "data"
+        List<dynamic> tripsJson = [];
+        
+        try {
+          final jsonBody = response.json;
+          // Handle format: {"data": {"message": "...", "data": [...]}}
+          if (jsonBody.containsKey('data')) {
+            final innerData = jsonBody['data'];
+            if (innerData is Map && innerData.containsKey('data') && innerData['data'] is List) {
+              tripsJson = innerData['data'] as List;
+            } else if (innerData is List) {
+              tripsJson = innerData;
+            } else {
+              debugPrint('Format de réponse inattendu: data n\'est ni une liste ni un objet contenant une liste');
+            }
+          }
+        } catch (e) {
+          final rawJson = jsonDecode(response.body);
+          if (rawJson is List) {
+            tripsJson = rawJson;
+          }
+        }
+        
+        debugPrint('Nombre de courses trouvées: ${tripsJson.length}');
+        
+        final trips = tripsJson
+            .map((json) => AvailableTrip.fromJson(json as Map<String, dynamic>))
+            .toList();
+            
+        return trips;
+      } else {
+        throw TripException(
+          message: 'Failed to fetch available trips',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      debugPrint('ERREUR fetching available trips: $e');
+      throw TripException(
+        message: e.toString(),
+        statusCode: null,
+      );
+    } finally {
+      debugPrint('=== TripService.getAvailableTrips() END ===');
     }
   }
 }

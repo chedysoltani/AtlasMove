@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
-
-enum RideStatus { pending, accepted, rejected, completed, cancelled }
+import '../services/location_service.dart';
+import '../services/trip_service.dart';
+import '../models/trip_models.dart';
 
 class DriverRidesScreen extends StatefulWidget {
   const DriverRidesScreen({super.key});
@@ -16,11 +18,17 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
     with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  
+  bool _isLoading = true;
+  String? _error;
+  List<AvailableTrip> _trips = [];
+  final LocationService _locationService = LocationService();
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
+    _fetchAvailableTrips();
   }
 
   void _initializeAnimations() {
@@ -31,7 +39,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
 
     _pulseAnimation = Tween<double>(
       begin: 1.0,
-      end: 1.1,
+      end: 1.05,
     ).animate(CurvedAnimation(
       parent: _pulseController,
       curve: Curves.easeInOut,
@@ -44,6 +52,52 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
   void dispose() {
     _pulseController.dispose();
     super.dispose();
+  }
+  
+  Future<void> _fetchAvailableTrips() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      debugPrint('Fetching driver location for trips search...');
+      
+      // Check permissions and get location
+      final serviceEnabled = await _locationService.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw Exception('Le service de localisation est désactivé. Veuillez l\'activer pour rechercher des courses.');
+      }
+
+      final permission = await _locationService.requestLocationPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        throw Exception('La permission de localisation est requise pour trouver des courses à proximité.');
+      }
+
+      final position = await _locationService.getCurrentPosition();
+      if (position == null) {
+        throw Exception('Impossible d\'obtenir votre position actuelle.');
+      }
+
+      debugPrint('Driver location found: ${position.latitude}, ${position.longitude}');
+      
+      final trips = await TripService.getAvailableTrips(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        radiusKm: 20,
+      );
+
+      setState(() {
+        _trips = trips;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching trips: $e');
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -61,6 +115,12 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black),
+            onPressed: _isLoading ? null : _fetchAvailableTrips,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -78,106 +138,145 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                 Container(
                   width: 12,
                   height: 12,
-                  decoration: const BoxDecoration(
-                    color: Colors.green,
+                  decoration: BoxDecoration(
+                    color: _isLoading ? Colors.orange : (_error != null ? Colors.red : Colors.green),
                     shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'En ligne - Recherche de courses...',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                Expanded(
                   child: Text(
-                    '3 disponibles',
+                    _isLoading ? 'Recherche en cours...' : (_error != null ? 'Erreur de recherche' : 'En ligne - Prêt'),
                     style: const TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
+                if (!_isLoading && _error == null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${_trips.length} disponibles',
+                      style: const TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
 
-          // Rides List
+          // Rides List or States
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _buildRideCard(
-                  id: 'RIDE-001',
-                  customerName: 'Mohammed Ali',
-                  pickup: 'Aéroport Mohammed V, Terminal 1',
-                  destination: 'Hôtel Marrakech, Guéliz',
-                  distance: 12.5,
-                  price: 85.00,
-                  type: 'Taxi',
-                  status: RideStatus.pending,
-                  urgency: 'Élevée',
-                ),
-                const SizedBox(height: 16),
-                _buildRideCard(
-                  id: 'RIDE-002',
-                  customerName: 'Fatima Zahra',
-                  pickup: 'Centre Commercial Al Maqam',
-                  destination: 'Rue Agdal, Rabat',
-                  distance: 8.3,
-                  price: 45.50,
-                  type: 'Livraison',
-                  status: RideStatus.pending,
-                  urgency: 'Moyenne',
-                ),
-                const SizedBox(height: 16),
-                _buildRideCard(
-                  id: 'RIDE-003',
-                  customerName: 'Youssef Amine',
-                  pickup: 'Gare Casa Port',
-                  destination: 'Zone Industrielle Aïn Sebaâ',
-                  distance: 15.7,
-                  price: 120.00,
-                  type: 'Camion',
-                  status: RideStatus.pending,
-                  urgency: 'Normale',
-                ),
-              ],
-            ),
+            child: _buildBodyContent(),
           ),
         ],
       ),
     );
   }
+  
+  Widget _buildBodyContent() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: AppTheme.primaryColor,
+        ),
+      );
+    }
+    
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 60),
+              const SizedBox(height: 16),
+              const Text(
+                'Une erreur est survenue',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error!.replaceAll('Exception: ', ''),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              CustomButton(
+                text: 'Réessayer',
+                onPressed: _fetchAvailableTrips,
+                // width: 200, CustomButton doesn't support width parameter directly
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    if (_trips.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.location_off, color: Colors.grey.shade300, size: 80),
+            const SizedBox(height: 16),
+            const Text(
+              'Aucune course disponible à proximité',
+              style: TextStyle(
+                color: Colors.black54,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Nous vous notifierons dès qu\'une\ncourse sera disponible.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return RefreshIndicator(
+      onRefresh: _fetchAvailableTrips,
+      color: AppTheme.primaryColor,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: _trips.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 16),
+        itemBuilder: (context, index) {
+          final trip = _trips[index];
+          return _buildRideCard(trip);
+        },
+      ),
+    );
+  }
 
-  Widget _buildRideCard({
-    required String id,
-    required String customerName,
-    required String pickup,
-    required String destination,
-    required double distance,
-    required double price,
-    required String type,
-    required RideStatus status,
-    required String urgency,
-  }) {
-    final isUrgent = urgency == 'Élevée';
-    final typeColor = _getTypeColor(type);
+  Widget _buildRideCard(AvailableTrip trip) {
+    // Determine urgency mock or logic (for demo, if distance < 2km we say urgent)
+    final distanceToPickup = trip.distanceToPickupKm ?? 0.0;
+    final isUrgent = distanceToPickup < 2.0 && distanceToPickup > 0;
+    final typeColor = _getTypeColor(trip.serviceName);
     
     return AnimatedBuilder(
       animation: _pulseAnimation,
       builder: (context, child) {
         return Transform.scale(
-          scale: status == RideStatus.pending ? _pulseAnimation.value : 1.0,
+          scale: _pulseAnimation.value,
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -217,7 +316,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                             Row(
                               children: [
                                 Text(
-                                  id,
+                                  trip.id.substring(0, 8).toUpperCase(),
                                   style: const TextStyle(
                                     color: Colors.black,
                                     fontSize: 16,
@@ -232,7 +331,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    type,
+                                    trip.serviceName,
                                     style: TextStyle(
                                       color: typeColor,
                                       fontSize: 10,
@@ -249,7 +348,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: const Text(
-                                      'URGENT',
+                                      'PROCHE',
                                       style: TextStyle(
                                         color: Colors.red,
                                         fontSize: 10,
@@ -262,7 +361,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Client: $customerName',
+                              'Client: ${trip.clientName ?? "Inconnu"}',
                               style: const TextStyle(
                                 color: Colors.grey,
                                 fontSize: 12,
@@ -277,7 +376,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            '${price.toStringAsFixed(2)} MAD',
+                            '${trip.estimatedFare.toStringAsFixed(2)} ${trip.currency}',
                             style: const TextStyle(
                               color: AppTheme.primaryColor,
                               fontSize: 18,
@@ -285,7 +384,9 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                             ),
                           ),
                           Text(
-                            '${distance.toStringAsFixed(1)} km',
+                            trip.distanceToPickupKm != null 
+                                ? 'à ${trip.distanceToPickupKm!.toStringAsFixed(1)} km'
+                                : '${trip.estimatedDistanceKm.toStringAsFixed(1)} km',
                             style: const TextStyle(
                               color: Colors.grey,
                               fontSize: 12,
@@ -306,7 +407,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                       _buildLocationRow(
                         Icons.location_on,
                         'Départ',
-                        pickup,
+                        trip.pickupAddress,
                         Colors.green,
                       ),
                       
@@ -316,7 +417,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                       _buildLocationRow(
                         Icons.flag,
                         'Destination',
-                        destination,
+                        trip.destinationAddress,
                         Colors.red,
                       ),
                     ],
@@ -324,36 +425,48 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                 ),
 
                 // Action Buttons
-                if (status == RideStatus.pending)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: CustomButton(
-                            text: 'Refuser',
-                            onPressed: () => _handleRideAction(id, false),
-                            height: 48,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: CustomButton(
-                            text: 'Accepter',
-                            onPressed: () => _handleRideAction(id, true),
-                            height: 48,
-                          ),
-                        ),
-                      ],
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
                     ),
                   ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _handleRideAction(trip.id, false),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          child: const Text(
+                            'Refuser',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: CustomButton(
+                          text: 'Accepter',
+                          onPressed: () => _handleRideAction(trip.id, true),
+                          height: 48,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -406,6 +519,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -427,13 +542,14 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
       case 'yacht':
         return Colors.cyan;
       default:
-        return Colors.grey;
+        return AppTheme.primaryColor;
     }
   }
 
   void _handleRideAction(String rideId, bool accepted) {
+    // Remove the trip from the list locally for now
     setState(() {
-      // TODO: Update ride status
+      _trips.removeWhere((trip) => trip.id == rideId);
     });
 
     if (accepted) {

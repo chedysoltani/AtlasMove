@@ -101,3 +101,73 @@ enum TripStatus {
     );
   }
 }
+
+class AvailableTrip {
+  final String id;
+  final String pickupAddress;
+  final double pickupLatitude;
+  final double pickupLongitude;
+  final String destinationAddress;
+  final double destinationLatitude;
+  final double destinationLongitude;
+  final double estimatedDistanceKm;
+  final double estimatedFare;
+  final String currency;
+  final String status;
+  final String serviceName;
+  final double? distanceToPickupKm; // The distance_km computed by SQL
+  final String? clientName; // May be null if backend doesn't join client
+  
+  AvailableTrip({
+    required this.id,
+    required this.pickupAddress,
+    required this.pickupLatitude,
+    required this.pickupLongitude,
+    required this.destinationAddress,
+    required this.destinationLatitude,
+    required this.destinationLongitude,
+    required this.estimatedDistanceKm,
+    required this.estimatedFare,
+    required this.currency,
+    required this.status,
+    required this.serviceName,
+    this.distanceToPickupKm,
+    this.clientName,
+  });
+
+  factory AvailableTrip.fromJson(Map<String, dynamic> json) {
+    // Parser le service
+    String serviceName = 'Inconnu';
+    if (json['service'] != null && json['service']['name'] != null) {
+      serviceName = json['service']['name'].toString();
+    }
+
+    // Tenter de récupérer le nom du client si le backend l'a inclus
+    String? clientName;
+    if (json['client'] != null) {
+      final firstName = json['client']['first_name']?.toString() ?? '';
+      final lastName = json['client']['last_name']?.toString() ?? '';
+      if (firstName.isNotEmpty || lastName.isNotEmpty) {
+        clientName = '$firstName $lastName'.trim();
+      }
+    }
+
+    return AvailableTrip(
+      id: json['id']?.toString() ?? '',
+      pickupAddress: json['pickup_address']?.toString() ?? 'Adresse inconnue',
+      pickupLatitude: double.tryParse(json['pickup_latitude']?.toString() ?? '0') ?? 0.0,
+      pickupLongitude: double.tryParse(json['pickup_longitude']?.toString() ?? '0') ?? 0.0,
+      destinationAddress: json['destination_address']?.toString() ?? 'Adresse inconnue',
+      destinationLatitude: double.tryParse(json['destination_latitude']?.toString() ?? '0') ?? 0.0,
+      destinationLongitude: double.tryParse(json['destination_longitude']?.toString() ?? '0') ?? 0.0,
+      estimatedDistanceKm: double.tryParse(json['estimated_distance_km']?.toString() ?? '0') ?? 0.0,
+      estimatedFare: double.tryParse(json['estimated_fare']?.toString() ?? '0') ?? 0.0,
+      currency: json['currency']?.toString() ?? 'TND',
+      status: json['status']?.toString() ?? 'pending',
+      serviceName: serviceName,
+      distanceToPickupKm: json['distance_km'] != null ? 
+          double.tryParse(json['distance_km'].toString()) : null,
+      clientName: clientName,
+    );
+  }
+}
