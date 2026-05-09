@@ -6,10 +6,12 @@ import 'dart:async';
 import '../providers/map_provider.dart';
 import '../providers/services_provider.dart';
 import '../models/service_models.dart';
+import '../models/trip_models.dart';
 import '../widgets/loading_widget.dart';
 import '../widgets/error_widget.dart';
 import '../services/location_service.dart';
 import '../services/geocoding_service.dart';
+import '../services/trip_service.dart';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 class _AppColors {
@@ -130,6 +132,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   Service? _selectedService;
   bool _servicesExpanded = false;
   bool _serviceSectionExpanded = false;
+  bool _isCreatingTrip = false;
+  TripResponse? _tripResponse;
+  String? _tripError;
   final TextEditingController _destinationController = TextEditingController();
   final FocusNode _destinationFocusNode = FocusNode();
   LatLng? _destinationCoordinates;
@@ -327,8 +332,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     mapNotifier.addPolyline(routePolyline);
   }
 
-  void _createRide() {
+  void _createRide() async {
+    // LOG: Début de la fonction
+    debugPrint('=== _createRide() START ===');
+    
+    // LOG: Vérification du service
+    debugPrint('Service sélectionné: ${_selectedService?.name ?? 'NULL'}');
     if (_selectedService == null) {
+      debugPrint('ERREUR: Aucun service sélectionné');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Veuillez sélectionner un service'),
@@ -337,12 +348,121 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Course créée avec le service: ${_selectedService!.name}'),
-        backgroundColor: _AppColors.green,
-      ),
-    );
+    
+    // LOG: Vérification de la destination
+    debugPrint('Destination - Coordonnées: ${_destinationCoordinates?.toString() ?? 'NULL'}');
+    debugPrint('Destination - Distance: ${_estimatedDistance ?? 'NULL'}');
+    debugPrint('Destination - Durée: ${_estimatedDuration ?? 'NULL'}');
+    debugPrint('Destination - Adresse: "${_destinationController.text}"');
+    
+    if (_destinationCoordinates == null || _estimatedDistance == null || _estimatedDuration == null) {
+      debugPrint('ERREUR: Destination incomplète');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez sélectionner une destination'),
+          backgroundColor: _AppColors.red,
+        ),
+      );
+      return;
+    }
+
+    final mapState = ref.read(mapProvider);
+    debugPrint('Position actuelle: ${mapState.currentPosition?.toString() ?? 'NULL'}');
+    
+    if (mapState.currentPosition == null) {
+      debugPrint('ERREUR: Position actuelle non disponible');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Position actuelle non disponible'),
+          backgroundColor: _AppColors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isCreatingTrip = true;
+      _tripError = null;
+    });
+
+    try {
+      // LOG: Préparation des données pour l'API
+      final tripData = {
+        'serviceId': _selectedService!.id,
+        'pickupAddress': 'Position actuelle',
+        'pickupLatitude': mapState.currentPosition!.latitude,
+        'pickupLongitude': mapState.currentPosition!.longitude,
+        'destinationAddress': _destinationController.text,
+        'destinationLatitude': _destinationCoordinates!.latitude,
+        'destinationLongitude': _destinationCoordinates!.longitude,
+        'estimatedDistanceKm': _estimatedDistance!,
+        'estimatedDurationMin': _parseDurationToMinutes(_estimatedDuration!),
+      };
+      
+      debugPrint('Données envoyées à l\'API: $tripData');
+      debugPrint('Appel de TripService.createTrip...');
+      
+      final response = await TripService.createTrip(
+        serviceId: _selectedService!.id,
+        pickupAddress: 'Position actuelle',
+        pickupLatitude: mapState.currentPosition!.latitude,
+        pickupLongitude: mapState.currentPosition!.longitude,
+        destinationAddress: _destinationController.text,
+        destinationLatitude: _destinationCoordinates!.latitude,
+        destinationLongitude: _destinationCoordinates!.longitude,
+        estimatedDistanceKm: _estimatedDistance!,
+        estimatedDurationMin: _parseDurationToMinutes(_estimatedDuration!),
+      );
+
+      debugPrint('Réponse API reçue: ${response.toString()}');
+      debugPrint('Message API: ${response.message}');
+      debugPrint('Trip ID: ${response.data?.id}');
+
+      if (mounted) {
+        setState(() {
+          _tripResponse = response;
+          _isCreatingTrip = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.message),
+            backgroundColor: _AppColors.green,
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('ERREUR lors de la création de course: $e');
+      debugPrint('Stack trace: $stackTrace');
+      debugPrint('Type d\'erreur: ${e.runtimeType}');
+      
+      if (mounted) {
+        setState(() {
+          _tripError = e.toString();
+          _isCreatingTrip = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: _AppColors.red,
+          ),
+        );
+      }
+    }
+    
+    debugPrint('=== _createRide() END ===');
+  }
+
+  int _parseDurationToMinutes(String duration) {
+    if (duration.contains('h')) {
+      final parts = duration.split('h');
+      final hours = int.parse(parts[0].trim());
+      final minutes = parts.length > 1 ? int.parse(parts[1].replaceAll('min', '').trim()) : 0;
+      return hours * 60 + minutes;
+    } else {
+      return int.parse(duration.replaceAll('min', '').trim());
+    }
   }
 
   void _onServiceSelected() {
@@ -629,6 +749,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
   // ── Bottom Sheet ───────────────────────────────────────────────────────────
   Widget _buildBottomSheet() {
+    if (_tripResponse?.data != null) {
+      return _buildTripWaitingCard();
+    }
+    
     final catalogueAsync = ref.watch(catalogueProvider);
     final screenHeight = MediaQuery.of(context).size.height;
     final targetHeight = screenHeight * (_serviceSectionExpanded ? _sheetHeight : 0.35);
@@ -732,7 +856,351 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     );
   }
 
-  // ── Destination Input ──────────────────────────────────────────────────────
+  // ── Trip Waiting Card ─────────────────────────────────────────────────────
+  Widget _buildTripWaitingCard() {
+    final tripData = _tripResponse!.data!;
+    
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        margin: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+        decoration: const BoxDecoration(
+          color: _AppColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x1A000000),
+              blurRadius: 24,
+              offset: Offset(0, -6),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Success header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: const BoxDecoration(
+                color: _AppColors.green,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      color: _AppColors.green,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Course créée avec succès',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'En attente d\'un livreur',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Trip details
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Fare section
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _AppColors.accentLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Tarif estimé',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _AppColors.gray600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '${tripData.estimatedFare.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                                color: _AppColors.accentMid,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              tripData.currency,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _AppColors.accentMid,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Trip info
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildTripInfoItem(
+                          icon: Icons.route_rounded,
+                          label: 'Distance',
+                          value: '${_estimatedDistance?.toStringAsFixed(1)} km',
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildTripInfoItem(
+                          icon: Icons.access_time_rounded,
+                          label: 'Durée',
+                          value: _estimatedDuration ?? '-',
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Status
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(tripData.status).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _getStatusColor(tripData.status),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(tripData.status),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _getStatusText(tripData.status),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _getStatusColor(tripData.status),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (tripData.estimatedArrivalMinutes != null)
+                          Text(
+                            '~${tripData.estimatedArrivalMinutes} min',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: _AppColors.gray600,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Action buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            // TODO: Implement cancel trip
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Annulation en cours...')),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            side: const BorderSide(color: _AppColors.gray300),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            'Annuler',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: _AppColors.gray600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // TODO: Implement contact driver
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Contact en cours...')),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _AppColors.accent,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            'Suivre',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                )],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildTripInfoItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _AppColors.gray50,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color: _AppColors.accent,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: _AppColors.gray400,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: _AppColors.gray900,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return _AppColors.gray400;
+      case 'searching':
+        return _AppColors.accent;
+      case 'accepted':
+        return _AppColors.green;
+      case 'arriving':
+        return Colors.orange;
+      case 'in_progress':
+        return _AppColors.accentMid;
+      case 'completed':
+        return _AppColors.green;
+      case 'cancelled':
+        return _AppColors.red;
+      default:
+        return _AppColors.gray400;
+    }
+  }
+  
+  String _getStatusText(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'En attente';
+      case 'searching':
+        return 'Recherche de livreur';
+      case 'accepted':
+        return 'Course acceptée';
+      case 'arriving':
+        return 'Livreur en route';
+      case 'in_progress':
+        return 'Course en cours';
+      case 'completed':
+        return 'Course terminée';
+      case 'cancelled':
+        return 'Course annulée';
+      default:
+        return 'En attente';
+    }
+  }
   Widget _buildDestinationInput() {
     return Column(
       children: [
@@ -1192,19 +1660,23 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   // ── CTA Button ─────────────────────────────────────────────────────────────
   Widget _buildCtaButton() {
     final hasService = _selectedService != null;
+    final canCreate = hasService && 
+        _destinationCoordinates != null && 
+        _estimatedDistance != null && 
+        _estimatedDuration != null;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
           16, 10, 16, MediaQuery.of(context).padding.bottom + 16),
       child: GestureDetector(
-        onTap: hasService ? _createRide : null,
+        onTap: canCreate && !_isCreatingTrip ? _createRide : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           height: 50,
           decoration: BoxDecoration(
-            color: hasService ? _AppColors.accent : _AppColors.gray100,
+            color: canCreate && !_isCreatingTrip ? _AppColors.accent : _AppColors.gray100,
             borderRadius: BorderRadius.circular(13),
-            boxShadow: hasService
+            boxShadow: canCreate && !_isCreatingTrip
                 ? const [
                     BoxShadow(
                       color: _AppColors.accentShadow,
@@ -1217,17 +1689,29 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.directions_car_rounded,
-                size: 18,
-                color: hasService ? _AppColors.white : _AppColors.gray400,
-              ),
+              if (_isCreatingTrip)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(_AppColors.white),
+                  ),
+                )
+              else
+                Icon(
+                  Icons.directions_car_rounded,
+                  size: 18,
+                  color: canCreate ? _AppColors.white : _AppColors.gray400,
+                ),
               const SizedBox(width: 9),
               Text(
-                hasService
-                    ? 'Créer la course — ${_selectedService!.name}'
-                    : 'Sélectionnez un service',
-                style: hasService
+                _isCreatingTrip
+                    ? 'Création en cours...'
+                    : canCreate
+                        ? 'Créer la course — ${_selectedService!.name}'
+                        : 'Sélectionnez un service',
+                style: (canCreate && !_isCreatingTrip)
                     ? _AppTextStyles.ctaLabel
                     : _AppTextStyles.ctaLabelDisabled,
               ),
