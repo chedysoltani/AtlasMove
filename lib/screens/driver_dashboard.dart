@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 import '../providers/auth_provider.dart';
+import '../services/location_tracking_service.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -14,6 +15,7 @@ class DriverDashboard extends StatefulWidget {
 
 class _DriverDashboardState extends State<DriverDashboard> {
   bool _isOnline = false;
+  final LocationTrackingService _locationTrackingService = LocationTrackingService();
   
   // Statistics
   final int _totalRides = 156;
@@ -24,12 +26,85 @@ class _DriverDashboardState extends State<DriverDashboard> {
   @override
   void initState() {
     super.initState();
-    // Debug: Vérifier le token du livreur
+    // Initialize location tracking after frame is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      print('DEBUG: Token livreur = ${authProvider.token}');
-      print('DEBUG: User livreur = ${authProvider.currentUser?.fullName}');
+      _initializeLocationTracking();
     });
+  }
+
+  @override
+  void dispose() {
+    _locationTrackingService.dispose();
+    super.dispose();
+  }
+
+  /// Initialize location tracking with authentication token
+  Future<void> _initializeLocationTracking() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.token;
+      
+      print('DEBUG: Token livreur = ${token}');
+      print('DEBUG: User livreur = ${authProvider.currentUser?.fullName}');
+
+      if (token == null || token.isEmpty) {
+        print('DEBUG: No authentication token available');
+        _showErrorSnackBar('Erreur: Token d\'authentification non disponible');
+        return;
+      }
+
+      // Check if location service is available
+      final isLocationAvailable = await _locationTrackingService.isLocationServiceAvailable();
+      if (!isLocationAvailable) {
+        print('DEBUG: Location service not available');
+        _showErrorSnackBar('Veuillez activer les services de localisation');
+        return;
+      }
+
+      // Send current location immediately
+      final success = await _locationTrackingService.sendCurrentLocation(token);
+      if (success) {
+        print('DEBUG: Initial location sent successfully');
+        _showSuccessSnackBar('Localisation envoyée avec succès');
+      } else {
+        print('DEBUG: Failed to send initial location');
+        _showErrorSnackBar('Erreur lors de l\'envoi de la localisation');
+      }
+
+      // Start continuous tracking
+      await _locationTrackingService.startLocationTracking(token);
+      
+    } catch (e) {
+      print('DEBUG: Error initializing location tracking: $e');
+      _showErrorSnackBar('Erreur d\'initialisation de la localisation: ${e.toString()}');
+    }
+  }
+
+  /// Show success message
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  /// Show error message
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () {},
+        ),
+      ),
+    );
   }
 
   @override
@@ -85,6 +160,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 
   Widget _buildStatusCard() {
+    final isLocationTracking = _locationTrackingService.isTracking;
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -151,6 +228,35 @@ class _DriverDashboardState extends State<DriverDashboard> {
                 ),
               ),
             ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Location tracking status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isLocationTracking ? Icons.location_on : Icons.location_off,
+                  color: Colors.white,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isLocationTracking ? 'Localisation active' : 'Localisation inactive',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
           
           const SizedBox(height: 16),
@@ -482,8 +588,45 @@ class _DriverDashboardState extends State<DriverDashboard> {
             ),
           ],
         ),
+        
+        const SizedBox(height: 12),
+        
+        // Location refresh button
+        CustomButton(
+          text: '🔄 Actualiser la localisation',
+          onPressed: _refreshLocation,
+          height: 44,
+          type: ButtonType.secondary,
+        ),
       ],
     );
+  }
+
+  /// Refresh location manually
+  Future<void> _refreshLocation() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = authProvider.token;
+      
+      if (token == null || token.isEmpty) {
+        _showErrorSnackBar('Erreur: Token d\'authentification non disponible');
+        return;
+      }
+
+      print('DEBUG: Manual location refresh requested');
+      
+      final success = await _locationTrackingService.sendCurrentLocation(token);
+      if (success) {
+        print('DEBUG: Manual location refresh successful');
+        _showSuccessSnackBar('Localisation actualisée avec succès');
+      } else {
+        print('DEBUG: Manual location refresh failed');
+        _showErrorSnackBar('Erreur lors de l\'actualisation de la localisation');
+      }
+    } catch (e) {
+      print('DEBUG: Error in manual location refresh: $e');
+      _showErrorSnackBar('Erreur: ${e.toString()}');
+    }
   }
 
   void _showStatusChangeMessage() {
