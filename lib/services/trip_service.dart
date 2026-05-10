@@ -170,6 +170,84 @@ class TripService {
       debugPrint('=== TripService.acceptTrip() END ===');
     }
   }
+  static Future<AvailableTrip?> getActiveTrip() async {
+    debugPrint('=== TripService.getActiveTrip() START ===');
+    try {
+      final response = await HttpClient.get('/l/trips/active');
+      
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      
+      if (response.isSuccess) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        
+        // La structure de l'API peut retourner null ou un message 404
+        if (responseData['data'] == null) return null;
+        
+        return AvailableTrip.fromJson(responseData['data']);
+      } else if (response.statusCode == 404) {
+        // Pas de course active
+        return null;
+      } else {
+        debugPrint('❌ Failed to get active trip. Status: ${response.statusCode}');
+        throw Exception('Failed to fetch active trip');
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur lors de la récupération de la course active: $e');
+      // Pour les erreurs de connexion, on peut retourner null pour ne pas bloquer l'appli
+      // mais on devrait idéalement différencier entre pas de course (404) et pas d'internet.
+      return null;
+    } finally {
+      debugPrint('=== TripService.getActiveTrip() END ===');
+    }
+  }
+
+  static Future<void> updateTripStatus(String tripId, String status) async {
+    debugPrint('=== TripService.updateTripStatus() START ===');
+    debugPrint('Trip ID: $tripId, Status: $status');
+
+    try {
+      final response = await HttpClient.patch(
+        '/l/trips/$tripId/status',
+        body: {'status': status},
+      );
+
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      
+      if (!response.isSuccess) {
+        debugPrint('❌ Failed to update trip status. Status: ${response.statusCode}');
+        throw Exception('Failed to update trip status');
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur lors de la mise à jour du statut: $e');
+      throw Exception('Erreur de connexion lors de la mise à jour du statut');
+    } finally {
+      debugPrint('=== TripService.updateTripStatus() END ===');
+    }
+  }
+
+  static Future<void> cancelTrip(String tripId, String reason) async {
+    debugPrint('=== TripService.cancelTrip() START ===');
+    debugPrint('Trip ID: $tripId, Reason: $reason');
+
+    try {
+      final response = await HttpClient.patch(
+        '/l/trips/$tripId/cancel',
+        body: {'reason': reason},
+      );
+
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      
+      if (!response.isSuccess) {
+        debugPrint('❌ Failed to cancel trip. Status: ${response.statusCode}');
+        throw Exception('Failed to cancel trip');
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur lors de l\'annulation de la course: $e');
+      throw Exception('Erreur de connexion lors de l\'annulation');
+    } finally {
+      debugPrint('=== TripService.cancelTrip() END ===');
+    }
+  }
 }
 
 class TripException implements Exception {

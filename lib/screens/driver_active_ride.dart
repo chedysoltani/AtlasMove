@@ -10,6 +10,7 @@ import '../widgets/error_widget.dart';
 import '../models/trip_models.dart';
 import '../providers/map_provider.dart';
 import '../services/location_service.dart';
+import '../services/trip_service.dart';
 
 enum RidePhase { arriving, started, completed }
 
@@ -23,7 +24,7 @@ class DriverActiveRideScreen extends ConsumerStatefulWidget {
 }
 
 class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen> {
-  RidePhase _currentPhase = RidePhase.arriving;
+  late RidePhase _currentPhase;
   bool _isMapReady = false;
   double _currentDistance = 0.0;
   String _estimatedTime = 'Calcul...';
@@ -31,6 +32,15 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   @override
   void initState() {
     super.initState();
+    // Initialize phase based on existing trip status
+    if (widget.trip.status == 'in_progress') {
+      _currentPhase = RidePhase.started;
+    } else if (widget.trip.status == 'completed') {
+      _currentPhase = RidePhase.completed;
+    } else {
+      _currentPhase = RidePhase.arriving;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(mapProvider.notifier).initializeMap();
     });
@@ -67,9 +77,10 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
   void _updateRouteDetails(LatLng currentPos) {
     // Depending on the phase, destination point changes
-    final targetLatLng = _currentPhase == RidePhase.arriving
-        ? LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude)
-        : LatLng(widget.trip.destinationLatitude, widget.trip.destinationLongitude);
+    // Only switch to destination when we actually start the trip towards the client (completed phase visually)
+    final targetLatLng = _currentPhase == RidePhase.completed
+        ? LatLng(widget.trip.destinationLatitude, widget.trip.destinationLongitude)
+        : LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude);
 
     final distance = _calculateDistance(currentPos, targetLatLng);
     
@@ -79,9 +90,9 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     final targetMarker = Marker(
       markerId: MarkerId('target'),
       position: targetLatLng,
-      infoWindow: InfoWindow(title: _currentPhase == RidePhase.arriving ? 'Client' : 'Destination'),
+      infoWindow: InfoWindow(title: _currentPhase == RidePhase.completed ? 'Destination' : 'Client'),
       icon: BitmapDescriptor.defaultMarkerWithHue(
-        _currentPhase == RidePhase.arriving ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed
+        _currentPhase == RidePhase.completed ? BitmapDescriptor.hueRed : BitmapDescriptor.hueGreen
       ),
     );
 
@@ -275,8 +286,62 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
               },
               icon: const Icon(Icons.phone, color: Colors.green),
             ),
+          // Cancel Button
+          IconButton(
+            onPressed: () => _showCancelDialog(),
+            icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+          ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showCancelDialog() async {
+    final TextEditingController reasonController = TextEditingController();
+    
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Annuler la course'),
+          content: TextField(
+            controller: reasonController,
+            decoration: const InputDecoration(
+              hintText: 'Raison de l\'annulation',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Retour', style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (reasonController.text.trim().isEmpty) return;
+                
+                Navigator.pop(context); // Close dialog
+                
+                try {
+                  await TripService.cancelTrip(widget.trip.id, reasonController.text);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Course annulée.'), backgroundColor: Colors.orange),
+                    );
+                    Navigator.pop(context); // Go back to dashboard
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              },
+              child: const Text('Confirmer', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -493,19 +558,15 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
     switch (_currentPhase) {
       case RidePhase.arriving:
-        buttonText = 'Je suis arrivé';
+        buttonText = 'Je suis en route';
         onPressed = () {
-           _updatePhase(RidePhase.started);
-           final mapState = ref.read(mapProvider);
-           if (mapState.currentPosition != null) {
-              _updateRouteDetails(mapState.currentPosition!);
-           }
+           _updatePhase(RidePhase.started, 'livreur_en_route');
         };
         break;
       case RidePhase.started:
         buttonText = 'Démarrer la course';
         onPressed = () {
-           _updatePhase(RidePhase.completed);
+           _updatePhase(RidePhase.completed, 'in_progress'); 
         };
         break;
       case RidePhase.completed:
@@ -521,27 +582,75 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     );
   }
 
-  void _updatePhase(RidePhase newPhase) {
+  Future<void> _updatePhase(RidePhase newPhase, String apiStatus) async {
+    final oldPhase = _currentPhase;
+    
+    // Optimistic Update
     setState(() {
       _currentPhase = newPhase;
     });
-
+    
     HapticFeedback.mediumImpact();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_getPhaseMessage(newPhase)),
-        backgroundColor: AppTheme.primaryColor,
-      ),
-    );
+    // Optimistically update map if moving to next phase
+    if (newPhase == RidePhase.completed) {
+       final mapState = ref.read(mapProvider);
+       if (mapState.currentPosition != null) {
+          _updateRouteDetails(mapState.currentPosition!);
+       }
+    }
+
+    try {
+      await TripService.updateTripStatus(widget.trip.id, apiStatus);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_getPhaseMessage(newPhase)),
+            backgroundColor: AppTheme.primaryColor,
+          ),
+        );
+      }
+    } catch (e) {
+      // Revert on failure
+      if (mounted) {
+        setState(() {
+          _currentPhase = oldPhase;
+        });
+        
+        // Revert map if needed
+        if (oldPhase == RidePhase.started) {
+           final mapState = ref.read(mapProvider);
+           if (mapState.currentPosition != null) {
+              _updateRouteDetails(mapState.currentPosition!);
+           }
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur réseau. Action annulée.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
-  void _completeRide() {
-    // Navigate to ride completion screen or go back
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-       const SnackBar(content: Text('Course terminée avec succès !'))
-    );
+  Future<void> _completeRide() async {
+    try {
+      await TripService.updateTripStatus(widget.trip.id, 'completed');
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(content: Text('Course terminée avec succès !'), backgroundColor: Colors.green)
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(content: Text('Erreur: impossible de terminer.'), backgroundColor: Colors.red)
+        );
+      }
+    }
   }
 
   String _getPhaseMessage(RidePhase phase) {

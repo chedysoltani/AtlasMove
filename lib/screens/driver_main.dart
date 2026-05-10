@@ -6,6 +6,8 @@ import 'driver_rides.dart';
 import 'driver_active_ride.dart';
 import 'driver_earnings.dart';
 import 'driver_profile.dart';
+import '../services/trip_service.dart';
+import '../models/trip_models.dart';
 
 class DriverMainScreen extends StatefulWidget {
   const DriverMainScreen({super.key});
@@ -14,8 +16,10 @@ class DriverMainScreen extends StatefulWidget {
   State<DriverMainScreen> createState() => _DriverMainScreenState();
 }
 
-class _DriverMainScreenState extends State<DriverMainScreen> {
+class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
+  bool _isCheckingActiveTrip = false;
+  bool _isActiveTripScreenOpen = false;
   
   final List<Widget> _pages = [
     const DriverDashboard(),
@@ -25,12 +29,78 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Check for active trip when screen is first loaded
+    // TEMPORARILY DISABLED: uncomment to enable active trip checking on startup
+    // _checkActiveTrip();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // TEMPORARILY DISABLED: uncomment to enable active trip checking on resume
+      // _checkActiveTrip();
+    }
+  }
+
+  Future<void> _checkActiveTrip() async {
+    if (_isCheckingActiveTrip || _isActiveTripScreenOpen) return;
+    
+    setState(() => _isCheckingActiveTrip = true);
+    
+    try {
+      final AvailableTrip? activeTrip = await TripService.getActiveTrip();
+      
+      if (activeTrip != null && mounted) {
+        _isActiveTripScreenOpen = true;
+        
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DriverActiveRideScreen(trip: activeTrip),
+          ),
+        );
+        
+        // When we return from the active ride screen, reset the flag
+        if (mounted) {
+          _isActiveTripScreenOpen = false;
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to check active trip: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingActiveTrip = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _currentIndex,
+            children: _pages,
+          ),
+          if (_isCheckingActiveTrip)
+            Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+        ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
