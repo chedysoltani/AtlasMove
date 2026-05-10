@@ -430,6 +430,20 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             backgroundColor: _AppColors.green,
           ),
         );
+
+        // Naviguer vers l'écran de paiement
+        if (response.data != null) {
+          Navigator.pushNamed(
+            context,
+            '/trip_payment',
+            arguments: {
+              'tripData': response.data!,
+              'serviceName': _selectedService!.name,
+              'pickupAddress': 'Position actuelle',
+              'destinationAddress': _destinationController.text,
+            },
+          );
+        }
       }
     } catch (e, stackTrace) {
       debugPrint('ERREUR lors de la création de course: $e');

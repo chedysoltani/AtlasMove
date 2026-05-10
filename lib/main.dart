@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart' as provider;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'utils/app_theme.dart';
 import 'screens/landing_screen.dart';
@@ -30,8 +32,19 @@ import 'screens/services_screen.dart';
 import 'screens/services_catalogue_screen.dart';
 import 'screens/services_assignments_screen.dart';
 import 'screens/create_ride_screen.dart';
+import 'screens/trip_payment_screen.dart';
+import 'models/trip_models.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Charger les variables d'environnement
+  await dotenv.load(fileName: ".env");
+  
+  // Initialiser Stripe
+  Stripe.publishableKey = dotenv.env['STRIPE_PUBLISHABLE_KEY'] ?? '';
+  await Stripe.instance.applySettings();
+  
   runApp(const AtlasMoveApp());
 }
 
@@ -82,6 +95,15 @@ class AtlasMoveApp extends StatelessWidget {
             '/services_catalogue': (context) => const ServicesCatalogueScreen(),
             '/services_assignments': (context) => const ServicesAssignmentsScreen(),
             '/create_ride': (context) => const CreateRideScreen(),
+            '/trip_payment': (context) {
+              final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>;
+              return TripPaymentScreen(
+                tripData: args['tripData'] as TripData,
+                serviceName: args['serviceName'] as String,
+                pickupAddress: args['pickupAddress'] as String,
+                destinationAddress: args['destinationAddress'] as String,
+              );
+            },
           },
         ),
       ),
