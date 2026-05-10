@@ -72,7 +72,6 @@ class AtlasMoveApp extends StatelessWidget {
             '/driver_main': (context) => const DriverMainScreen(),
             '/driver_dashboard': (context) => const DriverDashboard(),
             '/driver_rides': (context) => const DriverRidesScreen(),
-            '/driver_active_ride': (context) => const DriverActiveRideScreen(),
             '/driver_earnings': (context) => const DriverEarningsScreen(),
             '/driver_profile': (context) => const DriverProfileScreen(),
             '/driver_register': (context) => const DriverRegisterScreen(),

@@ -98,6 +98,22 @@ class HttpClient {
     );
   }
 
+  /// PATCH Request
+  static Future<HttpResponse> patch(
+    String endpoint, {
+    Map<String, String>? headers,
+    Map<String, dynamic>? body,
+    Map<String, dynamic>? queryParams,
+  }) async {
+    return _makeRequest(
+      'PATCH',
+      endpoint,
+      headers: headers,
+      body: body,
+      queryParams: queryParams,
+    );
+  }
+
   /// DELETE Request
   static Future<HttpResponse> delete(
     String endpoint, {

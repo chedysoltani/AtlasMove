@@ -148,6 +148,28 @@ class TripService {
       debugPrint('=== TripService.getAvailableTrips() END ===');
     }
   }
+  static Future<void> acceptTrip(String tripId) async {
+    debugPrint('=== TripService.acceptTrip() START ===');
+    debugPrint('Trip ID: $tripId');
+
+    try {
+      final response = await HttpClient.patch('/l/trips/$tripId/accept');
+
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      
+      if (response.isSuccess) {
+        debugPrint('✅ Trip accepted successfully');
+      } else {
+        debugPrint('❌ Failed to accept trip. Status: ${response.statusCode}');
+        throw Exception('Failed to accept trip: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur lors de l\'acceptation de la course: $e');
+      throw Exception('Erreur de connexion lors de l\'acceptation');
+    } finally {
+      debugPrint('=== TripService.acceptTrip() END ===');
+    }
+  }
 }
 
 class TripException implements Exception {

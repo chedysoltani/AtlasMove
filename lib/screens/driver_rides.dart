@@ -6,6 +6,7 @@ import '../widgets/custom_button.dart';
 import '../services/location_service.dart';
 import '../services/trip_service.dart';
 import '../models/trip_models.dart';
+import 'driver_active_ride.dart';
 
 class DriverRidesScreen extends StatefulWidget {
   const DriverRidesScreen({super.key});
@@ -21,6 +22,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
   
   bool _isLoading = true;
   String? _error;
+  String? _acceptingTripId;
   List<AvailableTrip> _trips = [];
   final LocationService _locationService = LocationService();
 
@@ -214,7 +216,6 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
               CustomButton(
                 text: 'Réessayer',
                 onPressed: _fetchAvailableTrips,
-                // width: 200, CustomButton doesn't support width parameter directly
               ),
             ],
           ),
@@ -455,7 +456,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () => _handleRideAction(trip.id, false),
+                          onPressed: () => _handleRideAction(trip, false),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
@@ -475,11 +476,13 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: CustomButton(
-                          text: 'Accepter',
-                          onPressed: () => _handleRideAction(trip.id, true),
-                          height: 48,
-                        ),
+                        child: _acceptingTripId == trip.id 
+                          ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator()))
+                          : CustomButton(
+                              text: 'Accepter',
+                              onPressed: () => _handleRideAction(trip, true),
+                              height: 48,
+                            ),
                       ),
                     ],
                   ),
@@ -546,6 +549,57 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
     );
   }
 
+  Future<void> _handleRideAction(AvailableTrip trip, bool accept) async {
+    if (accept) {
+      setState(() {
+        _acceptingTripId = trip.id;
+      });
+      
+      try {
+        await TripService.acceptTrip(trip.id);
+        
+        if (mounted) {
+          // Remove from list
+          setState(() {
+            _trips.removeWhere((t) => t.id == trip.id);
+            _acceptingTripId = null;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Course acceptée avec succès !'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
+          // Navigate to active ride
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DriverActiveRideScreen(trip: trip),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _acceptingTripId = null;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erreur: Impossible d\'accepter la course'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } else {
+      setState(() {
+        _trips.removeWhere((t) => t.id == trip.id);
+      });
+    }
+  }
+
   Color _getTypeColor(String type) {
     switch (type.toLowerCase()) {
       case 'taxi':
@@ -561,34 +615,5 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
       default:
         return AppTheme.primaryColor;
     }
-  }
-
-  void _handleRideAction(String rideId, bool accepted) {
-    // Remove the trip from the list locally for now
-    setState(() {
-      _trips.removeWhere((trip) => trip.id == rideId);
-    });
-
-    if (accepted) {
-      // Navigate to active ride screen
-      Navigator.pushNamed(context, '/driver_active_ride');
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Course acceptée ! Navigation vers le trajet...'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Course refusée'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-
-    // Play sound effect
-    HapticFeedback.lightImpact();
   }
 }

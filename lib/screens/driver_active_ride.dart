@@ -1,71 +1,138 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/painting.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'dart:math' as math;
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
+import '../widgets/loading_widget.dart';
+import '../widgets/error_widget.dart';
+import '../models/trip_models.dart';
+import '../providers/map_provider.dart';
+import '../services/location_service.dart';
 
 enum RidePhase { arriving, started, completed }
 
-class DriverActiveRideScreen extends StatefulWidget {
-  const DriverActiveRideScreen({super.key});
+class DriverActiveRideScreen extends ConsumerStatefulWidget {
+  final AvailableTrip trip;
+
+  const DriverActiveRideScreen({super.key, required this.trip});
 
   @override
-  State<DriverActiveRideScreen> createState() => _DriverActiveRideScreenState();
+  ConsumerState<DriverActiveRideScreen> createState() => _DriverActiveRideScreenState();
 }
 
-class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
-    with TickerProviderStateMixin {
+class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen> {
   RidePhase _currentPhase = RidePhase.arriving;
-  late AnimationController _progressController;
-  late Animation<double> _progressAnimation;
-
-  // Ride data
-  final String _customerName = 'Mohammed Ali';
-  final String _pickup = 'Aéroport Mohammed V, Terminal 1';
-  final String _destination = 'Hôtel Marrakech, Guéliz';
-  final double _totalDistance = 12.5;
-  final double _currentDistance = 8.2;
-  final double _price = 85.00;
-  final String _estimatedTime = '25 min';
+  bool _isMapReady = false;
+  double _currentDistance = 0.0;
+  String _estimatedTime = 'Calcul...';
 
   @override
   void initState() {
     super.initState();
-    _initializeAnimations();
-  }
-
-  void _initializeAnimations() {
-    _progressController = AnimationController(
-      duration: const Duration(seconds: 1),
-      vsync: this,
-    );
-
-    _progressAnimation = Tween<double>(
-      begin: 0.0,
-      end: (_totalDistance - _currentDistance) / _totalDistance,
-    ).animate(CurvedAnimation(
-      parent: _progressController,
-      curve: Curves.easeInOut,
-    ));
-
-    _progressController.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(mapProvider.notifier).initializeMap();
+    });
   }
 
   @override
   void dispose() {
-    _progressController.dispose();
     super.dispose();
+  }
+
+  double _calculateDistance(LatLng start, LatLng end) {
+    const double earthRadius = 6371;
+    final double lat1Rad = start.latitude * (math.pi / 180);
+    final double lon1Rad = start.longitude * (math.pi / 180);
+    final double lat2Rad = end.latitude * (math.pi / 180);
+    final double lon2Rad = end.longitude * (math.pi / 180);
+    final double dLat = lat2Rad - lat1Rad;
+    final double dLon = lon2Rad - lon1Rad;
+    final double a = math.pow(math.sin(dLat / 2), 2) +
+        math.cos(lat1Rad) *
+            math.cos(lat2Rad) *
+            math.pow(math.sin(dLon / 2), 2);
+    return earthRadius * 2 * math.asin(math.sqrt(a));
+  }
+
+  String _estimateDuration(double distanceKm) {
+    final minutes = (distanceKm / 30 * 60).round();
+    if (minutes < 1) return '< 1 min';
+    if (minutes < 60) return '$minutes min';
+    final hours = minutes ~/ 60;
+    final remaining = minutes % 60;
+    return '${hours}h ${remaining}min';
+  }
+
+  void _updateRouteDetails(LatLng currentPos) {
+    // Depending on the phase, destination point changes
+    final targetLatLng = _currentPhase == RidePhase.arriving
+        ? LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude)
+        : LatLng(widget.trip.destinationLatitude, widget.trip.destinationLongitude);
+
+    final distance = _calculateDistance(currentPos, targetLatLng);
+    
+    // Update polylines and markers via mapProvider
+    final mapNotifier = ref.read(mapProvider.notifier);
+    
+    final targetMarker = Marker(
+      markerId: MarkerId('target'),
+      position: targetLatLng,
+      infoWindow: InfoWindow(title: _currentPhase == RidePhase.arriving ? 'Client' : 'Destination'),
+      icon: BitmapDescriptor.defaultMarkerWithHue(
+        _currentPhase == RidePhase.arriving ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed
+      ),
+    );
+
+    final routePolyline = Polyline(
+      polylineId: const PolylineId('route'),
+      points: [currentPos, targetLatLng],
+      color: AppTheme.primaryColor,
+      width: 5,
+    );
+
+    // We do this post frame to avoid build conflicts if called during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      mapNotifier.clearPolylines();
+      mapNotifier.addMarker(targetMarker);
+      mapNotifier.addPolyline(routePolyline);
+      
+      setState(() {
+        _currentDistance = distance;
+        _estimatedTime = _estimateDuration(distance);
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final mapState = ref.watch(mapProvider);
+
+    // Reactively update route if driver moves
+    ref.listen<MapState>(mapProvider, (previous, next) {
+      if (next.currentPosition != null && _isMapReady) {
+        if (previous?.currentPosition != next.currentPosition || previous?.status != next.status) {
+          _updateRouteDetails(next.currentPosition!);
+        }
+      }
+    });
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
           // Map Background
-          _buildMapBackground(),
+          _buildGoogleMap(mapState),
           
+          if (mapState.status == MapStatus.loading) const MapLoadingWidget(),
+          
+          if (mapState.status == MapStatus.error ||
+              mapState.status == MapStatus.permissionDenied ||
+              mapState.status == MapStatus.locationDisabled)
+            _buildErrorWidget(mapState),
+            
           // Header
           Positioned(
             top: 0,
@@ -74,119 +141,78 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
             child: _buildHeader(),
           ),
           
-          // Bottom Sheet with ride info
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _buildRideInfoSheet(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMapBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.blue.shade50,
-            Colors.blue.shade100,
-            Colors.grey.shade200,
-          ],
-        ),
-      ),
-      child: Stack(
-        children: [
-          // Map Grid Pattern
-          CustomPaint(
-            size: Size.infinite,
-            painter: RouteMapPainter(),
-          ),
-          
-          // Route visualization
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Driver position
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.3),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppTheme.primaryColor, width: 3),
-                  ),
-                  child: const Icon(
-                    Icons.directions_car,
-                    color: AppTheme.primaryColor,
-                    size: 32,
-                  ),
-                ),
-                
-                const SizedBox(height: 40),
-                
-                // Route line
-                Container(
-                  width: 4,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppTheme.primaryColor, Colors.green],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                
-                const SizedBox(height: 40),
-                
-                // Customer position
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.3),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.green, width: 3),
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.green,
-                    size: 28,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
           // Map Controls
-          Positioned(
-            top: 120,
-            right: 20,
-            child: Column(
-              children: [
-                _buildMapControl(Icons.my_location, () {
-                  // TODO: Center on current location
-                }),
-                const SizedBox(height: 8),
-                _buildMapControl(Icons.navigation, () {
-                  // TODO: Start navigation
-                }),
-              ],
+          if (_isMapReady && mapState.status == MapStatus.ready)
+            _buildMapControls(mapState),
+            
+          // Bottom Sheet with ride info
+          if (_isMapReady && mapState.status == MapStatus.ready)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: _buildRideInfoSheet(mapState),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGoogleMap(MapState mapState) {
+    return GoogleMap(
+      initialCameraPosition: mapState.cameraPosition ??
+          CameraPosition(
+            target: LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude), 
+            zoom: 14
+          ),
+      onMapCreated: (GoogleMapController controller) {
+        ref.read(mapProvider.notifier).setMapController(controller);
+        setState(() => _isMapReady = true);
+        if (mapState.currentPosition != null) {
+           _updateRouteDetails(mapState.currentPosition!);
+        }
+      },
+      myLocationEnabled: false, // We use custom marker
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      compassEnabled: true,
+      mapToolbarEnabled: false,
+      markers: mapState.markers,
+      polylines: mapState.polylines,
+      trafficEnabled: false,
+      buildingsEnabled: true,
+      padding: EdgeInsets.only(top: 100, bottom: MediaQuery.of(context).size.height * 0.45),
+    );
+  }
+
+  Widget _buildMapControls(MapState mapState) {
+    return Positioned(
+      top: 120,
+      right: 20,
+      child: Column(
+        children: [
+          _buildMapControl(
+            Icons.my_location, 
+            () => ref.read(mapProvider.notifier).centerOnCurrentPosition(),
+            color: mapState.isFollowingUser ? AppTheme.primaryColor : Colors.black,
+          ),
+          const SizedBox(height: 8),
+          _buildMapControl(
+            mapState.isFollowingUser ? Icons.gps_fixed : Icons.gps_not_fixed,
+            () {
+               ref.read(mapProvider.notifier).toggleFollowingUser();
+               ScaffoldMessenger.of(context).showSnackBar(
+                 SnackBar(content: Text(mapState.isFollowingUser ? 'Suivi GPS désactivé' : 'Suivi GPS activé'))
+               );
+            },
+            color: mapState.isFollowingUser ? AppTheme.primaryColor : Colors.black,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMapControl(IconData icon, VoidCallback onPressed) {
+  Widget _buildMapControl(IconData icon, VoidCallback onPressed, {Color color = Colors.black}) {
     return Container(
       width: 48,
       height: 48,
@@ -203,14 +229,19 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
       ),
       child: IconButton(
         onPressed: onPressed,
-        icon: Icon(icon, color: Colors.black, size: 24),
+        icon: Icon(icon, color: color, size: 24),
       ),
     );
   }
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 16,
+        left: 16,
+        right: 16,
+        bottom: 16,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -237,18 +268,19 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
               ),
             ),
           ),
-          IconButton(
-            onPressed: () {
-              // TODO: Emergency call
-            },
-            icon: const Icon(Icons.phone, color: Colors.red),
-          ),
+          if (widget.trip.clientPhone != null)
+            IconButton(
+              onPressed: () {
+                // TODO: Call intent
+              },
+              icon: const Icon(Icons.phone, color: Colors.green),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildRideInfoSheet() {
+  Widget _buildRideInfoSheet(MapState mapState) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.45,
       decoration: const BoxDecoration(
@@ -257,6 +289,13 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
           topLeft: Radius.circular(24),
           topRight: Radius.circular(24),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 10,
+            offset: Offset(0, -2),
+          ),
+        ],
       ),
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -299,7 +338,7 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _customerName,
+                        widget.trip.clientName ?? "Client Inconnu",
                         style: const TextStyle(
                           color: Colors.black,
                           fontSize: 18,
@@ -307,34 +346,29 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            '4.8 (42 courses)',
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        widget.trip.serviceName,
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                if (widget.trip.clientPhone != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.phone,
+                      color: Colors.green,
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.phone,
-                    color: Colors.green,
-                    size: 20,
-                  ),
-                ),
               ],
             ),
             
@@ -359,14 +393,12 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
   }
 
   Widget _buildRouteProgress() {
-    final progress = (_totalDistance - _currentDistance) / _totalDistance;
-    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Progression du trajet',
-          style: TextStyle(
+        Text(
+          _currentPhase == RidePhase.arriving ? 'Vers le client' : 'Vers la destination',
+          style: const TextStyle(
             color: Colors.black,
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -374,27 +406,6 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
         ),
         
         const SizedBox(height: 12),
-        
-        // Progress Bar
-        Container(
-          height: 8,
-          decoration: BoxDecoration(
-            color: Colors.grey.shade200,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: FractionallySizedBox(
-            alignment: Alignment.centerLeft,
-            widthFactor: progress,
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          ),
-        ),
-        
-        const SizedBox(height: 8),
         
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -412,6 +423,7 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
               style: const TextStyle(
                 color: Colors.grey,
                 fontSize: 14,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -429,18 +441,18 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
       ),
       child: Column(
         children: [
-          _buildInfoRow('Départ', _pickup),
+          _buildInfoRow('Point de départ', widget.trip.pickupAddress),
           const SizedBox(height: 12),
-          _buildInfoRow('Destination', _destination),
+          _buildInfoRow('Destination', widget.trip.destinationAddress),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: _buildInfoRow('Distance', '${_totalDistance.toStringAsFixed(1)} km'),
+                child: _buildInfoRow('Distance totale', '${widget.trip.estimatedDistanceKm.toStringAsFixed(1)} km'),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildInfoRow('Prix', '${_price.toStringAsFixed(2)} MAD'),
+                child: _buildInfoRow('Prix', '${widget.trip.estimatedFare.toStringAsFixed(2)} ${widget.trip.currency}'),
               ),
             ],
           ),
@@ -468,6 +480,8 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -480,11 +494,19 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
     switch (_currentPhase) {
       case RidePhase.arriving:
         buttonText = 'Je suis arrivé';
-        onPressed = () => _updatePhase(RidePhase.started);
+        onPressed = () {
+           _updatePhase(RidePhase.started);
+           final mapState = ref.read(mapProvider);
+           if (mapState.currentPosition != null) {
+              _updateRouteDetails(mapState.currentPosition!);
+           }
+        };
         break;
       case RidePhase.started:
         buttonText = 'Démarrer la course';
-        onPressed = () => _updatePhase(RidePhase.completed);
+        onPressed = () {
+           _updatePhase(RidePhase.completed);
+        };
         break;
       case RidePhase.completed:
         buttonText = 'Terminer la course';
@@ -515,8 +537,11 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
   }
 
   void _completeRide() {
-    // Navigate to ride completion screen
-    Navigator.pushNamed(context, '/driver_ride_complete');
+    // Navigate to ride completion screen or go back
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+       const SnackBar(content: Text('Course terminée avec succès !'))
+    );
   }
 
   String _getPhaseMessage(RidePhase phase) {
@@ -524,59 +549,24 @@ class _DriverActiveRideScreenState extends State<DriverActiveRideScreen>
       case RidePhase.arriving:
         return 'En route vers le client...';
       case RidePhase.started:
-        return 'Course en cours...';
+        return 'Course en cours, en route vers la destination...';
       case RidePhase.completed:
         return 'Course terminée !';
     }
   }
-}
 
-class RouteMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.grey.withOpacity(0.3)
-      ..strokeWidth = 1;
-
-    // Draw grid
-    const gridSize = 50.0;
-    
-    for (double x = 0; x < size.width; x += gridSize) {
-      canvas.drawLine(
-        Offset(x, 0),
-        Offset(x, size.height),
-        paint,
-      );
-    }
-    
-    for (double y = 0; y < size.height; y += gridSize) {
-      canvas.drawLine(
-        Offset(0, y),
-        Offset(size.width, y),
-        paint,
-      );
-    }
-    
-    // Draw roads
-    final roadPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.5)
-      ..strokeWidth = 3;
-    
-    // Main road
-    canvas.drawLine(
-      Offset(0, size.height * 0.5),
-      Offset(size.width, size.height * 0.5),
-      roadPaint,
-    );
-    
-    // Cross road
-    canvas.drawLine(
-      Offset(size.width * 0.5, 0),
-      Offset(size.width * 0.5, size.height),
-      roadPaint,
+  Widget _buildErrorWidget(MapState mapState) {
+    return LocationErrorWidget(
+      message: mapState.errorMessage ?? 'Une erreur est survenue',
+      status: mapState.status,
+      onRetry: () => ref.read(mapProvider.notifier).retry(),
+      onOpenSettings: () {
+        if (mapState.status == MapStatus.permissionDenied) {
+          LocationService().openAppSettings();
+        } else if (mapState.status == MapStatus.locationDisabled) {
+          LocationService().openLocationSettings();
+        }
+      },
     );
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
