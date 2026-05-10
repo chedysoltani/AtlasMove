@@ -9,7 +9,9 @@ import '../models/trip_models.dart';
 import 'driver_active_ride.dart';
 
 class DriverRidesScreen extends StatefulWidget {
-  const DriverRidesScreen({super.key});
+  final VoidCallback? onBackToDashboard;
+  
+  const DriverRidesScreen({super.key, this.onBackToDashboard});
 
   @override
   State<DriverRidesScreen> createState() => _DriverRidesScreenState();
@@ -89,16 +91,20 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
         radiusKm: 20,
       );
 
-      setState(() {
-        _trips = trips;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _trips = trips;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint('Error fetching trips: $e');
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -109,6 +115,16 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        leading: widget.onBackToDashboard != null
+            ? IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios_new, 
+                  color: Colors.black,
+                  size: 24,
+                ),
+                onPressed: widget.onBackToDashboard,
+              )
+            : null,
         title: const Text(
           'Courses disponibles',
           style: TextStyle(

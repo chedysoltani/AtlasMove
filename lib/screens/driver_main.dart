@@ -21,16 +21,23 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
   bool _isCheckingActiveTrip = false;
   bool _isActiveTripScreenOpen = false;
   
-  final List<Widget> _pages = [
-    const DriverDashboard(),
-    const DriverRidesScreen(),
-    const DriverEarningsScreen(),
-    const DriverProfileScreen(),
-  ];
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+    _pages = [
+      const DriverDashboard(),
+      DriverRidesScreen(
+        onBackToDashboard: () {
+          setState(() {
+            _currentIndex = 0;
+          });
+        },
+      ),
+      const DriverEarningsScreen(),
+      const DriverProfileScreen(),
+    ];
     WidgetsBinding.instance.addObserver(this);
     // Check for active trip when screen is first loaded
     // TEMPORARILY DISABLED: uncomment to enable active trip checking on startup

@@ -11,6 +11,7 @@ import '../models/trip_models.dart';
 import '../providers/map_provider.dart';
 import '../services/location_service.dart';
 import '../services/trip_service.dart';
+import '../services/route_service.dart';
 
 enum RidePhase { arriving, started, completed }
 
@@ -28,6 +29,8 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   bool _isMapReady = false;
   double _currentDistance = 0.0;
   String _estimatedTime = 'Calcul...';
+  bool _isFetchingRoute = false;
+  DateTime? _lastRouteFetchTime;
 
   @override
   void initState() {
@@ -75,47 +78,96 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     return '${hours}h ${remaining}min';
   }
 
-  void _updateRouteDetails(LatLng currentPos) {
-    // Depending on the phase, destination point changes
-    // Only switch to destination when we actually start the trip towards the client (completed phase visually)
+  Future<void> _updateRouteDetails(LatLng currentPos) async {
     final targetLatLng = _currentPhase == RidePhase.completed
         ? LatLng(widget.trip.destinationLatitude, widget.trip.destinationLongitude)
         : LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude);
 
-    final distance = _calculateDistance(currentPos, targetLatLng);
-    
-    // Update polylines and markers via mapProvider
-    final mapNotifier = ref.read(mapProvider.notifier);
-    
-    final targetMarker = Marker(
-      markerId: MarkerId('target'),
-      position: targetLatLng,
-      infoWindow: InfoWindow(title: _currentPhase == RidePhase.completed ? 'Destination' : 'Client'),
-      icon: BitmapDescriptor.defaultMarkerWithHue(
-        _currentPhase == RidePhase.completed ? BitmapDescriptor.hueRed : BitmapDescriptor.hueGreen
-      ),
-    );
+    // Throttle route fetching to once every 10 seconds to avoid API spam
+    final now = DateTime.now();
+    if (_isFetchingRoute || 
+        (_lastRouteFetchTime != null && now.difference(_lastRouteFetchTime!).inSeconds < 10)) {
+      return;
+    }
 
-    final routePolyline = Polyline(
-      polylineId: const PolylineId('route'),
-      points: [currentPos, targetLatLng],
-      color: AppTheme.primaryColor,
-      width: 5,
-    );
+    setState(() => _isFetchingRoute = true);
 
-    // We do this post frame to avoid build conflicts if called during build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    try {
+      final routeResult = await RouteService.getRoute(currentPos, targetLatLng);
+      
       if (!mounted) return;
+
+      final mapNotifier = ref.read(mapProvider.notifier);
+      
+      final targetMarker = Marker(
+        markerId: const MarkerId('target'),
+        position: targetLatLng,
+        infoWindow: InfoWindow(title: _currentPhase == RidePhase.completed ? 'Destination' : 'Client'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+          _currentPhase == RidePhase.completed ? BitmapDescriptor.hueRed : BitmapDescriptor.hueGreen
+        ),
+      );
+
+      List<LatLng> points = [currentPos, targetLatLng];
+      double distance = _calculateDistance(currentPos, targetLatLng);
+      String durationStr = _estimateDuration(distance);
+
+      if (routeResult != null) {
+        points = routeResult.points;
+        distance = routeResult.distanceKm;
+        
+        final durationMin = (routeResult.durationSeconds / 60).round();
+        if (durationMin < 1) durationStr = '< 1 min';
+        else if (durationMin < 60) durationStr = '$durationMin min';
+        else {
+          final h = durationMin ~/ 60;
+          final m = durationMin % 60;
+          durationStr = '${h}h ${m}min';
+        }
+      }
+
+      final routePolyline = Polyline(
+        polylineId: const PolylineId('route'),
+        points: points,
+        color: AppTheme.primaryColor,
+        width: 5,
+        jointType: JointType.round,
+        endCap: Cap.roundCap,
+        startCap: Cap.roundCap,
+      );
+
       mapNotifier.clearPolylines();
       mapNotifier.addMarker(targetMarker);
       mapNotifier.addPolyline(routePolyline);
+
+      // Frame bounds to include driver and target
+      if (points.isNotEmpty && mapStateReady(ref.read(mapProvider))) {
+        final bounds = LatLngBounds(
+          southwest: LatLng(
+            math.min(currentPos.latitude, targetLatLng.latitude),
+            math.min(currentPos.longitude, targetLatLng.longitude),
+          ),
+          northeast: LatLng(
+            math.max(currentPos.latitude, targetLatLng.latitude),
+            math.max(currentPos.longitude, targetLatLng.longitude),
+          ),
+        );
+        ref.read(mapProvider).mapController?.animateCamera(
+          CameraUpdate.newLatLngBounds(bounds, 100), // padding
+        );
+      }
       
       setState(() {
         _currentDistance = distance;
-        _estimatedTime = _estimateDuration(distance);
+        _estimatedTime = durationStr;
+        _lastRouteFetchTime = now;
       });
-    });
+    } finally {
+      if (mounted) setState(() => _isFetchingRoute = false);
+    }
   }
+
+  bool mapStateReady(MapState state) => state.status == MapStatus.ready;
 
   @override
   Widget build(BuildContext context) {
@@ -247,51 +299,79 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
   Widget _buildHeader() {
     return Container(
-      padding: EdgeInsets.only(
+      margin: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 16,
         left: 16,
         right: 16,
-        bottom: 16,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
+        borderRadius: BorderRadius.circular(100),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
-          ),
-          Expanded(
-            child: Text(
-              'Course en cours',
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+      child: Material(
+        color: Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                  splashRadius: 24,
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Course Active',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (widget.trip.clientPhone != null)
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    onPressed: () {
+                      // TODO: Call intent
+                    },
+                    icon: Icon(Icons.phone, color: Colors.green.shade700),
+                    splashRadius: 24,
+                  ),
+                ),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  onPressed: () => _showCancelDialog(),
+                  icon: Icon(Icons.close_rounded, color: Colors.red.shade700),
+                  splashRadius: 24,
+                ),
+              ),
+            ],
           ),
-          if (widget.trip.clientPhone != null)
-            IconButton(
-              onPressed: () {
-                // TODO: Call intent
-              },
-              icon: const Icon(Icons.phone, color: Colors.green),
-            ),
-          // Cancel Button
-          IconButton(
-            onPressed: () => _showCancelDialog(),
-            icon: const Icon(Icons.cancel_outlined, color: Colors.red),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -347,111 +427,114 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
   Widget _buildRideInfoSheet(MapState mapState) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.45,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(32),
+          topRight: Radius.circular(32),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black12,
-            blurRadius: 10,
-            offset: Offset(0, -2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, -8),
           ),
         ],
       ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Customer Info
-            Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    color: AppTheme.primaryColor,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.trip.clientName ?? "Client Inconnu",
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.trip.serviceName,
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (widget.trip.clientPhone != null)
+              
+              const SizedBox(height: 24),
+              
+              // Customer Info Profile
+              Row(
+                children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
                     ),
                     child: const Icon(
-                      Icons.phone,
-                      color: Colors.green,
-                      size: 20,
+                      Icons.person_rounded,
+                      color: AppTheme.primaryColor,
+                      size: 28,
                     ),
                   ),
-              ],
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Route Progress
-            _buildRouteProgress(),
-            
-            const SizedBox(height: 24),
-            
-            // Trip Info
-            _buildTripInfo(),
-            
-            const SizedBox(height: 24),
-            
-            // Action Button
-            _buildActionButton(),
-          ],
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.trip.clientName ?? "Client Inconnu",
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            widget.trip.serviceName,
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Route Progress
+              _buildRouteProgress(),
+              
+              const SizedBox(height: 20),
+              
+              // Trip Info
+              _buildTripInfo(),
+              
+              const SizedBox(height: 24),
+              
+              // Action Button with AnimatedSwitcher for smooth phase changes
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _buildActionButton(),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -461,13 +544,26 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          _currentPhase == RidePhase.arriving ? 'Vers le client' : 'Vers la destination',
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          children: [
+            Text(
+              _currentPhase == RidePhase.arriving ? 'Vers le client' : 'Vers la destination',
+              style: const TextStyle(
+                color: Colors.black87,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (_isFetchingRoute)
+              const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+          ],
         ),
         
         const SizedBox(height: 12),
@@ -478,17 +574,24 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
             Text(
               '${_currentDistance.toStringAsFixed(1)} km restants',
               style: const TextStyle(
-                color: Colors.black,
-                fontSize: 14,
+                color: Colors.black87,
+                fontSize: 15,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            Text(
-              _estimatedTime,
-              style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _estimatedTime,
+                style: const TextStyle(
+                  color: AppTheme.primaryColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
@@ -502,22 +605,30 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         children: [
           _buildInfoRow('Point de départ', widget.trip.pickupAddress),
-          const SizedBox(height: 12),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(),
+          ),
           _buildInfoRow('Destination', widget.trip.destinationAddress),
-          const SizedBox(height: 12),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(),
+          ),
           Row(
             children: [
               Expanded(
                 child: _buildInfoRow('Distance totale', '${widget.trip.estimatedDistanceKm.toStringAsFixed(1)} km'),
               ),
+              Container(width: 1, height: 30, color: Colors.grey.shade300),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildInfoRow('Prix', '${widget.trip.estimatedFare.toStringAsFixed(2)} ${widget.trip.currency}'),
+                child: _buildInfoRow('Prix estimé', '${widget.trip.estimatedFare.toStringAsFixed(2)} ${widget.trip.currency}'),
               ),
             ],
           ),
@@ -532,16 +643,17 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       children: [
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.grey,
+          style: TextStyle(
+            color: Colors.grey.shade600,
             fontSize: 12,
+            fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           value,
           style: const TextStyle(
-            color: Colors.black,
+            color: Colors.black87,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -576,6 +688,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     }
 
     return CustomButton(
+      key: ValueKey(_currentPhase),
       text: buttonText,
       onPressed: onPressed,
       height: 56,
@@ -656,11 +769,11 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   String _getPhaseMessage(RidePhase phase) {
     switch (phase) {
       case RidePhase.arriving:
-        return 'En route vers le client...';
+        return 'En attente de départ...';
       case RidePhase.started:
-        return 'Course en cours, en route vers la destination...';
+        return 'Vous êtes en route vers le point de collecte !';
       case RidePhase.completed:
-        return 'Course terminée !';
+        return 'Course démarrée, en route vers la destination !';
     }
   }
 

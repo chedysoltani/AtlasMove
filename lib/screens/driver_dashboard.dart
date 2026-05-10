@@ -129,6 +129,16 @@ class _DriverDashboardState extends State<DriverDashboard> {
             },
             icon: const Icon(Icons.notifications, color: Colors.black),
           ),
+          IconButton(
+            onPressed: () async {
+              // Deconnecter l'utilisateur
+              await Provider.of<AuthProvider>(context, listen: false).logout();
+              if (mounted) {
+                Navigator.of(context).pushReplacementNamed('/login');
+              }
+            },
+            icon: const Icon(Icons.logout, color: Colors.red),
+          ),
         ],
       ),
       body: SingleChildScrollView(
