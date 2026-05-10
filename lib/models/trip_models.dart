@@ -179,3 +179,76 @@ class AvailableTrip {
     );
   }
 }
+class TripHistoryItem {
+  final String id;
+  final String status;
+  final String pickupAddress;
+  final String destinationAddress;
+  final String serviceName;
+  final double estimatedFare;
+  final String currency;
+  final DateTime createdAt;
+  final double estimatedDistanceKm;
+  final int estimatedDurationMin;
+
+  TripHistoryItem({
+    required this.id,
+    required this.status,
+    required this.pickupAddress,
+    required this.destinationAddress,
+    required this.serviceName,
+    required this.estimatedFare,
+    required this.currency,
+    required this.createdAt,
+    required this.estimatedDistanceKm,
+    required this.estimatedDurationMin,
+  });
+
+  factory TripHistoryItem.fromJson(Map<String, dynamic> json) {
+    String serviceName = 'Inconnu';
+    if (json['service'] != null && json['service']['name'] != null) {
+      serviceName = json['service']['name'].toString();
+    }
+
+    return TripHistoryItem(
+      id: json['id']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'pending',
+      pickupAddress: json['pickup_address']?.toString() ?? 'Adresse inconnue',
+      destinationAddress: json['destination_address']?.toString() ?? 'Adresse inconnue',
+      serviceName: serviceName,
+      estimatedFare: double.tryParse(json['estimated_fare']?.toString() ?? '0') ?? 0.0,
+      currency: json['currency']?.toString() ?? 'MAD',
+      createdAt: json['created_at'] != null 
+          ? DateTime.parse(json['created_at'].toString()) 
+          : DateTime.now(),
+      estimatedDistanceKm: double.tryParse(json['estimated_distance_km']?.toString() ?? '0') ?? 0.0,
+      estimatedDurationMin: int.tryParse(json['estimated_duration_min']?.toString() ?? '0') ?? 0,
+    );
+  }
+}
+
+class TripHistoryResponse {
+  final List<TripHistoryItem> trips;
+  final int total;
+  final int page;
+  final int limit;
+
+  TripHistoryResponse({
+    required this.trips,
+    required this.total,
+    required this.page,
+    required this.limit,
+  });
+
+  factory TripHistoryResponse.fromJson(Map<String, dynamic> json) {
+    final data = json['data'] ?? {};
+    final tripsList = data['data'] as List? ?? [];
+    
+    return TripHistoryResponse(
+      trips: tripsList.map((t) => TripHistoryItem.fromJson(t as Map<String, dynamic>)).toList(),
+      total: int.tryParse(data['total']?.toString() ?? '0') ?? 0,
+      page: int.tryParse(data['page']?.toString() ?? '1') ?? 1,
+      limit: int.tryParse(data['limit']?.toString() ?? '10') ?? 10,
+    );
+  }
+}

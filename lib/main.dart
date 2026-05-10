@@ -21,6 +21,7 @@ import 'screens/driver_earnings.dart';
 import 'screens/driver_profile.dart';
 import 'screens/driver_register_screen.dart';
 import 'screens/driver_register_test_screen.dart';
+import 'screens/client_trip_history_screen.dart';
 import 'screens/signup_steps/signup_step1_personal.dart';
 import 'screens/signup_steps/signup_step2_documents.dart';
 import 'screens/signup_steps/signup_step3_vehicle.dart';
@@ -58,6 +59,7 @@ class AtlasMoveApp extends StatelessWidget {
             '/signup_step2': (context) => const SignupStep2Documents(),
             '/signup_step3': (context) => const SignupStep3Vehicle(),
             '/client_dashboard': (context) => const ClientDashboard(),
+            '/client_trip_history': (context) => const ClientTripHistoryScreen(),
             '/booking': (context) => const BookingScreen(),
             '/payment': (context) => const PaymentPage(),
             '/otp_verification': (context) {

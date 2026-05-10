@@ -398,16 +398,16 @@ class _ClientDashboardState extends State<ClientDashboard> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: CustomButton(
-                      text: '📋 Historique',
-                      onPressed: () {
-                        // TODO: Naviguer vers l'historique
-                      },
-                      type: ButtonType.outline,
-                      height: 48,
+                    Expanded(
+                      child: CustomButton(
+                        text: '📋 Historique',
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/client_trip_history');
+                        },
+                        type: ButtonType.outline,
+                        height: 48,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ],

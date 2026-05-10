@@ -248,6 +248,40 @@ class TripService {
       debugPrint('=== TripService.cancelTrip() END ===');
     }
   }
+
+  static Future<TripHistoryResponse> getClientTripHistory({int page = 1, int limit = 10}) async {
+    debugPrint('=== TripService.getClientTripHistory() START ===');
+    debugPrint('Params: page=$page, limit=$limit');
+    
+    try {
+      final queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+      
+      final response = await HttpClient.get('/m/trips', queryParams: queryParams);
+      
+      debugPrint('Status Code: ${response.statusCode}');
+      
+      if (response.isSuccess) {
+        final jsonBody = response.json;
+        return TripHistoryResponse.fromJson(jsonBody);
+      } else {
+        throw TripException(
+          message: response.json['message'] ?? 'Failed to fetch trip history',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      debugPrint('ERREUR fetching trip history: $e');
+      throw TripException(
+        message: e.toString(),
+        statusCode: null,
+      );
+    } finally {
+      debugPrint('=== TripService.getClientTripHistory() END ===');
+    }
+  }
 }
 
 class TripException implements Exception {
