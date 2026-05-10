@@ -116,7 +116,9 @@ class AvailableTrip {
   final String status;
   final String serviceName;
   final double? distanceToPickupKm; // The distance_km computed by SQL
-  final String? clientName; // May be null if backend doesn't join client
+  final String? clientId;
+  String? clientName; // May be null if backend doesn't join client, mutable to fetch later
+  final String? clientPhone;
   
   AvailableTrip({
     required this.id,
@@ -132,7 +134,9 @@ class AvailableTrip {
     required this.status,
     required this.serviceName,
     this.distanceToPickupKm,
+    this.clientId,
     this.clientName,
+    this.clientPhone,
   });
 
   factory AvailableTrip.fromJson(Map<String, dynamic> json) {
@@ -144,12 +148,14 @@ class AvailableTrip {
 
     // Tenter de récupérer le nom du client si le backend l'a inclus
     String? clientName;
+    String? clientPhone;
     if (json['client'] != null) {
       final firstName = json['client']['first_name']?.toString() ?? '';
       final lastName = json['client']['last_name']?.toString() ?? '';
       if (firstName.isNotEmpty || lastName.isNotEmpty) {
         clientName = '$firstName $lastName'.trim();
       }
+      clientPhone = json['client']['phone']?.toString();
     }
 
     return AvailableTrip(
@@ -167,7 +173,9 @@ class AvailableTrip {
       serviceName: serviceName,
       distanceToPickupKm: json['distance_km'] != null ? 
           double.tryParse(json['distance_km'].toString()) : null,
+      clientId: json['client_id']?.toString(),
       clientName: clientName,
+      clientPhone: clientPhone,
     );
   }
 }

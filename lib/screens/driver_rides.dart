@@ -367,6 +367,23 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                                 fontSize: 12,
                               ),
                             ),
+                            if (trip.clientPhone != null && trip.clientPhone!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.phone, size: 12, color: Colors.grey),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      trip.clientPhone!,
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                           ],
                         ),
                       ),
