@@ -1,95 +1,91 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import '../core/network/http_client.dart';
+import '../models/payment_models.dart';
 
 class PaymentService {
   static const String _tag = 'PaymentService';
 
-  /// Crée un PaymentIntent sur le backend et renvoie le client_secret
-  static Future<String?> createPaymentIntent({
-    required double amount,
-    required String currency,
-    required String tripId,
-  }) async {
-    debugPrint('[$_tag] Creating PaymentIntent for trip $tripId: $amount $currency');
-    
+  /// Récupère l'historique des paiements
+  static Future<PaymentHistoryResponse?> getPaymentHistory({int page = 1, int limit = 20}) async {
     try {
-      // MODE MOCK pour les tests (à commenter quand le backend est prêt)
-      // return "pi_mock_secret_${DateTime.now().millisecondsSinceEpoch}";
-
-      final response = await HttpClient.post('/payments/create-intent', body: {
-        'amount': (amount * 100).toInt(), // Stripe utilise les centimes
-        'currency': currency.toLowerCase(),
-        'trip_id': tripId,
+      final response = await HttpClient.get('/m/payments', queryParams: {
+        'page': page.toString(),
+        'limit': limit.toString(),
       });
 
       if (response.isSuccess) {
-        final data = response.json;
-        final clientSecret = data['client_secret'];
-        debugPrint('[$_tag] PaymentIntent created successfully');
-        return clientSecret;
-      } else {
-        debugPrint('[$_tag] Error creating PaymentIntent: ${response.body}');
-        return null;
+        return PaymentHistoryResponse.fromJson(response.json);
       }
+      return null;
     } catch (e) {
-      debugPrint('[$_tag] Exception creating PaymentIntent: $e');
+      debugPrint('[$_tag] Error fetching payment history: $e');
       return null;
     }
   }
 
-  /// Initialise le Stripe Payment Sheet
-  static Future<bool> initPaymentSheet({
-    required String clientSecret,
-    String merchantDisplayName = 'AtlasMove',
-  }) async {
-    debugPrint('[$_tag] Initializing Payment Sheet');
-    
+  /// Récupère les paiements en cours de traitement (pour le polling)
+  static Future<List<PaymentResponseDto>> getProcessingPayments() async {
     try {
-      await Stripe.instance.initPaymentSheet(
-        paymentSheetParameters: SetupPaymentSheetParameters(
-          paymentIntentClientSecret: clientSecret,
-          merchantDisplayName: merchantDisplayName,
-          style: ThemeMode.light,
-          appearance: const PaymentSheetAppearance(
-            colors: PaymentSheetAppearanceColors(
-              primary: Color(0xFF4F8EF7),
-            ),
-            shapes: PaymentSheetShape(
-              borderRadius: 12,
-              shadow: PaymentSheetShadowParams(color: Colors.black12),
-            ),
-          ),
-        ),
-      );
-      debugPrint('[$_tag] Payment Sheet initialized successfully');
-      return true;
+      final response = await HttpClient.get('/m/payments', queryParams: {
+        'status': 'processing',
+        'limit': '5',
+      });
+
+      if (response.isSuccess) {
+        final payload = response.json['data'] as Map<String, dynamic>;
+        final list = payload['data'] as List;
+        return list.map((e) => PaymentResponseDto.fromJson(e)).toList();
+      }
+      return [];
     } catch (e) {
-      debugPrint('[$_tag] Error initializing Payment Sheet: $e');
-      return false;
+      debugPrint('[$_tag] Error fetching processing payments: $e');
+      return [];
     }
   }
 
-  /// Affiche le Payment Sheet et attend le résultat
-  static Future<PaymentResult> presentPaymentSheet() async {
-    debugPrint('[$_tag] Presenting Payment Sheet');
-    
+  /// Récupère le client_secret pour confirmer un paiement 3DS
+  static Future<String?> getConfirmClientSecret(String paymentId) async {
     try {
-      await Stripe.instance.presentPaymentSheet();
-      debugPrint('[$_tag] Payment success');
-      return PaymentResult.success;
-    } on StripeException catch (e) {
-      if (e.error.localizedMessage?.contains('cancelled') ?? false) {
-        debugPrint('[$_tag] Payment cancelled by user');
-        return PaymentResult.cancelled;
+      final response = await HttpClient.get('/m/payments/$paymentId/confirm');
+      if (response.isSuccess) {
+        return response.json['client_secret'];
       }
-      debugPrint('[$_tag] Stripe error: ${e.error.localizedMessage}');
-      return PaymentResult.failed;
+      return null;
     } catch (e) {
-      debugPrint('[$_tag] Unexpected error presenting Payment Sheet: $e');
-      return PaymentResult.failed;
+      debugPrint('[$_tag] Error getting confirm client secret: $e');
+      return null;
+    }
+  }
+
+  /// Gère le flux de confirmation 3DS via le SDK Stripe
+  static Future<void> handle3DSConfirmation(String clientSecret) async {
+    try {
+      await Stripe.instance.confirmPayment(
+        paymentIntentClientSecret: clientSecret,
+        data: const PaymentMethodParams.card(
+          paymentMethodData: PaymentMethodData(),
+        ),
+      );
+    } catch (e) {
+      debugPrint('[$_tag] Error during 3DS confirmation: $e');
+      rethrow;
+    }
+  }
+
+  /// Réessaie un paiement échoué
+  static Future<PaymentResponseDto?> retryPayment(String paymentId, {String? cardId}) async {
+    try {
+      final Map<String, dynamic> body = cardId != null ? {'card_id': cardId} : <String, dynamic>{};
+      final response = await HttpClient.post('/m/payments/$paymentId/retry', body: body);
+      
+      if (response.isSuccess) {
+        return PaymentResponseDto.fromJson(response.json['data']);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[$_tag] Error retrying payment: $e');
+      return null;
     }
   }
 }
-
-enum PaymentResult { success, failed, cancelled }

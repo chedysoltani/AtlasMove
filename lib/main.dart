@@ -32,10 +32,10 @@ import 'screens/services_screen.dart';
 import 'screens/services_catalogue_screen.dart';
 import 'screens/services_assignments_screen.dart';
 import 'screens/create_ride_screen.dart';
-import 'screens/trip_payment_screen.dart';
 import 'screens/driver_offer_screen.dart';
 import 'screens/client_rewards_screen.dart';
 import 'screens/cards_list_screen.dart';
+import 'screens/payment_history_screen.dart';
 import 'models/trip_models.dart';
 
 void main() async {
@@ -98,18 +98,10 @@ class AtlasMoveApp extends StatelessWidget {
             '/services_catalogue': (context) => const ServicesCatalogueScreen(),
             '/services_assignments': (context) => const ServicesAssignmentsScreen(),
             '/create_ride': (context) => const CreateRideScreen(),
-            '/trip_payment': (context) {
-              final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>;
-              return TripPaymentScreen(
-                tripData: args['tripData'] as TripData,
-                serviceName: args['serviceName'] as String,
-                pickupAddress: args['pickupAddress'] as String,
-                destinationAddress: args['destinationAddress'] as String,
-              );
-            },
             '/driver_offer': (context) => const DriverOfferScreen(),
             '/client_rewards': (context) => const ClientRewardsScreen(),
             '/cards': (context) => const CardsListScreen(),
+            '/payment_history': (context) => const PaymentHistoryScreen(),
           },
         ),
       ),

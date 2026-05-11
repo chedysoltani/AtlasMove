@@ -12,6 +12,8 @@ import '../widgets/error_widget.dart';
 import '../services/location_service.dart';
 import '../services/geocoding_service.dart';
 import '../services/trip_service.dart';
+import '../providers/cards_provider.dart';
+import '../models/card_models.dart';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 class _AppColors {
@@ -146,6 +148,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   Timer? _debounceTimer;
   bool _showRouteEstimation = false;
   double _sheetHeight = 0.35;
+  String _paymentType = 'cash'; // 'card' | 'cash'
 
   @override
   void initState() {
@@ -153,6 +156,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(mapProvider.notifier).initializeMap();
       ref.read(catalogueProvider.notifier).fetchCatalogue();
+      ref.read(cardsProvider.notifier).loadCards();
     });
     _destinationController.addListener(_onDestinationChanged);
   }
@@ -333,75 +337,57 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   }
 
   void _createRide() async {
-    // LOG: Début de la fonction
-    debugPrint('=== _createRide() START ===');
-    
-    // LOG: Vérification du service
-    debugPrint('Service sélectionné: ${_selectedService?.name ?? 'NULL'}');
-    if (_selectedService == null) {
-      debugPrint('ERREUR: Aucun service sélectionné');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner un service'),
-          backgroundColor: _AppColors.red,
-        ),
-      );
-      return;
-    }
-    
-    // LOG: Vérification de la destination
-    debugPrint('Destination - Coordonnées: ${_destinationCoordinates?.toString() ?? 'NULL'}');
-    debugPrint('Destination - Distance: ${_estimatedDistance ?? 'NULL'}');
-    debugPrint('Destination - Durée: ${_estimatedDuration ?? 'NULL'}');
-    debugPrint('Destination - Adresse: "${_destinationController.text}"');
-    
-    if (_destinationCoordinates == null || _estimatedDistance == null || _estimatedDuration == null) {
-      debugPrint('ERREUR: Destination incomplète');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner une destination'),
-          backgroundColor: _AppColors.red,
-        ),
-      );
-      return;
-    }
-
-    final mapState = ref.read(mapProvider);
-    debugPrint('Position actuelle: ${mapState.currentPosition?.toString() ?? 'NULL'}');
-    
-    if (mapState.currentPosition == null) {
-      debugPrint('ERREUR: Position actuelle non disponible');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Position actuelle non disponible'),
-          backgroundColor: _AppColors.red,
-        ),
-      );
-      return;
-    }
+    if (_isCreatingTrip) return;
 
     setState(() {
       _isCreatingTrip = true;
       _tripError = null;
     });
 
+    debugPrint('=== _createRide() START ===');
+    
     try {
-      // LOG: Préparation des données pour l'API
-      final tripData = {
-        'serviceId': _selectedService!.id,
-        'pickupAddress': 'Position actuelle',
-        'pickupLatitude': mapState.currentPosition!.latitude,
-        'pickupLongitude': mapState.currentPosition!.longitude,
-        'destinationAddress': _destinationController.text,
-        'destinationLatitude': _destinationCoordinates!.latitude,
-        'destinationLongitude': _destinationCoordinates!.longitude,
-        'estimatedDistanceKm': _estimatedDistance!,
-        'estimatedDurationMin': _parseDurationToMinutes(_estimatedDuration!),
-      };
+      // 1. Validation du Service
+      if (_selectedService == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Veuillez sélectionner un service'), backgroundColor: _AppColors.red),
+          );
+        }
+        return;
+      }
       
-      debugPrint('Données envoyées à l\'API: $tripData');
-      debugPrint('Appel de TripService.createTrip...');
-      
+      // 2. Validation de la Destination
+      if (_destinationCoordinates == null || _estimatedDistance == null || _estimatedDuration == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Veuillez sélectionner une destination'), backgroundColor: _AppColors.red),
+          );
+        }
+        return;
+      }
+
+      // 3. Validation de la Position
+      final mapState = ref.read(mapProvider);
+      if (mapState.currentPosition == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Position actuelle non disponible'), backgroundColor: _AppColors.red),
+          );
+        }
+        return;
+      }
+
+      // 4. Validation de la Carte (si paiement par carte)
+      if (_paymentType == 'card') {
+        final cardsState = ref.read(cardsProvider);
+        if (cardsState.cards.isEmpty) {
+          if (mounted) _showNoCardDialog();
+          return;
+        }
+      }
+
+      // 5. Appel API
       final response = await TripService.createTrip(
         serviceId: _selectedService!.id,
         pickupAddress: 'Position actuelle',
@@ -412,60 +398,29 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         destinationLongitude: _destinationCoordinates!.longitude,
         estimatedDistanceKm: _estimatedDistance!,
         estimatedDurationMin: _parseDurationToMinutes(_estimatedDuration!),
+        paymentType: _paymentType,
       );
 
-      debugPrint('Réponse API reçue: ${response.toString()}');
-      debugPrint('Message API: ${response.message}');
-      debugPrint('Trip ID: ${response.data?.id}');
-
       if (mounted) {
-        setState(() {
-          _tripResponse = response;
-          _isCreatingTrip = false;
-        });
-        
+        setState(() => _tripResponse = response);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response.message),
-            backgroundColor: _AppColors.green,
-          ),
+          SnackBar(content: Text(response.message), backgroundColor: _AppColors.green),
         );
-
-        // Naviguer vers l'écran de paiement
-        if (response.data != null) {
-          Navigator.pushNamed(
-            context,
-            '/trip_payment',
-            arguments: {
-              'tripData': response.data!,
-              'serviceName': _selectedService!.name,
-              'pickupAddress': 'Position actuelle',
-              'destinationAddress': _destinationController.text,
-            },
-          );
-        }
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('ERREUR lors de la création de course: $e');
-      debugPrint('Stack trace: $stackTrace');
-      debugPrint('Type d\'erreur: ${e.runtimeType}');
-      
       if (mounted) {
-        setState(() {
-          _tripError = e.toString();
-          _isCreatingTrip = false;
-        });
-        
+        setState(() => _tripError = e.toString());
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: ${e.toString()}'),
-            backgroundColor: _AppColors.red,
-          ),
+          SnackBar(content: Text('Erreur: ${e.toString()}'), backgroundColor: _AppColors.red),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() => _isCreatingTrip = false);
+      }
+      debugPrint('=== _createRide() END ===');
     }
-    
-    debugPrint('=== _createRide() END ===');
   }
 
   int _parseDurationToMinutes(String duration) {
@@ -856,6 +811,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                       _buildServiceSelection(catalogueAsync),
 
                       const SizedBox(height: 14),
+                      const _Divider(),
+                      const SizedBox(height: 14),
+
+                      // ── Payment selection ──────────────────────────────────
+                      _buildPaymentSelection(),
+
+                      const SizedBox(height: 14),
                     ],
                   ),
                 ),
@@ -1016,6 +978,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                           icon: Icons.access_time_rounded,
                           label: 'Durée',
                           value: _estimatedDuration ?? '-',
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildTripInfoItem(
+                          icon: _paymentType == 'card' ? Icons.credit_card_rounded : Icons.payments_rounded,
+                          label: 'Paiement',
+                          value: _paymentType == 'card' ? 'Carte' : 'Espèces',
                         ),
                       ),
                     ],
@@ -1578,6 +1548,148 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
     return Column(
       children: services.map((service) => _buildServiceItem(service)).toList(),
+    );
+  }
+
+  Widget _buildPaymentSelection() {
+    final cardsState = ref.watch(cardsProvider);
+    final defaultCard = cardsState.cards.isNotEmpty 
+        ? cardsState.cards.firstWhere((c) => c.isDefault, orElse: () => cardsState.cards.first)
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('MODE DE PAIEMENT', style: _AppTextStyles.sectionLabel),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _buildPaymentTypeItem(
+                id: 'cash',
+                label: 'Espèces',
+                icon: Icons.payments_rounded,
+                isSelected: _paymentType == 'cash',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildPaymentTypeItem(
+                id: 'card',
+                label: 'Carte',
+                subLabel: defaultCard?.maskedLabel,
+                icon: Icons.credit_card_rounded,
+                isSelected: _paymentType == 'card',
+                onTap: () {
+                  if (_paymentType == 'card' && defaultCard != null) {
+                    // Si déjà sélectionné, on propose de changer
+                    Navigator.pushNamed(context, '/cards');
+                  } else {
+                    setState(() => _paymentType = 'card');
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+        if (_paymentType == 'card' && defaultCard != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, left: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline_rounded, size: 12, color: _AppColors.gray400),
+                const SizedBox(width: 4),
+                Text(
+                  'Sera débité sur ${defaultCard.brand.toUpperCase()} •••• ${defaultCard.last4}',
+                  style: const TextStyle(fontSize: 10, color: _AppColors.gray400),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, '/cards'),
+                  child: const Text(
+                    'Changer',
+                    style: TextStyle(fontSize: 10, color: _AppColors.accentMid, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentTypeItem({
+    required String id,
+    required String label,
+    String? subLabel,
+    required IconData icon,
+    required bool isSelected,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap ?? () => setState(() => _paymentType = id),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? _AppColors.accentLight : _AppColors.gray50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? _AppColors.accent : _AppColors.gray200,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected ? _AppColors.accent : _AppColors.gray400,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? _AppColors.accentMid : _AppColors.gray600,
+              ),
+            ),
+            if (subLabel != null)
+              Text(
+                subLabel,
+                style: TextStyle(
+                  fontSize: 9,
+                  color: isSelected ? _AppColors.accentMid.withOpacity(0.7) : _AppColors.gray400,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showNoCardDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Aucune carte enregistrée'),
+        content: const Text(
+          'Vous devez enregistrer une carte bancaire pour utiliser ce mode de paiement.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/cards');
+            },
+            child: const Text('Ajouter une carte'),
+          ),
+        ],
+      ),
     );
   }
 

@@ -208,6 +208,13 @@ class _ClientDashboardState extends State<ClientDashboard> {
                     Icons.credit_card,
                     () => Navigator.pushNamed(context, '/cards'),
                   ),
+                  _buildActionCard(
+                    context,
+                    '📜 Paiements',
+                    'Historique de vos factures',
+                    Icons.history_edu,
+                    () => Navigator.pushNamed(context, '/payment_history'),
+                  ),
                 ],
               ),
               

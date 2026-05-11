@@ -15,6 +15,7 @@ class TripService {
     required double destinationLongitude,
     required double estimatedDistanceKm,
     required int estimatedDurationMin,
+    required String paymentType, // "card" | "cash"
   }) async {
     // LOG: Début de la fonction
     debugPrint('=== TripService.createTrip() START ===');
@@ -31,6 +32,7 @@ class TripService {
         'destination_longitude': destinationLongitude,
         'estimated_distance_km': double.parse(estimatedDistanceKm.toStringAsFixed(2)), // 2 décimales max
         'estimated_duration_min': estimatedDurationMin,
+        'payment_type': paymentType,
       };
       
       debugPrint('Données envoyées: $requestData');
