@@ -33,6 +33,9 @@ import 'screens/services_catalogue_screen.dart';
 import 'screens/services_assignments_screen.dart';
 import 'screens/create_ride_screen.dart';
 import 'screens/trip_payment_screen.dart';
+import 'screens/driver_offer_screen.dart';
+import 'screens/client_rewards_screen.dart';
+import 'screens/cards_list_screen.dart';
 import 'models/trip_models.dart';
 
 void main() async {
@@ -104,6 +107,9 @@ class AtlasMoveApp extends StatelessWidget {
                 destinationAddress: args['destinationAddress'] as String,
               );
             },
+            '/driver_offer': (context) => const DriverOfferScreen(),
+            '/client_rewards': (context) => const ClientRewardsScreen(),
+            '/cards': (context) => const CardsListScreen(),
           },
         ),
       ),

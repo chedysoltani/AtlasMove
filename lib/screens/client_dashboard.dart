@@ -194,6 +194,20 @@ class _ClientDashboardState extends State<ClientDashboard> {
                     Icons.person,
                     () => Navigator.pushNamed(context, '/profile'),
                   ),
+                  _buildActionCard(
+                    context,
+                    '🎁 Fidélité',
+                    'Vos récompenses & cadeaux',
+                    Icons.card_giftcard,
+                    () => Navigator.pushNamed(context, '/client_rewards'),
+                  ),
+                  _buildActionCard(
+                    context,
+                    '💳 Mes Cartes',
+                    'Gérer vos modes de paiement',
+                    Icons.credit_card,
+                    () => Navigator.pushNamed(context, '/cards'),
+                  ),
                 ],
               ),
               
