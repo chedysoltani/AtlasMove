@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../utils/app_theme.dart';
+import '../services/trip_service.dart';
+import '../models/trip_models.dart';
 
 class ClientDashboard extends StatefulWidget {
   const ClientDashboard({super.key});
@@ -10,6 +13,54 @@ class ClientDashboard extends StatefulWidget {
 
 class _ClientDashboardState extends State<ClientDashboard> {
   int _currentIndex = 0;
+  List<TripHistoryItem> _recentTrips = [];
+  bool _isLoadingRecent = false;
+  String? _statsTripsCount = '--';
+  String? _statsTotalAmount = '--';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    setState(() {
+      _isLoadingRecent = true;
+    });
+
+    try {
+      final response = await TripService.getClientTripHistory(page: 1, limit: 3);
+      if (mounted) {
+        setState(() {
+          _recentTrips = response.trips;
+          _statsTripsCount = response.total.toString();
+          
+          // Calculer le montant total approximatif des trajets chargés (ou on pourrait avoir une API dédiée)
+          double total = 0;
+          for (var trip in response.trips) {
+            if (trip.status.toLowerCase() == 'completed') {
+              total += trip.estimatedFare;
+            }
+          }
+          _statsTotalAmount = total > 0 ? '${total.toStringAsFixed(2)} €' : '0.00 €';
+          
+          _isLoadingRecent = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading dashboard data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingRecent = false;
+        });
+      }
+    }
+  }
+
+  void _navigateToHistory() {
+    Navigator.pushNamed(context, '/client_trip_history').then((_) => _loadDashboardData());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -201,13 +252,23 @@ class _ClientDashboardState extends State<ClientDashboard> {
               const SizedBox(height: 20),
               
               // Statistics Section
-              Text(
-                '📊 Statistiques principales',
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '📊 Statistiques principales',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _loadDashboardData,
+                    icon: const Icon(Icons.refresh, size: 20, color: AppTheme.primaryColor),
+                    tooltip: 'Rafraîchir',
+                  ),
+                ],
               ),
               
               const SizedBox(height: 16),
@@ -229,21 +290,22 @@ class _ClientDashboardState extends State<ClientDashboard> {
                     Icons.trending_up,
                     'Ce mois',
                   ),
-                  _buildStatCard(
+                   _buildStatCard(
                     context,
                     'Trajets',
-                    '156',
+                    _statsTripsCount ?? '0',
                     Icons.route,
                     Icons.trending_up,
-                    'Ce mois',
+                    'Total',
+                    onTap: _navigateToHistory,
                   ),
                   _buildStatCard(
                     context,
                     'Montant',
-                    '€1,247',
+                    _statsTotalAmount ?? '0 €',
                     Icons.euro_symbol,
                     Icons.trending_up,
-                    'Ce mois',
+                    'Estimé',
                   ),
                   _buildStatCard(
                     context,
@@ -259,118 +321,61 @@ class _ClientDashboardState extends State<ClientDashboard> {
               const SizedBox(height: 20),
               
               // Recent Activity Section
-              Text(
-                '📍 Activité récente',
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '📍 Activité récente',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _navigateToHistory,
+                    child: const Text(
+                      'Voir tout',
+                      style: TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               
               const SizedBox(height: 16),
               
-              // Activity Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              // Activity Cards
+              if (_isLoadingRecent)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_recentTrips.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
                       children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.local_taxi,
-                            color: AppTheme.primaryColor,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Course vers Centre Commercial',
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '15 Avril 2024 - 14:30',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Chauffeur: Jean Dupont',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Distance: 12.5 km • Durée: 25 min',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
+                        Icon(Icons.history, size: 48, color: Colors.grey.shade300),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Aucune activité récente',
+                          style: TextStyle(color: Colors.grey),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '€24.50',
-                          style: const TextStyle(
-                            color: AppTheme.primaryColor,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'Terminé',
-                            style: TextStyle(
-                              color: AppTheme.primaryColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+                  ),
+                )
+              else
+                ..._recentTrips.take(3).map((trip) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildRecentTripCard(context, trip),
+                )),
               
               const SizedBox(height: 20),
             ],
@@ -385,9 +390,12 @@ class _ClientDashboardState extends State<ClientDashboard> {
     String value,
     IconData icon,
     IconData trendIcon,
-    String subtitle,
-  ) {
-    return Container(
+    String subtitle, {
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -481,8 +489,147 @@ class _ClientDashboardState extends State<ClientDashboard> {
           ],
         ),
       ),
+    ),
     );
   }
+
+  Widget _buildRecentTripCard(BuildContext context, TripHistoryItem trip) {
+    final dateFormat = DateFormat('dd MMM yyyy - HH:mm');
+    final priceFormat = NumberFormat.currency(symbol: trip.currency, decimalDigits: 2);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.local_taxi,
+                  color: AppTheme.primaryColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Vers ${trip.destinationAddress.split(',').first}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      dateFormat.format(trip.createdAt),
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${trip.estimatedDistanceKm.toStringAsFixed(1)} km • ${trip.estimatedDurationMin} min',
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                priceFormat.format(trip.estimatedFare),
+                style: const TextStyle(
+                  color: AppTheme.primaryColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              _buildStatusBadge(trip.status),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    Color color;
+    String label;
+
+    switch (status.toLowerCase()) {
+      case 'completed':
+        color = Colors.green;
+        label = 'Terminé';
+        break;
+      case 'cancelled':
+        color = Colors.red;
+        label = 'Annulé';
+        break;
+      case 'accepted':
+        color = Colors.blue;
+        label = 'Accepté';
+        break;
+      case 'in_progress':
+      case 'started':
+        color = Colors.orange;
+        label = 'En cours';
+        break;
+      default:
+        color = Colors.grey;
+        label = status;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildActionCard(
     BuildContext context,
