@@ -174,8 +174,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   void _onDestinationChanged() {
     final query = _destinationController.text;
     _debounceTimer?.cancel();
-    if (query.length >= 3) {
-      _debounceTimer = Timer(const Duration(milliseconds: 800), () {
+    if (query.length >= 2) {
+      _debounceTimer = Timer(const Duration(milliseconds: 500), () {
         if (mounted) _searchAddresses(query);
       });
     } else {
@@ -192,15 +192,39 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       _addressSuggestions = [];
     });
     try {
-      final suggestions = await GeocodingService.searchAddressSuggestions(query);
+      final mapState = ref.read(mapProvider);
+      final suggestions = await GeocodingService.searchAddressSuggestions(
+        query,
+        userLocation: mapState.currentPosition,
+        radiusKm: 100,
+      );
       if (mounted) {
         setState(() {
           _addressSuggestions = suggestions;
           _isSearching = false;
         });
+        // Show feedback if no results found
+        if (suggestions.isEmpty && query.length >= 3) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Aucun résultat trouvé. Essayez une autre recherche.'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }
       }
     } catch (e) {
-      if (mounted) setState(() => _isSearching = false);
+      if (mounted) {
+        setState(() => _isSearching = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la recherche. Veuillez réessayer.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 

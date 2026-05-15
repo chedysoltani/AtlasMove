@@ -107,6 +107,8 @@ Text(
                       context,
                       icon: Icons.person,
                       title: 'Pour les Clients',
+                      
+                     
                       description: 'Demandez des courses et livraisons en quelques clics',
                       onTap: () => _navigateToAuth(context, 'client'),
                     ),
