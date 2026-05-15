@@ -77,39 +77,122 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen> {
   }
 
   Widget _buildCardItem(CardDto card) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: card.isDefault 
-          ? const BorderSide(color: AppTheme.primaryColor, width: 2)
-          : BorderSide.none,
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: _getBrandIcon(card.brand),
-        title: Text(
-          card.maskedLabel,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Expire le ${card.expiryLabel}'),
-            if (card.isExpired)
-              const Text(
-                'Expirée',
-                style: TextStyle(color: Colors.red, fontSize: 12),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Stack(
+        children: [
+          // Credit Card Design
+          Container(
+            height: 180,
+            decoration: BoxDecoration(
+              gradient: _getCardGradient(card.brand),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: _getCardColor(card.brand).withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Card Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _getBrandIcon(card.brand),
+                      if (card.isDefault)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Défaut',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  // Card Number
+                  Text(
+                    card.maskedLabel,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  // Card Footer
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'EXPIRE',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            card.expiryLabel,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (card.isExpired)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'Expirée',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
-          ],
-        ),
-        trailing: card.isDefault
-            ? const Chip(
-                label: Text('Défaut', style: TextStyle(fontSize: 10, color: Colors.white)),
-                backgroundColor: AppTheme.primaryColor,
-              )
-            : null,
-        onTap: () => _showActions(card),
+            ),
+          ),
+          // Tap overlay
+          Positioned.fill(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => _showActions(card),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -190,5 +273,39 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen> {
         iconData = Icons.credit_card;
     }
     return Icon(iconData, size: 32, color: Colors.blueGrey);
+  }
+
+  LinearGradient _getCardGradient(String brand) {
+    switch (brand.toLowerCase()) {
+      case 'visa':
+        return const LinearGradient(
+          colors: [Color.fromARGB(255, 226, 144, 109), Color.fromARGB(255, 229, 102, 17)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      case 'mastercard':
+        return const LinearGradient(
+          colors: [Color.fromARGB(255, 229, 102, 17), Color.fromARGB(255, 244, 128, 49)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+      default:
+        return const LinearGradient(
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        );
+    }
+  }
+
+  Color _getCardColor(String brand) {
+    switch (brand.toLowerCase()) {
+      case 'visa':
+        return const Color(0xFF1A1F71);
+      case 'mastercard':
+        return const Color(0xFFEB001B);
+      default:
+        return const Color(0xFF667EEA);
+    }
   }
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_theme.dart';
-import '../../widgets/custom_button.dart';
 
 class ClientDashboard extends StatefulWidget {
   const ClientDashboard({super.key});
@@ -59,6 +58,18 @@ class _ClientDashboardState extends State<ClientDashboard> {
             label: 'Accueil',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.directions_car),
+            label: 'Course',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.card_giftcard),
+            label: 'Fidélité',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.credit_card),
+            label: 'Cartes',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Profil',
           ),
@@ -68,17 +79,47 @@ class _ClientDashboardState extends State<ClientDashboard> {
   }
 
   Widget _buildBody() {
-    if (_currentIndex == 0) {
-      return _buildDashboardContent();
-    } else {
-      // Navigation directe vers l'écran de profil
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushNamed(context, '/profile');
-        setState(() {
-          _currentIndex = 0; // Revenir à l'onglet Accueil
+    switch (_currentIndex) {
+      case 0:
+        return _buildDashboardContent();
+      case 1:
+        // Navigation vers créer une course
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushNamed(context, '/create_ride');
+          setState(() {
+            _currentIndex = 0;
+          });
         });
-      });
-      return const Center(child: CircularProgressIndicator());
+        return const Center(child: CircularProgressIndicator());
+      case 2:
+        // Navigation vers fidélité
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushNamed(context, '/client_rewards');
+          setState(() {
+            _currentIndex = 0;
+          });
+        });
+        return const Center(child: CircularProgressIndicator());
+      case 3:
+        // Navigation vers cartes
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushNamed(context, '/cards');
+          setState(() {
+            _currentIndex = 0;
+          });
+        });
+        return const Center(child: CircularProgressIndicator());
+      case 4:
+        // Navigation vers profil
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushNamed(context, '/profile');
+          setState(() {
+            _currentIndex = 0;
+          });
+        });
+        return const Center(child: CircularProgressIndicator());
+      default:
+        return _buildDashboardContent();
     }
   }
 
@@ -155,67 +196,6 @@ class _ClientDashboardState extends State<ClientDashboard> {
                     ),
                   ],
                 ),
-              ),
-              
-              const SizedBox(height: 20),
-              
-              // Quick Actions Section
-              Text(
-                '⚡ Actions rapides',
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Quick Actions Grid
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.2,
-                children: [
-                  _buildActionCard(
-                    context,
-                    '� Créer une course',
-                    'Réserver un trajet',
-                    Icons.directions_car,
-                    () => Navigator.pushNamed(context, '/create_ride'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    '👤 Mon profil',
-                    'Gérer mes informations',
-                    Icons.person,
-                    () => Navigator.pushNamed(context, '/profile'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    '🎁 Fidélité',
-                    'Vos récompenses & cadeaux',
-                    Icons.card_giftcard,
-                    () => Navigator.pushNamed(context, '/client_rewards'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    '💳 Mes Cartes',
-                    'Gérer vos modes de paiement',
-                    Icons.credit_card,
-                    () => Navigator.pushNamed(context, '/cards'),
-                  ),
-                  _buildActionCard(
-                    context,
-                    '📜 Paiements',
-                    'Historique de vos factures',
-                    Icons.history_edu,
-                    () => Navigator.pushNamed(context, '/payment_history'),
-                  ),
-                ],
               ),
               
               const SizedBox(height: 20),
@@ -393,44 +373,6 @@ class _ClientDashboardState extends State<ClientDashboard> {
               ),
               
               const SizedBox(height: 20),
-              
-              // Quick Actions Section
-              Text(
-                'Actions rapides',
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: CustomButton(
-                      text: '🚗 Créer une course',
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/create_ride');
-                      },
-                      height: 48,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                    Expanded(
-                      child: CustomButton(
-                        text: '📋 Historique',
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/client_trip_history');
-                        },
-                        type: ButtonType.outline,
-                        height: 48,
-                      ),
-                    ),
-                ],
-              ),
             ],
           ),
         ),

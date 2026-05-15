@@ -18,13 +18,13 @@ class DriverRegisterScreen extends StatefulWidget {
 
 class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _firstNameController = TextEditingController(text: 'amal');
-  final _lastNameController = TextEditingController(text: 'ghanmi');
-  final _emailController = TextEditingController(text: 'amal@example.com');
-  final _phoneController = TextEditingController(text: '+21698765432');
-  final _passwordController = TextEditingController(text: 'SecureP@ss123');
-  final _confirmPasswordController = TextEditingController(text: 'SecureP@ss123');
-  final _vehicleTypeController = TextEditingController(text: 'voiture');
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _vehicleTypeController = TextEditingController();
 
   File? _idCard;
   File? _drivingLicense;
@@ -34,75 +34,6 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
   String? _errorMessage;
 
   final ImagePicker _imagePicker = ImagePicker();
-
-  /// Crée une image PNG minimale mais valide (pour les tests)
-  List<int> _createMinimalPng() {
-    // En-tête PNG (Portable Network Graphics)
-    final pngHeader = [
-      // Signature PNG
-      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-      // Chunk IHDR (Image Header)
-      0x00, 0x00, 0x00, 0x0D, // Length (13 bytes)
-      0x49, 0x48, 0x44, 0x52, // "IHDR"
-      0x00, 0x00, 0x00, 0x01, // Width: 1 pixel
-      0x00, 0x00, 0x00, 0x01, // Height: 1 pixel
-      0x08, // Bit depth: 8 bits
-      0x02, // Color type: 2 (RGB)
-      0x00, 0x00, 0x00, 0x00, // Compression, filter, interlace
-      0x9D, 0x3C, 0x78, // CRC32 for IHDR
-      // Chunk IDAT (Image Data)
-      0x00, 0x00, 0x00, 0x0A, // Length (10 bytes)
-      0x49, 0x44, 0x41, 0x54, // "IDAT"
-      // Données image compressées (1x1 pixel RGB)
-      0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01,
-      0x0D, 0x7A, 0x5D, 0x01, // CRC32 for IDAT
-      // Chunk IEND (Image End)
-      0x00, 0x00, 0x00, 0x00, // Length (0 bytes)
-      0x49, 0x45, 0x4E, 0x44, // "IEND"
-      0xAE, 0x42, 0x60, 0x82, // CRC32 for IEND
-    ];
-    return pngHeader;
-  }
-
-  /// Crée des fichiers de test pour les documents
-  Future<void> _createTestFiles() async {
-    try {
-      final tempDir = Directory.systemTemp;
-      final pngBytes = _createMinimalPng();
-      
-      // Créer les trois fichiers de test
-      _idCard = File('${tempDir.path}/test_id_card.png');
-      _drivingLicense = File('${tempDir.path}/test_driving_license.png');
-      _vehicleRegistration = File('${tempDir.path}/test_vehicle_registration.png');
-      
-      await _idCard!.writeAsBytes(pngBytes);
-      await _drivingLicense!.writeAsBytes(pngBytes);
-      await _vehicleRegistration!.writeAsBytes(pngBytes);
-      
-      debugPrint('📁 Fichiers de test créés:');
-      debugPrint('  - ID Card: ${_idCard!.path}');
-      debugPrint('  - License: ${_drivingLicense!.path}');
-      debugPrint('  - Registration: ${_vehicleRegistration!.path}');
-      
-      setState(() {}); // Rafraîchir l'UI
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Fichiers de test créés avec succès!'),
-          backgroundColor: AppTheme.successColor,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      debugPrint('❌ Erreur création fichiers test: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur création fichiers test: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 
   @override
   void dispose() {
@@ -264,28 +195,6 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Message d'information
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info, color: Colors.green.shade600, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Formulaire pré-rempli avec des données de test. Cliquez "Créer fichiers test" pour générer les documents requis.',
-                        style: TextStyle(color: Colors.green.shade600, fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
               // Message d'erreur
               if (_errorMessage != null)
@@ -480,35 +389,6 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
                   color: AppTheme.primaryColor,
                 ),
               ),
-              const SizedBox(height: 8),
-
-              // Bouton de test pour créer des fichiers factices
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.science, color: Colors.blue, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Mode test : Crée des fichiers PNG factices',
-                        style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
-                      ),
-                    ),
-                    CustomButton(
-                      text: 'Créer fichiers test',
-                      onPressed: _createTestFiles,
-                      type: ButtonType.outline,
-                      height: 32,
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 16),
 
               // Carte d'identité
@@ -642,38 +522,6 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
                 width: double.infinity,
               ),
               const SizedBox(height: 20),
-
-              // Exemple de données
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '📝 Exemple de données:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'first_name: amal\n'
-                      'last_name: ghanmi\n'
-                      'email: amal@example.com\n'
-                      'phone: +21698765432\n'
-                      'password: SecureP@ss123\n'
-                      'vehicle_type: voiture',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),

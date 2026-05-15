@@ -301,43 +301,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     const SizedBox(height: 30),
                     
                     // Section d'information API
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.green.shade600, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'API Intégrée',
-                                  style: TextStyle(
-                                    color: Colors.green.shade600,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                Text(
-                                  'Inscription client via api.atla.business',
-                                  style: TextStyle(
-                                    color: Colors.green.shade700,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    
                     
                     const SizedBox(height: 40),
                     

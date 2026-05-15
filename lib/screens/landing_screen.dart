@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
+import 'package:google_fonts/google_fonts.dart';
+  Shader linearGradient = const LinearGradient(
+  colors: <Color>[
+    Color(0xffFF8C42),
+    Color(0xffFF5E62),
+  ],
+).createShader(const Rect.fromLTWH(0.0, 0.0, 300.0, 70.0));
+
 
 class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
@@ -14,46 +22,7 @@ class LandingScreen extends StatelessWidget {
           child: Column(
             children: [
               // Header Section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.menu,
-                            color: AppTheme.textWhite,
-                            size: 20,
-                          ),
-                        ),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: AppTheme.surfaceColor,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
-                          ),
-                          child: const Icon(
-                            Icons.account_circle,
-                            color: AppTheme.primaryColor,
-                            size: 20,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              
               
               const SizedBox(height: 40),
               
@@ -66,11 +35,11 @@ class LandingScreen extends StatelessWidget {
                   children: [
                     // Animated Logo
                     Container(
-                      width: 120,
-                      height: 120,
+                      width: 200,
+                      height: 200,
                       decoration: BoxDecoration(
                         color: AppTheme.primaryColor,
-                        borderRadius: BorderRadius.circular(30),
+                        borderRadius: BorderRadius.circular(50),
                         boxShadow: [
                           BoxShadow(
                             color: AppTheme.primaryColor.withOpacity(0.3),
@@ -79,27 +48,35 @@ class LandingScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.local_shipping,
-                        color: AppTheme.textWhite,
-                        size: 60,
+                      child: Image.asset(
+                        'assets/images/AtlasMove.png',
+                        width: 180,
+                        height: 180,
                       ),
                     ),
                     
                     const SizedBox(height: 24),
                     
                     // Title
-                    const Text(
-                      'AtlasMove',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textWhite,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
+                
+Text(
+  'AtlasMove',
+  style: GoogleFonts.poppins(
+    fontSize: 36,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 2,
+    foreground: Paint()..shader = linearGradient,
+    shadows: [
+      Shadow(
+        blurRadius: 10,
+        color: Colors.black26,
+        offset: Offset(2, 4),
+      ),
+    ],
+  ),
+),
                     
-                    const SizedBox(height: 8),
+                    
                     
                     const Text(
                       'Plateforme de Transport & Livraison',
@@ -110,26 +87,10 @@ class LandingScreen extends StatelessWidget {
                       ),
                     ),
                     
-                    const SizedBox(height: 40),
+                   
                     
                     // Description
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.1)),
-                      ),
-                      child: const Text(
-                        'La solution moderne pour vos besoins de transport et livraison. Rapide, fiable et accessible à tous.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textSecondary,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
+                   
                   ],
                 ),
               ),
@@ -203,14 +164,7 @@ class LandingScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     
                     // Bouton de test pour débogage
-                    CustomButton(
-                      text: '🧪 Test Inscription',
-                      onPressed: () => Navigator.of(context).pushNamed('/driver_register_test'),
-                      type: ButtonType.secondary,
-                      height: 40,
-                      width: double.infinity,
-                    ),
-                    
+                  
                     const SizedBox(height: 24),
                     
                     // Trust Indicators
