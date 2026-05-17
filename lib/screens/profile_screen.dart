@@ -165,302 +165,308 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: const Color(0xFFF8F9FB),
       appBar: AppBar(
-        backgroundColor: AppTheme.backgroundColor,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.primaryColor),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Mon Profil',
           style: TextStyle(
-            color: AppTheme.primaryColor,
+            color: Colors.black,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
+        centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: AppTheme.primaryColor),
-            onPressed: _logout,
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+            onPressed: () => _showLogoutDialog(),
             tooltip: 'Déconnexion',
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: _isLoading && _currentUser == null
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
+          : SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                children: [
+                  _buildProfileHeader(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildSectionTitle('INFORMATIONS PERSONNELLES'),
+                          _buildInfoSection([
+                            _buildModernField(
+                              controller: _firstNameController,
+                              label: 'Prénom',
+                              icon: Icons.person_outline_rounded,
+                            ),
+                            const Divider(height: 1, indent: 50),
+                            _buildModernField(
+                              controller: _lastNameController,
+                              label: 'Nom',
+                              icon: Icons.person_outline_rounded,
+                            ),
+                            const Divider(height: 1, indent: 50),
+                            _buildModernField(
+                              controller: _genderController,
+                              label: 'Genre',
+                              icon: Icons.wc_rounded,
+                              hint: 'male, female, other',
+                            ),
+                            const Divider(height: 1, indent: 50),
+                            _buildModernField(
+                              controller: _dateOfBirthController,
+                              label: 'Date de naissance',
+                              icon: Icons.cake_outlined,
+                              hint: 'YYYY-MM-DD',
+                            ),
+                          ]),
+                          
+                          const SizedBox(height: 25),
+                          _buildSectionTitle('COORDONNÉES'),
+                          _buildInfoSection([
+                            _buildModernField(
+                              controller: _emailController,
+                              label: 'Email',
+                              icon: Icons.email_outlined,
+                              keyboardType: TextInputType.emailAddress,
+                            ),
+                            const Divider(height: 1, indent: 50),
+                            _buildModernField(
+                              controller: _phoneController,
+                              label: 'Téléphone',
+                              icon: Icons.phone_android_rounded,
+                              keyboardType: TextInputType.phone,
+                            ),
+                            const Divider(height: 1, indent: 50),
+                            _buildModernField(
+                              controller: _countryController,
+                              label: 'Pays',
+                              icon: Icons.public_rounded,
+                            ),
+                          ]),
+
+                          const SizedBox(height: 35),
+                          
+                          // Bouton de mise à jour
+                          _buildUpdateButton(),
+                          
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildProfileHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 30),
+      child: Column(
+        children: [
+          Stack(
             children: [
-              const SizedBox(height: 20),
-              
-              // Photo de profil
               Container(
-                padding: const EdgeInsets.all(16),
+                width: 120,
+                height: 120,
                 decoration: BoxDecoration(
+                  shape: BoxShape.circle,
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2), width: 4),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
                     ),
                   ],
                 ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Photo de profil',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    // Affichage de la photo actuelle ou placeholder
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: _profilePictureUrl != null && _profilePictureUrl!.isNotEmpty
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                _profilePictureUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(Icons.person, size: 40);
-                                },
-                              ),
-                            )
-                          : const Icon(Icons.person, size: 40),
-                    ),
-                    const SizedBox(height: 12),
-                    
-                    // Bouton pour choisir une image
-                    CustomButton(
-                      text: 'Choisir une photo',
-                      onPressed: _pickImage,
-                      type: ButtonType.text,
-                      width: double.infinity,
-                    ),
-                  ],
+                child: ClipOval(
+                  child: _profilePictureUrl != null && _profilePictureUrl!.isNotEmpty
+                      ? Image.network(
+                          _profilePictureUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 60, color: Colors.grey),
+                        )
+                      : const Icon(Icons.person, size: 60, color: Colors.grey),
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // Message d'erreur
-              if (_errorMessage != null)
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade200),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 20),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error, color: Colors.red.shade600, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(color: Colors.red.shade600),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Champ Prénom
-              CustomTextField(
-                controller: _firstNameController,
-                labelText: 'Prénom',
-                prefixIcon: const Icon(Icons.person),
-                textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value != null && value.trim().isNotEmpty) {
-                    if (value.length < 2) {
-                      return 'Le prénom doit contenir au moins 2 caractères';
-                    }
-                    if (value.length > 50) {
-                      return 'Le prénom ne doit pas dépasser 50 caractères';
-                    }
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Champ Nom
-              CustomTextField(
-                controller: _lastNameController,
-                labelText: 'Nom',
-                prefixIcon: const Icon(Icons.person),
-                textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value != null && value.trim().isNotEmpty) {
-                    if (value.length < 2) {
-                      return 'Le nom doit contenir au moins 2 caractères';
-                    }
-                    if (value.length > 50) {
-                      return 'Le nom ne doit pas dépasser 50 caractères';
-                    }
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Champ Email
-              CustomTextField(
-                controller: _emailController,
-                labelText: 'Email',
-                prefixIcon: const Icon(Icons.email),
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value != null && value.trim().isNotEmpty) {
-                    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-                    if (!emailRegex.hasMatch(value)) {
-                      return 'Email invalide';
-                    }
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Champ Téléphone
-              CustomTextField(
-                controller: _phoneController,
-                labelText: 'Téléphone',
-                prefixIcon: const Icon(Icons.phone),
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value != null && value.trim().isNotEmpty) {
-                    // Format plus strict pour l'API : commence par + et 10-15 chiffres
-                    final phoneRegex = RegExp(r'^\+[0-9]{10,15}$');
-                    if (!phoneRegex.hasMatch(value)) {
-                      return 'Format requis: + suivi de 10-15 chiffres (ex: +33612345678)';
-                    }
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Champ Genre
-              CustomTextField(
-                controller: _genderController,
-                labelText: 'Genre',
-                prefixIcon: const Icon(Icons.person),
-                textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value != null && value!.isNotEmpty) {
-                    final validGenders = ['male', 'female', 'other'];
-                    if (!validGenders.contains(value!.toLowerCase())) {
-                      return 'Genre invalide (male, female, other)';
-                    }
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Champ Date de naissance
-              CustomTextField(
-                controller: _dateOfBirthController,
-                labelText: 'Date de naissance',
-                prefixIcon: const Icon(Icons.calendar_today),
-                keyboardType: TextInputType.datetime,
-                textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value != null && value!.isNotEmpty) {
-                    // Validation simple de la date
-                    try {
-                      final date = DateTime.parse(value);
-                      // Vérifier que la date n'est pas dans le futur
-                      if (date.isAfter(DateTime.now())) {
-                        return 'La date de naissance ne peut pas être dans le futur';
-                      }
-                    } catch (e) {
-                      return 'Format de date invalide (YYYY-MM-DD)';
-                    }
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Champ Pays
-              CustomTextField(
-                controller: _countryController,
-                labelText: 'Pays',
-                prefixIcon: const Icon(Icons.flag),
-                textInputAction: TextInputAction.done,
-                validator: (value) {
-                  if (value != null && value!.length < 2) {
-                    return 'Le pays doit contenir au moins 2 caractères';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Section de connexion rapide
-             
-
-              // Bouton de mise à jour
-              CustomButton(
-                text: _isLoading ? 'Mise à jour...' : 'Mettre à jour le profil',
-                onPressed: _isLoading ? null : _updateProfile,
-                isLoading: _isLoading,
-                width: double.infinity,
-              ),
-              const SizedBox(height: 20),
-
-              // Informations de l'API
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Informations de l\'API:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text('Endpoint: PUT /users/profile'),
-                    const Text('Base URL: ${HttpClient.baseUrl}'),
-                    if (_currentUser != null) ...[
-                      const SizedBox(height: 4),
-                      Text('ID Utilisateur: ${_currentUser!.id}'),
-                      Text('Email: ${_currentUser!.email}'),
-                      Text('Rôle: ${_currentUser!.role}'),
-                    ],
-                  ],
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Text(
+            '${_firstNameController.text} ${_lastNameController.text}'.trim().isEmpty 
+                ? 'Mon Profil' 
+                : '${_firstNameController.text} ${_lastNameController.text}',
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          Text(
+            _emailController.text,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey.shade500,
+          letterSpacing: 1.2,
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoSection(List<Widget> children) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildModernField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+    String? hint,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          icon: Icon(icon, color: AppTheme.primaryColor, size: 22),
+          labelText: label,
+          labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+          hintText: hint,
+          border: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUpdateButton() {
+    return GestureDetector(
+      onTap: _isLoading ? null : _updateProfile,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppTheme.primaryColor, Color(0xFFE85A2A)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryColor.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Center(
+          child: _isLoading
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                )
+              : const Text(
+                  'Enregistrer les modifications',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Déconnexion'),
+        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _logout();
+            },
+            child: const Text('Déconnexion', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -470,17 +476,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await ProfileService.logout();
       
       if (mounted) {
-        // Rediriger vers la page de login
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/login',
-          (route) => false,
-        );
-        
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Déconnexion réussie'),
             backgroundColor: AppTheme.successColor,
-            duration: const Duration(seconds: 2),
           ),
         );
       }

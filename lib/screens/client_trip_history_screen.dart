@@ -157,7 +157,10 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
         if (index < _trips.length) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
-            child: TripHistoryCard(trip: _trips[index]),
+            child: TripHistoryCard(
+              trip: _trips[index],
+              onCancel: () => _cancelTripDialog(_trips[index]),
+            ),
           );
         } else {
           return const Padding(
@@ -238,17 +241,280 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
       ),
     );
   }
+
+  Future<void> _cancelTripDialog(TripHistoryItem trip) async {
+    final reasons = [
+      "Temps d'attente trop long",
+      "Changement de programme",
+      "Erreur lors de la commande",
+      "Chauffeur trop éloigné",
+      "Autre",
+    ];
+    
+    String selectedReason = reasons[0];
+    final TextEditingController customReasonController = TextEditingController();
+    bool isSubmitting = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Grabber handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.errorColor.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.cancel_outlined,
+                          color: AppTheme.errorColor,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Annuler la course',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  const Text(
+                    'Veuillez indiquer le motif de l\'annulation de votre course :',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Reason list
+                  ...reasons.map((reason) {
+                    final isSelected = selectedReason == reason;
+                    return GestureDetector(
+                      onTap: () {
+                        setModalState(() {
+                          selectedReason = reason;
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppTheme.primaryColor.withOpacity(0.06) : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected ? AppTheme.primaryColor : Colors.grey.shade200,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                              color: isSelected ? AppTheme.primaryColor : Colors.grey,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              reason,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  
+                  // Custom reason text field
+                  if (selectedReason == "Autre") ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: customReasonController,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        hintText: 'Saisissez la raison de l\'annulation...',
+                        fillColor: Colors.grey.shade50,
+                        filled: true,
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  
+                  // Action buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.grey,
+                            side: BorderSide(color: Colors.grey.shade300),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Retour',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  final finalReason = selectedReason == "Autre"
+                                      ? customReasonController.text.trim()
+                                      : selectedReason;
+                                  
+                                  if (selectedReason == "Autre" && finalReason.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Veuillez préciser la raison.'),
+                                        backgroundColor: AppTheme.errorColor,
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  setModalState(() {
+                                    isSubmitting = true;
+                                  });
+
+                                  try {
+                                    await TripService.cancelClientTrip(trip.id, finalReason);
+                                    
+                                    if (mounted) {
+                                      Navigator.pop(context); // Close bottom sheet
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Course annulée avec succès.'),
+                                          backgroundColor: AppTheme.successColor,
+                                        ),
+                                      );
+                                      _loadHistory(); // Reload history list
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      setModalState(() {
+                                        isSubmitting = false;
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Erreur : $e'),
+                                          backgroundColor: AppTheme.errorColor,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.errorColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                                  ),
+                                )
+                              : const Text(
+                                  'Confirmer',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 class TripHistoryCard extends StatelessWidget {
   final TripHistoryItem trip;
+  final VoidCallback? onCancel;
 
-  const TripHistoryCard({super.key, required this.trip});
+  const TripHistoryCard({
+    super.key,
+    required this.trip,
+    this.onCancel,
+  });
 
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd MMM yyyy, HH:mm');
     final priceFormat = NumberFormat.currency(symbol: trip.currency, decimalDigits: 2);
+    
+    final status = trip.status.toLowerCase();
+    final isCancelable = status == 'pending' || 
+                         status == 'searching' || 
+                         status == 'accepted' || 
+                         status == 'arriving';
 
     return Container(
       decoration: BoxDecoration(
@@ -378,6 +644,41 @@ class TripHistoryCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (isCancelable && onCancel != null) ...[
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: onCancel,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.errorColor,
+                      side: const BorderSide(color: AppTheme.errorColor, width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.close_rounded, size: 18, color: AppTheme.errorColor),
+                        SizedBox(width: 8),
+                        Text(
+                          'Annuler cette course',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.errorColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

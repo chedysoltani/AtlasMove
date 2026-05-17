@@ -17,10 +17,11 @@ import '../models/card_models.dart';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 class _AppColors {
-  static const accent = Color(0xFF4F8EF7);
-  static const accentLight = Color(0xFFEBF2FF);
-  static const accentMid = Color(0xFF3B74D9);
-  static const accentShadow = Color(0x594F8EF7);
+  static const primary = Color(0xFFFF6B35); // Orange vibrant de la marque
+  static const accent = Color(0xFFFF6B35); 
+  static const accentLight = Color(0xFFFFF1EB); // Orange très clair
+  static const accentMid = Color(0xFFE85A2A);   // Orange plus sombre
+  static const accentShadow = Color(0x59FF6B35);
 
   static const green = Color(0xFF22C55E);
   static const greenLight = Color(0xFFDCFCE7);
@@ -32,7 +33,7 @@ class _AppColors {
   static const gray300 = Color(0xFFCDD3E0);
   static const gray400 = Color(0xFF9BA3B4);
   static const gray600 = Color(0xFF5C6475);
-  static const gray900 = Color(0xFF0F172A);
+  static const gray900 = Color(0xFF0F172A); // Noir/Bleu très sombre (Brand Black)
 
   static const white = Colors.white;
 }
@@ -150,6 +151,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   double _sheetHeight = 0.35;
   String _paymentType = 'cash'; // 'card' | 'cash'
 
+  bool _isDestinationFocused = false;
+
   @override
   void initState() {
     super.initState();
@@ -159,6 +162,11 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       ref.read(cardsProvider.notifier).loadCards();
     });
     _destinationController.addListener(_onDestinationChanged);
+    _destinationFocusNode.addListener(() {
+      setState(() {
+        _isDestinationFocused = _destinationFocusNode.hasFocus;
+      });
+    });
   }
 
   @override
@@ -748,7 +756,15 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     
     final catalogueAsync = ref.watch(catalogueProvider);
     final screenHeight = MediaQuery.of(context).size.height;
-    final targetHeight = screenHeight * (_serviceSectionExpanded ? _sheetHeight : 0.35);
+    
+    // Calcul de la hauteur cible en fonction de l'état
+    double targetHeight;
+    if (_destinationCoordinates == null) {
+      // Augmentation de la hauteur initiale (0.32 au lieu de 0.22)
+      targetHeight = _isDestinationFocused ? screenHeight * 0.65 : screenHeight * 0.32;
+    } else {
+      targetHeight = _serviceSectionExpanded ? screenHeight * 0.75 : screenHeight * 0.48;
+    }
 
     return Positioned(
       bottom: 0,
@@ -756,102 +772,173 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       right: 0,
       child: GestureDetector(
         onVerticalDragUpdate: (details) {
-          if (_destinationCoordinates != null && _selectedService != null) {
-            if (details.primaryDelta! < -10) {
-              _onServiceSelected();
+          if (_destinationCoordinates != null) {
+            if (details.primaryDelta! < -10 && !_serviceSectionExpanded) {
+              setState(() {
+                _serviceSectionExpanded = true;
+                _sheetHeight = 0.75;
+              });
             } else if (details.primaryDelta! > 10 && _serviceSectionExpanded) {
               _collapseServiceSection();
             }
           }
         },
-        onVerticalDragEnd: (details) {
-          if (_destinationCoordinates != null && _selectedService != null) {
-            if (details.velocity.pixelsPerSecond.dy < -500) {
-              _onServiceSelected();
-            } else if (details.velocity.pixelsPerSecond.dy > 500 && _serviceSectionExpanded) {
-              _collapseServiceSection();
-            }
-          }
-        },
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.fastOutSlowIn,
           height: targetHeight,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: _AppColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
             boxShadow: [
               BoxShadow(
-                color: Color(0x1A000000),
-                blurRadius: 24,
-                offset: Offset(0, -6),
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, -4),
               ),
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Drag handle
-              Container(
-                margin: const EdgeInsets.only(top: 10, bottom: 0),
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: _serviceSectionExpanded ? _AppColors.accent : _AppColors.gray200,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              if (_serviceSectionExpanded && _destinationCoordinates != null && _selectedService != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Glissez vers le bas pour voir le trajet',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: _AppColors.gray400,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-                const SizedBox(height: 4),
-              ],
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Destination input ──────────────────────────────────
-                      _buildDestinationInput(),
-
-                      // ── Route info inline (after destination selected) ─────
-                      if (_showRouteInfo && _estimatedDistance != null)
-                        _buildRouteInlineBadge(),
-
-                      const SizedBox(height: 14),
-                      const _Divider(),
-                      const SizedBox(height: 14),
-
-                      // ── Service selection ──────────────────────────────────
-                      _buildServiceSelection(catalogueAsync),
-
-                      const SizedBox(height: 14),
-                      const _Divider(),
-                      const SizedBox(height: 14),
-
-                      // ── Payment selection ──────────────────────────────────
-                      _buildPaymentSelection(),
-
-                      const SizedBox(height: 14),
-                    ],
+              // Handle minimaliste
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 4),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: _AppColors.gray200,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
 
-              // ── CTA Button ─────────────────────────────────────────────────
+              Expanded(
+                child: _buildMainContent(catalogueAsync),
+              ),
+
+              // Bouton CTA fixé en bas
               _buildCtaButton(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMainContent(AsyncValue<ServiceCatalogue> catalogueAsync) {
+    // Si la destination n'est pas choisie, on se concentre sur l'input
+    if (_destinationCoordinates == null) {
+      return SingleChildScrollView(
+        key: const ValueKey('destination_step'),
+        padding: EdgeInsets.fromLTRB(20, _isDestinationFocused ? 10 : 20, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!_isDestinationFocused) ...[
+              const Text(
+                'Où allons-nous aujourd\'hui ?',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: _AppColors.gray900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+            _buildDestinationInput(),
+          ],
+        ),
+      );
+    }
+
+    // Si la destination est choisie, on affiche les services et le paiement
+    return SingleChildScrollView(
+      key: const ValueKey('service_step'),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Récapitulatif destination compact
+          _buildDestinationSummary(),
+          
+          if (_showRouteInfo && _estimatedDistance != null)
+            _buildRouteInlineBadge(),
+
+          const SizedBox(height: 24),
+          
+          // Sélection du service
+          _buildServiceSelection(catalogueAsync),
+
+          const SizedBox(height: 24),
+          
+          // Sélection du paiement
+          _buildPaymentSelection(),
+          
+          const SizedBox(height: 10),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDestinationSummary() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _AppColors.gray50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _AppColors.gray100),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _AppColors.accentLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.location_on_rounded, size: 18, color: _AppColors.accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Destination',
+                  style: TextStyle(fontSize: 11, color: _AppColors.gray400, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  _destinationController.text,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _AppColors.gray900),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                _destinationCoordinates = null;
+                _showRouteInfo = false;
+                _showRouteEstimation = false;
+                _destinationController.clear();
+                _selectedService = null;
+                _selectedCategory = null;
+                _serviceSectionExpanded = false;
+              });
+              final n = ref.read(mapProvider.notifier);
+              n.clearPolylines();
+              n.removeMarker('pickup');
+              n.removeMarker('destination');
+            },
+            icon: const Icon(Icons.edit_outlined, size: 18, color: _AppColors.accent),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
       ),
     );
   }
@@ -1213,63 +1300,62 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     return Column(
       children: [
         // Input field
-        Container(
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
           decoration: BoxDecoration(
-            color: _AppColors.gray50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _AppColors.gray200),
+            color: _isDestinationFocused ? _AppColors.white : _AppColors.gray50,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _isDestinationFocused ? _AppColors.primary : _AppColors.gray200,
+              width: _isDestinationFocused ? 2 : 1,
+            ),
+            boxShadow: _isDestinationFocused ? [
+              BoxShadow(
+                color: _AppColors.primary.withOpacity(0.1),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              )
+            ] : [],
           ),
           child: TextField(
             controller: _destinationController,
             focusNode: _destinationFocusNode,
             style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
               color: _AppColors.gray900,
             ),
             decoration: InputDecoration(
-              hintText: 'Où allez-vous ?',
+              hintText: 'Saisissez votre destination...',
               hintStyle: const TextStyle(
-                fontSize: 13,
+                fontSize: 15,
                 color: _AppColors.gray400,
+                fontWeight: FontWeight.w400,
               ),
-              prefixIcon: _isSearching
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: Padding(
-                        padding: EdgeInsets.all(12),
+              prefixIcon: Container(
+                padding: const EdgeInsets.all(12),
+                child: _isSearching
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation(_AppColors.accent),
+                          valueColor: AlwaysStoppedAnimation(_AppColors.primary),
                         ),
+                      )
+                    : Icon(
+                        Icons.search_rounded,
+                        color: _isDestinationFocused ? _AppColors.primary : _AppColors.gray400,
+                        size: 22,
                       ),
-                    )
-                  : const Icon(
-                      Icons.search_rounded,
-                      color: _AppColors.gray400,
-                      size: 20,
-                    ),
-              suffixIcon: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: _AppColors.accent,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: const Icon(
-                    Icons.directions_car_rounded,
-                    color: _AppColors.white,
-                    size: 17,
-                  ),
-                ),
               ),
+              suffixIcon: _destinationController.text.isNotEmpty ? IconButton(
+                icon: const Icon(Icons.cancel_rounded, color: _AppColors.gray300, size: 20),
+                onPressed: () => _destinationController.clear(),
+              ) : null,
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 13,
+                vertical: 16,
               ),
             ),
           ),
@@ -1277,18 +1363,18 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
         // Address suggestions
         if (_addressSuggestions.isNotEmpty) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
           Container(
-            constraints: const BoxConstraints(maxHeight: 180),
+            constraints: const BoxConstraints(maxHeight: 350), // Augmenté pour voir encore plus de résultats
             decoration: BoxDecoration(
               color: _AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _AppColors.gray200),
-              boxShadow: const [
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _AppColors.gray200, width: 1),
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x20000000),
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
@@ -1382,13 +1468,29 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     );
   }
 
-  // ── Service Selection ──────────────────────────────────────────────────────
   Widget _buildServiceSelection(AsyncValue<ServiceCatalogue> catalogueAsync) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('CHOISIR UN SERVICE', style: _AppTextStyles.sectionLabel),
-        const SizedBox(height: 10),
+        Row(
+          children: [
+            const Text('SERVICES DISPONIBLES', style: _AppTextStyles.sectionLabel),
+            const Spacer(),
+            if (_selectedService != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _AppColors.greenLight,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Sélectionné',
+                  style: TextStyle(fontSize: 10, color: _AppColors.green, fontWeight: FontWeight.bold),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
         catalogueAsync.when(
           loading: () => const SizedBox(
             height: 90,
@@ -1427,9 +1529,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             children: [
               _buildCategoriesList(catalogue),
               if (_servicesExpanded && _selectedCategory != null) ...[
-                const SizedBox(height: 10),
-                _buildServicesLabel(),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 _buildServicesList(),
               ],
             ],
@@ -1585,60 +1685,103 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('MODE DE PAIEMENT', style: _AppTextStyles.sectionLabel),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(
-              child: _buildPaymentTypeItem(
-                id: 'cash',
-                label: 'Espèces',
-                icon: Icons.payments_rounded,
-                isSelected: _paymentType == 'cash',
-              ),
+            _buildCompactPaymentItem(
+              id: 'cash',
+              label: 'Espèces',
+              icon: Icons.payments_rounded,
+              isSelected: _paymentType == 'cash',
             ),
             const SizedBox(width: 12),
-            Expanded(
-              child: _buildPaymentTypeItem(
-                id: 'card',
-                label: 'Carte',
-                subLabel: defaultCard?.maskedLabel,
-                icon: Icons.credit_card_rounded,
-                isSelected: _paymentType == 'card',
-                onTap: () {
-                  if (_paymentType == 'card' && defaultCard != null) {
-                    // Si déjà sélectionné, on propose de changer
-                    Navigator.pushNamed(context, '/cards');
-                  } else {
-                    setState(() => _paymentType = 'card');
-                  }
-                },
-              ),
+            _buildCompactPaymentItem(
+              id: 'card',
+              label: defaultCard != null ? 'Carte' : 'Ajouter une carte',
+              subLabel: defaultCard?.maskedLabel,
+              icon: Icons.credit_card_rounded,
+              isSelected: _paymentType == 'card',
+              onTap: () {
+                if (defaultCard == null) {
+                  _showNoCardDialog();
+                } else if (_paymentType == 'card') {
+                  Navigator.pushNamed(context, '/cards');
+                } else {
+                  setState(() => _paymentType = 'card');
+                }
+              },
             ),
           ],
         ),
-        if (_paymentType == 'card' && defaultCard != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8, left: 4),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline_rounded, size: 12, color: _AppColors.gray400),
-                const SizedBox(width: 4),
-                Text(
-                  'Sera débité sur ${defaultCard.brand.toUpperCase()} •••• ${defaultCard.last4}',
-                  style: const TextStyle(fontSize: 10, color: _AppColors.gray400),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => Navigator.pushNamed(context, '/cards'),
-                  child: const Text(
-                    'Changer',
-                    style: TextStyle(fontSize: 10, color: _AppColors.accentMid, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          ),
       ],
+    );
+  }
+
+  Widget _buildCompactPaymentItem({
+    required String id,
+    required String label,
+    String? subLabel,
+    required IconData icon,
+    required bool isSelected,
+    VoidCallback? onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap ?? () => setState(() => _paymentType = id),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? _AppColors.accent : _AppColors.gray50,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: isSelected ? [
+              BoxShadow(
+                color: _AppColors.accent.withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              )
+            ] : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected ? _AppColors.white : _AppColors.gray400,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? _AppColors.white : _AppColors.gray900,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subLabel != null)
+                      Text(
+                        subLabel,
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: isSelected ? _AppColors.white.withOpacity(0.7) : _AppColors.gray400,
+                        ),
+                        maxLines: 1,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1724,32 +1867,50 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       onTap: service.isActive
           ? () {
               setState(() => _selectedService = service);
-              _onServiceSelected();
+              if (!_serviceSectionExpanded) {
+                setState(() {
+                  _serviceSectionExpanded = true;
+                  _sheetHeight = 0.75;
+                });
+              }
             }
           : null,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 7),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        duration: const Duration(milliseconds: 250),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isSelected ? _AppColors.accentLight : _AppColors.gray50,
-          borderRadius: BorderRadius.circular(11),
+          color: isSelected ? _AppColors.accentLight : _AppColors.white,
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isSelected ? _AppColors.accent : _AppColors.gray200,
+            color: isSelected ? _AppColors.accent : _AppColors.gray100,
+            width: 1.5,
           ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: _AppColors.accent.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ] : [],
         ),
         child: Row(
           children: [
-            // Color dot
+            // Service Icon background
             Container(
-              width: 8,
-              height: 8,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isSelected ? _AppColors.accent : _AppColors.gray300,
+                color: isSelected ? _AppColors.white : _AppColors.gray50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                _getCategoryIcon(_selectedCategory?.name ?? ''),
+                size: 22,
+                color: isSelected ? _AppColors.accent : _AppColors.gray400,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 16),
             // Info
             Expanded(
               child: Column(
@@ -1757,16 +1918,17 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                 children: [
                   Text(
                     service.name,
-                    style: service.isActive
-                        ? _AppTextStyles.serviceNameStyle
-                        : _AppTextStyles.serviceNameStyle.copyWith(
-                            color: _AppColors.gray400),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: service.isActive ? _AppColors.gray900 : _AppColors.gray400,
+                    ),
                   ),
                   if (service.description != null) ...[
                     const SizedBox(height: 2),
                     Text(
                       service.description!,
-                      style: _AppTextStyles.serviceDescStyle,
+                      style: _AppTextStyles.serviceDescStyle.copyWith(fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1775,32 +1937,25 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            // Price + check
+            // Price
             if (service.basePrice != null)
-              Text(
-                '${service.basePrice!.toStringAsFixed(2)} ${service.currency}',
-                style: isSelected
-                    ? _AppTextStyles.servicePriceActiveStyle
-                    : _AppTextStyles.servicePriceStyle,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${service.basePrice!.toStringAsFixed(2)} ${service.currency}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: isSelected ? _AppColors.accentMid : _AppColors.gray900,
+                    ),
+                  ),
+                  const Text(
+                    'estimé',
+                    style: TextStyle(fontSize: 10, color: _AppColors.gray400),
+                  ),
+                ],
               ),
-            const SizedBox(width: 8),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isSelected ? _AppColors.accent : Colors.transparent,
-                border: Border.all(
-                  color: isSelected ? _AppColors.accent : _AppColors.gray300,
-                  width: 1.5,
-                ),
-              ),
-              child: isSelected
-                  ? const Icon(Icons.check_rounded,
-                      size: 12, color: _AppColors.white)
-                  : null,
-            ),
           ],
         ),
       ),
@@ -1817,54 +1972,68 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-          16, 10, 16, MediaQuery.of(context).padding.bottom + 16),
+          20, 10, 20, MediaQuery.of(context).padding.bottom + 16),
       child: GestureDetector(
         onTap: canCreate && !_isCreatingTrip ? _createRide : null,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          height: 50,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          height: 56,
           decoration: BoxDecoration(
-            color: canCreate && !_isCreatingTrip ? _AppColors.accent : _AppColors.gray100,
-            borderRadius: BorderRadius.circular(13),
-            boxShadow: canCreate && !_isCreatingTrip
-                ? const [
+            gradient: (canCreate && !_isCreatingTrip)
+                ? const LinearGradient(
+                    colors: [_AppColors.accent, _AppColors.accentMid],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: (canCreate && !_isCreatingTrip) ? null : _AppColors.gray100,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: (canCreate && !_isCreatingTrip)
+                ? [
                     BoxShadow(
-                      color: _AppColors.accentShadow,
-                      blurRadius: 18,
-                      offset: Offset(0, 6),
+                      color: _AppColors.accent.withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
                     ),
                   ]
                 : null,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Stack(
+            alignment: Alignment.center,
             children: [
+              AnimatedOpacity(
+                opacity: _isCreatingTrip ? 0.0 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 20,
+                      color: canCreate ? _AppColors.white : _AppColors.gray400,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      canCreate
+                          ? 'Confirmer la course'
+                          : 'Choisir une option',
+                      style: (canCreate && !_isCreatingTrip)
+                          ? _AppTextStyles.ctaLabel.copyWith(fontSize: 16)
+                          : _AppTextStyles.ctaLabelDisabled.copyWith(fontSize: 16),
+                    ),
+                  ],
+                ),
+              ),
               if (_isCreatingTrip)
                 const SizedBox(
-                  width: 16,
-                  height: 16,
+                  width: 24,
+                  height: 24,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2,
+                    strokeWidth: 3,
                     valueColor: AlwaysStoppedAnimation(_AppColors.white),
                   ),
-                )
-              else
-                Icon(
-                  Icons.directions_car_rounded,
-                  size: 18,
-                  color: canCreate ? _AppColors.white : _AppColors.gray400,
                 ),
-              const SizedBox(width: 9),
-              Text(
-                _isCreatingTrip
-                    ? 'Création en cours...'
-                    : canCreate
-                        ? 'Créer la course — ${_selectedService!.name}'
-                        : 'Sélectionnez un service',
-                style: (canCreate && !_isCreatingTrip)
-                    ? _AppTextStyles.ctaLabel
-                    : _AppTextStyles.ctaLabelDisabled,
-              ),
             ],
           ),
         ),

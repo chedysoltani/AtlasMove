@@ -251,6 +251,42 @@ class TripService {
     }
   }
 
+  static Future<void> cancelClientTrip(String tripId, String reason) async {
+    debugPrint('=== TripService.cancelClientTrip() START ===');
+    debugPrint('Trip ID: $tripId, Reason: $reason');
+
+    try {
+      // Pour les clients, l'endpoint est sous le préfixe /m/trips
+      final response = await HttpClient.patch(
+        '/m/trips/$tripId/cancel',
+        body: {'reason': reason},
+      );
+
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      
+      if (!response.isSuccess) {
+        // En cas d'échec sur /m/ (par exemple si l'API n'est pas encore migrée ou utilise un autre pattern),
+        // on tente un fallback vers /l/ pour assurer la continuité de service.
+        debugPrint('⚠️ Échec sur /m/trips, essai du fallback sur /l/trips...');
+        final fallbackResponse = await HttpClient.patch(
+          '/l/trips/$tripId/cancel',
+          body: {'reason': reason},
+        );
+        
+        if (!fallbackResponse.isSuccess) {
+          debugPrint('❌ Failed to cancel trip with fallback. Status: ${fallbackResponse.statusCode}');
+          throw Exception('Failed to cancel trip');
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur lors de l\'annulation de la course par le client: $e');
+      throw Exception('Erreur de connexion lors de l\'annulation');
+    } finally {
+      debugPrint('=== TripService.cancelClientTrip() END ===');
+    }
+  }
+
   static Future<TripHistoryResponse> getClientTripHistory({int page = 1, int limit = 10}) async {
     debugPrint('=== TripService.getClientTripHistory() START ===');
     debugPrint('Params: page=$page, limit=$limit');
