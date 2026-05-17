@@ -955,10 +955,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         margin: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
         decoration: const BoxDecoration(
           color: _AppColors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           boxShadow: [
             BoxShadow(
-              color: Color(0x1A000000),
+              color: Color(0x14000000),
               blurRadius: 24,
               offset: Offset(0, -6),
             ),
@@ -967,52 +967,60 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Success header
+            // Compact Premium Brand Header with Elegant Dark Mode Gradient
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: const BoxDecoration(
-                color: _AppColors.green,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+                gradient: LinearGradient(
+                  colors: [
+                    _AppColors.gray900,
+                    Color(0xFF1E293B),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
               ),
-              child: Column(
+              child: Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: _AppColors.primary.withOpacity(0.15),
                       shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+                      border: Border.all(color: _AppColors.primary, width: 1.5),
                     ),
                     child: const Icon(
-                      Icons.check_rounded,
-                      color: _AppColors.green,
-                      size: 28,
+                      Icons.check_circle_rounded,
+                      color: _AppColors.primary,
+                      size: 22,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Course créée avec succès',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'En attente d\'un livreur',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Course créée avec succès !',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Merci d\'utiliser AtlasMove.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1021,47 +1029,47 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             
             // Trip details
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Fare section
+                  // Fare section - Elegant compact horizontal row
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
                     decoration: BoxDecoration(
-                      color: _AppColors.accentLight,
+                      color: _AppColors.accentLight.withOpacity(0.4),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _AppColors.primary.withOpacity(0.12)),
                     ),
-                    child: Column(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
                           'Tarif estimé',
                           style: TextStyle(
                             fontSize: 12,
                             color: _AppColors.gray600,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 4),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              '${tripData.estimatedFare.toStringAsFixed(2)}',
+                              tripData.estimatedFare.toStringAsFixed(2),
                               style: const TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
                                 color: _AppColors.accentMid,
                               ),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 2),
                             Text(
                               tripData.currency,
                               style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
                                 color: _AppColors.accentMid,
                               ),
                             ),
@@ -1071,9 +1079,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
                   
-                  // Trip info
+                  // Trip info - Compact layout
                   Row(
                     children: [
                       Expanded(
@@ -1083,7 +1091,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                           value: '${_estimatedDistance?.toStringAsFixed(1)} km',
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: _buildTripInfoItem(
                           icon: Icons.access_time_rounded,
@@ -1091,7 +1099,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                           value: _estimatedDuration ?? '-',
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: _buildTripInfoItem(
                           icon: _paymentType == 'card' ? Icons.credit_card_rounded : Icons.payments_rounded,
@@ -1102,25 +1110,25 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                     ],
                   ),
                   
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
                   
-                  // Status
+                  // Status Bar - Tighter design
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: _getStatusColor(tripData.status).withOpacity(0.1),
+                      color: _getStatusColor(tripData.status).withOpacity(0.08),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: _getStatusColor(tripData.status),
+                        color: _getStatusColor(tripData.status).withOpacity(0.2),
                         width: 1,
                       ),
                     ),
                     child: Row(
                       children: [
                         Container(
-                          width: 8,
-                          height: 8,
+                          width: 6,
+                          height: 6,
                           decoration: BoxDecoration(
                             color: _getStatusColor(tripData.status),
                             shape: BoxShape.circle,
@@ -1130,8 +1138,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                         Text(
                           _getStatusText(tripData.status),
                           style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
                             color: _getStatusColor(tripData.status),
                           ),
                         ),
@@ -1140,7 +1148,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                           Text(
                             '~${tripData.estimatedArrivalMinutes} min',
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
                               color: _AppColors.gray600,
                             ),
                           ),
@@ -1148,64 +1157,42 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   
-                  // Action buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            // TODO: Implement cancel trip
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Annulation en cours...')),
-                            );
-                          },
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: const BorderSide(color: _AppColors.gray300),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Text(
-                            'Annuler',
+                  // Centered, sleek, and compact Pill button
+                  Center(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushReplacementNamed(context, '/client_trip_history');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        elevation: 3,
+                        shadowColor: _AppColors.primary.withOpacity(0.3),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.map_rounded, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Suivre ma course',
                             style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: _AppColors.gray600,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // TODO: Implement contact driver
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Contact en cours...')),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _AppColors.accent,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Text(
-                            'Suivre',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                )],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1220,7 +1207,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     required String value,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
       decoration: BoxDecoration(
         color: _AppColors.gray50,
         borderRadius: BorderRadius.circular(10),
@@ -1229,14 +1216,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         children: [
           Icon(
             icon,
-            size: 20,
+            size: 18,
             color: _AppColors.accent,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             label,
             style: const TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               color: _AppColors.gray400,
               fontWeight: FontWeight.w500,
             ),
@@ -1245,7 +1232,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           Text(
             value,
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 12,
               fontWeight: FontWeight.w700,
               color: _AppColors.gray900,
             ),

@@ -37,6 +37,14 @@ import 'screens/client_rewards_screen.dart';
 import 'screens/cards_list_screen.dart';
 import 'screens/payment_history_screen.dart';
 import 'models/trip_models.dart';
+import 'services/notification_service.dart';
+import 'widgets/notification_sheet.dart';
+import 'models/notification_model.dart';
+import 'screens/driver_subscription_screen.dart';
+import 'screens/driver_crypto_select_screen.dart';
+import 'screens/driver_crypto_recharge_screen.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +55,14 @@ void main() async {
   // Initialiser Stripe
   Stripe.publishableKey = dotenv.env['STRIPE_PUBLISHABLE_KEY'] ?? '';
   await Stripe.instance.applySettings();
+
+  // Configurer la réception globale des notifications in-app
+  NotificationService.onNewNotificationReceived = (item) {
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      NotificationSheet.showInAppBanner(context, item);
+    }
+  };
   
   runApp(const AtlasMoveApp());
 }
@@ -60,6 +76,7 @@ class AtlasMoveApp extends StatelessWidget {
       child: provider.ChangeNotifierProvider(
         create: (context) => AuthProvider(),
         child: MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'AtlasMove',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
@@ -102,6 +119,9 @@ class AtlasMoveApp extends StatelessWidget {
             '/client_rewards': (context) => const ClientRewardsScreen(),
             '/cards': (context) => const CardsListScreen(),
             '/payment_history': (context) => const PaymentHistoryScreen(),
+            '/driver_subscription': (context) => const DriverSubscriptionScreen(),
+            '/driver_crypto_select': (context) => const DriverCryptoSelectScreen(),
+            '/driver_crypto_recharge': (context) => const DriverCryptoRechargeScreen(),
           },
         ),
       ),

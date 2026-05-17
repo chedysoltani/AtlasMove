@@ -5,6 +5,9 @@ import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 import '../providers/auth_provider.dart';
 import '../services/location_tracking_service.dart';
+import '../services/notification_service.dart';
+import '../widgets/notification_sheet.dart';
+import '../services/subscription_service.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -30,6 +33,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeLocationTracking();
     });
+    NotificationService().initialize();
   }
 
   @override
@@ -123,21 +127,58 @@ class _DriverDashboardState extends State<DriverDashboard> {
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            onPressed: () {
-              // TODO: Notifications
+          AnimatedBuilder(
+            animation: NotificationService(),
+            builder: (context, _) {
+              final unreadCount = NotificationService().unreadCount;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    onPressed: () => NotificationSheet.show(context),
+                    icon: const Icon(Icons.notifications_outlined, color: Colors.black),
+                    tooltip: 'Notifications',
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                           textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
             },
-            icon: const Icon(Icons.notifications, color: Colors.black),
           ),
           IconButton(
             onPressed: () async {
               // Deconnecter l'utilisateur
+              NotificationService().disconnect();
               await Provider.of<AuthProvider>(context, listen: false).logout();
               if (mounted) {
                 Navigator.of(context).pushReplacementNamed('/login');
               }
             },
             icon: const Icon(Icons.logout, color: Colors.red),
+            tooltip: 'Déconnexion',
           ),
         ],
       ),
@@ -148,6 +189,11 @@ class _DriverDashboardState extends State<DriverDashboard> {
           children: [
             // Status Card
             _buildStatusCard(),
+            
+            const SizedBox(height: 16),
+
+            // Subscription Banner
+            _buildSubscriptionBanner(),
             
             const SizedBox(height: 16),
             
@@ -283,6 +329,142 @@ class _DriverDashboardState extends State<DriverDashboard> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSubscriptionBanner() {
+    final subService = SubscriptionService();
+    return AnimatedBuilder(
+      animation: subService,
+      builder: (context, _) {
+        final isValid = subService.isSubscriptionValid;
+        final isTrial = subService.isTrialActive;
+
+        if (isValid) {
+          return InkWell(
+            onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF161722),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.successColor.withOpacity(0.3), width: 1),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.successColor.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.verified_rounded, color: AppTheme.successColor, size: 16),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Abonnement Premium Actif ✨',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          isTrial ? 'Mois gratuit (expire bientôt)' : 'Abonnement valide',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 12),
+                ],
+              ),
+            ),
+          );
+        } else {
+          return InkWell(
+            onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1D2D),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.4), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  )
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.star_rounded, color: AppTheme.primaryColor, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Activez votre Compte Livreur',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Votre abonnement est inactif. Activez dès maintenant votre 1er mois GRATUIT (puis 90\$/mois) pour commencer à recevoir des courses avec 0% de commission !',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade400,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        'Activer l\'abonnement',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_forward_rounded, color: AppTheme.primaryColor, size: 14),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+      },
     );
   }
 

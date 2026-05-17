@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import '../../utils/app_theme.dart';
 import '../services/trip_service.dart';
 import '../models/trip_models.dart';
+import '../services/notification_service.dart';
+import '../widgets/notification_sheet.dart';
 
 class ClientDashboard extends StatefulWidget {
   const ClientDashboard({super.key});
@@ -22,6 +24,7 @@ class _ClientDashboardState extends State<ClientDashboard> {
   void initState() {
     super.initState();
     _loadDashboardData();
+    NotificationService().initialize();
   }
 
   Future<void> _loadDashboardData() async {
@@ -78,9 +81,50 @@ class _ClientDashboardState extends State<ClientDashboard> {
         ),
         centerTitle: true,
         actions: _currentIndex == 0 ? [
+          AnimatedBuilder(
+            animation: NotificationService(),
+            builder: (context, _) {
+              final unreadCount = NotificationService().unreadCount;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    onPressed: () => NotificationSheet.show(context),
+                    icon: const Icon(Icons.notifications_outlined, color: Colors.black),
+                    tooltip: 'Notifications',
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             onPressed: () {
-              // TODO: Implémenter la déconnexion
+              NotificationService().disconnect();
               Navigator.of(context).pushNamedAndRemoveUntil(
                 '/login',
                 (route) => false,
