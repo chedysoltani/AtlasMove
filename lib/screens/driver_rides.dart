@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:async';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 import '../services/location_service.dart';
@@ -27,6 +28,10 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
   String? _acceptingTripId;
   List<AvailableTrip> _trips = [];
   final LocationService _locationService = LocationService();
+  final Map<String, double?> _submittedBids = {};
+  final Map<String, double> _bidInputs = {};
+  final Map<String, bool> _isBiddingExpanded = {};
+  final Map<String, Timer> _bidPollingTimers = {};
 
   @override
   void initState() {
@@ -54,10 +59,51 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
 
   @override
   void dispose() {
+    for (final t in _bidPollingTimers.values) {
+      t.cancel();
+    }
     _pulseController.dispose();
     super.dispose();
   }
   
+  /// Polls the offer status every 4s. When accepted by the client, redirects to Active Ride.
+  void _startBidAcceptancePolling(AvailableTrip trip, double bidAmount) {
+    // Don't start duplicate polling for the same trip
+    _bidPollingTimers[trip.id]?.cancel();
+    _bidPollingTimers[trip.id] = Timer.periodic(
+      const Duration(seconds: 4),
+      (timer) async {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        try {
+          final activeTrip = await TripService.getActiveTrip();
+          if (activeTrip != null && activeTrip.id == trip.id && mounted) {
+            timer.cancel();
+            _bidPollingTimers.remove(trip.id);
+            HapticFeedback.heavyImpact();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('🎉 Votre offre a été acceptée ! Course en cours.'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DriverActiveRideScreen(trip: activeTrip),
+              ),
+            );
+          }
+        } catch (_) {
+          // Keep polling silently on error
+        }
+      },
+    );
+  }
+
   Future<void> _fetchAvailableTrips() async {
     setState(() {
       _isLoading = true;
@@ -410,7 +456,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            '${trip.estimatedFare.toStringAsFixed(2)} ${trip.currency}',
+                            '${(trip.offeredFare ?? trip.estimatedFare).toStringAsFixed(2)} ${trip.currency}',
                             style: const TextStyle(
                               color: AppTheme.primaryColor,
                               fontSize: 18,
@@ -426,6 +472,23 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                               fontSize: 12,
                             ),
                           ),
+                          if (trip.isNegotiable)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              margin: const EdgeInsets.only(top: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                'Négociable 🤝',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ],
@@ -458,7 +521,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                   ),
                 ),
 
-                // Action Buttons
+                // Action Buttons & Bidding Section
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -468,38 +531,129 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                       bottomRight: Radius.circular(16),
                     ),
                   ),
-                  child: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => _handleRideAction(trip, false),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: BorderSide(color: Colors.grey.shade300),
+                      // Bid status if already submitted
+                      if (_submittedBids[trip.id] != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.green.withOpacity(0.3)),
                           ),
-                          child: const Text(
-                            'Refuser',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.check_circle_rounded, color: Colors.green, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Offre de ${_submittedBids[trip.id]!.toStringAsFixed(2)} ${trip.currency} soumise au client ! En attente...',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _acceptingTripId == trip.id 
-                          ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator()))
-                          : CustomButton(
-                              text: 'Accepter',
-                              onPressed: () => _handleRideAction(trip, true),
-                              height: 48,
+                      ],
+                      
+                      // Bidding controls panel if expanded
+                      if (trip.isNegotiable && _isBiddingExpanded[trip.id] == true) ...[
+                        _buildBiddingPanel(trip),
+                        const SizedBox(height: 12),
+                      ],
+                      
+                      // Default actions row
+                      if (_isBiddingExpanded[trip.id] != true)
+                        Row(
+                          children: [
+                            // Refuser
+                            Expanded(
+                              flex: 3,
+                              child: OutlinedButton(
+                                onPressed: () => _handleRideAction(trip, false),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  side: BorderSide(color: Colors.grey.shade300),
+                                ),
+                                child: const Text(
+                                  'Refuser',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                             ),
-                      ),
+                            const SizedBox(width: 8),
+                            
+                            // Négocier
+                            if (trip.isNegotiable && _submittedBids[trip.id] == null) ...[
+                              Expanded(
+                                flex: 4,
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isBiddingExpanded[trip.id] = true;
+                                      _bidInputs[trip.id] = (trip.offeredFare ?? trip.estimatedFare) + 1.0;
+                                    });
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    side: const BorderSide(color: Colors.orange, width: 1.5),
+                                  ),
+                                  child: const Text(
+                                    'Négocier 🤝',
+                                    style: TextStyle(
+                                      color: Colors.orange,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            
+                            // Accepter
+                            Expanded(
+                              flex: 5,
+                              child: _acceptingTripId == trip.id 
+                                ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator()))
+                                : CustomButton(
+                                    text: _submittedBids[trip.id] != null ? 'Accepter Client' : 'Accepter',
+                                    onPressed: () => _handleRideAction(trip, true),
+                                    height: 48,
+                                  ),
+                            ),
+                          ],
+                        )
+                      else
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _isBiddingExpanded[trip.id] = false;
+                            });
+                          },
+                          child: const Text(
+                            'Retour aux options',
+                            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -508,6 +662,136 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildBiddingPanel(AvailableTrip trip) {
+    final currentBid = _bidInputs[trip.id] ?? (trip.offeredFare ?? trip.estimatedFare);
+    final clientFare = trip.offeredFare ?? trip.estimatedFare;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.orange.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Proposer votre contre-tarif :',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.orange,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  if (currentBid > clientFare) {
+                    setState(() {
+                      _bidInputs[trip.id] = double.parse((currentBid - 0.5).toStringAsFixed(2));
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: const Icon(Icons.remove, color: Colors.black, size: 16),
+                ),
+              ),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: Text(
+                  '${currentBid.toStringAsFixed(2)} ${trip.currency}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _bidInputs[trip.id] = double.parse((currentBid + 0.5).toStringAsFixed(2));
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: const Icon(Icons.add, color: Colors.black, size: 16),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+              onPressed: () async {
+                try {
+                  await TripService.submitDriverOffer(trip.id, currentBid);
+                  setState(() {
+                    _submittedBids[trip.id] = currentBid;
+                    _isBiddingExpanded[trip.id] = false;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Offre de ${currentBid.toStringAsFixed(2)} ${trip.currency} soumise !'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  // Start polling until client accepts or rejects
+                  _startBidAcceptancePolling(trip, currentBid);
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text(
+                'Envoyer l\'offre',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

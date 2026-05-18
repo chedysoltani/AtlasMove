@@ -272,6 +272,16 @@ class _NotificationSheetState extends State<NotificationSheet> {
 
     final path = actionUrl.toLowerCase().trim();
 
+    if (path.contains('/trips/') && path.contains('/offers')) {
+      final parts = path.split('/');
+      final tripsIndex = parts.indexOf('trips');
+      if (tripsIndex != -1 && tripsIndex + 1 < parts.length) {
+        final tripId = parts[tripsIndex + 1];
+        Navigator.pushNamed(context, '/create_ride', arguments: {'tripId': tripId});
+        return;
+      }
+    }
+
     if (path.contains('/client_trip_history') || path.contains('/trips/')) {
       Navigator.pushNamed(context, '/client_trip_history');
     } else if (path.contains('/profile')) {

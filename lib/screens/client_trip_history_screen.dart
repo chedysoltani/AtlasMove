@@ -515,22 +515,27 @@ class TripHistoryCard extends StatelessWidget {
                          status == 'searching' || 
                          status == 'accepted' || 
                          status == 'arriving';
+    final isMatching = status == 'pending' || status == 'searching';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+    return GestureDetector(
+      onTap: isMatching ? () {
+        Navigator.pushNamed(context, '/create_ride', arguments: {'tripId': trip.id});
+      } : null,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(color: Colors.grey.shade100),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
         child: Column(
           children: [
             // Top Section: Status & Date
@@ -682,7 +687,8 @@ class TripHistoryCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 

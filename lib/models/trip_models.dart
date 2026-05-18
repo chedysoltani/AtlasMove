@@ -51,8 +51,8 @@ class TripData {
   });
   
   factory TripData.fromJson(Map<String, dynamic> json) {
-    // Utiliser directement estimated_fare de la réponse API
-    double estimatedFare = double.tryParse(json['estimated_fare']?.toString() ?? '0') ?? 0.0;
+    // Utiliser directement offered_fare ou estimated_fare de la réponse API
+    double estimatedFare = double.tryParse((json['offered_fare'] ?? json['offeredFare'] ?? json['estimated_fare'] ?? json['estimatedFare'])?.toString() ?? '0') ?? 0.0;
     String currency = json['currency']?.toString() ?? 'MAD';
     
     // Fallback: utiliser les données du service si estimated_fare n'est pas disponible
@@ -119,6 +119,8 @@ class AvailableTrip {
   final String? clientId;
   String? clientName; // May be null if backend doesn't join client, mutable to fetch later
   final String? clientPhone;
+  final bool isNegotiable;
+  final double? offeredFare;
   
   AvailableTrip({
     required this.id,
@@ -137,6 +139,8 @@ class AvailableTrip {
     this.clientId,
     this.clientName,
     this.clientPhone,
+    this.isNegotiable = true,
+    this.offeredFare,
   });
 
   factory AvailableTrip.fromJson(Map<String, dynamic> json) {
@@ -176,6 +180,8 @@ class AvailableTrip {
       clientId: json['client_id']?.toString(),
       clientName: clientName,
       clientPhone: clientPhone,
+      isNegotiable: json['is_negotiable'] ?? true,
+      offeredFare: json['offered_fare'] != null ? double.tryParse(json['offered_fare'].toString()) : null,
     );
   }
 }
@@ -216,7 +222,7 @@ class TripHistoryItem {
       pickupAddress: json['pickup_address']?.toString() ?? 'Adresse inconnue',
       destinationAddress: json['destination_address']?.toString() ?? 'Adresse inconnue',
       serviceName: serviceName,
-      estimatedFare: double.tryParse(json['estimated_fare']?.toString() ?? '0') ?? 0.0,
+      estimatedFare: double.tryParse((json['offered_fare'] ?? json['offeredFare'] ?? json['estimated_fare'] ?? json['estimatedFare'])?.toString() ?? '0') ?? 0.0,
       currency: json['currency']?.toString() ?? 'MAD',
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at'].toString()) 
@@ -249,6 +255,44 @@ class TripHistoryResponse {
       total: int.tryParse(data['total']?.toString() ?? '0') ?? 0,
       page: int.tryParse(data['page']?.toString() ?? '1') ?? 1,
       limit: int.tryParse(data['limit']?.toString() ?? '10') ?? 10,
+    );
+  }
+}
+
+class BidOffer {
+  final String id;
+  final String tripId;
+  final String livreurId;
+  final String driverName;
+  final String? driverPhoto;
+  final double driverRating;
+  final String driverVehicle;
+  final double proposedFare;
+  final String status; // "pending", "countered", "accepted", "rejected"
+
+  BidOffer({
+    required this.id,
+    required this.tripId,
+    required this.livreurId,
+    required this.driverName,
+    this.driverPhoto,
+    required this.driverRating,
+    required this.driverVehicle,
+    required this.proposedFare,
+    required this.status,
+  });
+
+  factory BidOffer.fromJson(Map<String, dynamic> json) {
+    return BidOffer(
+      id: json['id']?.toString() ?? '',
+      tripId: (json['trip_id'] ?? json['tripId'])?.toString() ?? '',
+      livreurId: (json['livreur_id'] ?? json['livreurId'])?.toString() ?? '',
+      driverName: (json['driver_name'] ?? json['driverName'] ?? json['driver']?['fullName'] ?? json['driver']?['name'])?.toString() ?? 'Livreur',
+      driverPhoto: (json['driver_photo'] ?? json['driverPhoto'] ?? json['driver']?['photo'])?.toString(),
+      driverRating: double.tryParse((json['driver_rating'] ?? json['driverRating'] ?? json['driver']?['rating'] ?? json['driver']?['stars'])?.toString() ?? '4.8') ?? 4.8,
+      driverVehicle: (json['driver_vehicle'] ?? json['driverVehicle'] ?? json['driver']?['vehicle'] ?? json['driver']?['vehicle_type'])?.toString() ?? 'Moto standard',
+      proposedFare: double.tryParse((json['proposed_fare'] ?? json['proposedFare'] ?? json['proposed_price'])?.toString() ?? '0') ?? 0.0,
+      status: json['status']?.toString() ?? 'pending',
     );
   }
 }

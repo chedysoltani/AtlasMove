@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:math' as math;
@@ -14,6 +15,7 @@ import '../services/geocoding_service.dart';
 import '../services/trip_service.dart';
 import '../providers/cards_provider.dart';
 import '../models/card_models.dart';
+import 'client_active_ride_screen.dart';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 class _AppColors {
@@ -150,6 +152,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   bool _showRouteEstimation = false;
   double _sheetHeight = 0.35;
   String _paymentType = 'cash'; // 'card' | 'cash'
+  bool _isNegotiable = true;
+  double? _customOfferedFare;
+  List<BidOffer> _driverOffers = [];
+  Timer? _offersTimer;
 
   bool _isDestinationFocused = false;
 
@@ -160,6 +166,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       ref.read(mapProvider.notifier).initializeMap();
       ref.read(catalogueProvider.notifier).fetchCatalogue();
       ref.read(cardsProvider.notifier).loadCards();
+      
+      // Check for tripId argument to resume active matching session
+      final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args.containsKey('tripId')) {
+        final tripId = args['tripId'] as String;
+        _resumeActiveTripSession(tripId);
+      }
     });
     _destinationController.addListener(_onDestinationChanged);
     _destinationFocusNode.addListener(() {
@@ -171,6 +184,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
   @override
   void dispose() {
+    _offersTimer?.cancel();
     _debounceTimer?.cancel();
     _destinationController.removeListener(_onDestinationChanged);
     _destinationController.dispose();
@@ -431,10 +445,16 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         estimatedDistanceKm: _estimatedDistance!,
         estimatedDurationMin: _parseDurationToMinutes(_estimatedDuration!),
         paymentType: _paymentType,
+        isNegotiable: _isNegotiable,
+        offeredFare: _customOfferedFare,
       );
 
       if (mounted) {
-        setState(() => _tripResponse = response);
+        setState(() {
+          _tripResponse = response;
+          _driverOffers = [];
+        });
+        _startBidsPolling(response.data!.id);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(response.message), backgroundColor: _AppColors.green),
         );
@@ -452,6 +472,87 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         setState(() => _isCreatingTrip = false);
       }
       debugPrint('=== _createRide() END ===');
+    }
+  }
+
+  void _startBidsPolling(String tripId) {
+    _offersTimer?.cancel();
+    _offersTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      if (!mounted || _tripResponse == null) {
+        timer.cancel();
+        return;
+      }
+      
+      try {
+        final offers = await TripService.getTripOffers(tripId);
+        if (mounted) {
+          setState(() {
+            _driverOffers = offers;
+          });
+        }
+      } catch (e) {
+        debugPrint('Polling offers error: $e');
+      }
+    });
+  }
+
+  Future<void> _resumeActiveTripSession(String tripId) async {
+    debugPrint('Resuming active trip session for ID: $tripId');
+    try {
+      // 1. Charger les offres existantes
+      final offers = await TripService.getTripOffers(tripId);
+      
+      // 2. Charger l'historique pour trouver les détails exacts de la course active
+      final history = await TripService.getClientTripHistory(page: 1, limit: 5);
+      TripHistoryItem? activeTrip;
+      
+      for (final t in history.trips) {
+        if (t.id == tripId) {
+          activeTrip = t;
+          break;
+        }
+      }
+      
+      final tripItem = activeTrip ?? TripHistoryItem(
+        id: tripId,
+        status: 'pending',
+        pickupAddress: 'Position actuelle',
+        destinationAddress: 'Destination',
+        serviceName: 'Moto standard',
+        estimatedFare: offers.isNotEmpty ? offers.first.proposedFare : 4.50,
+        currency: 'TND',
+        createdAt: DateTime.now(),
+        estimatedDistanceKm: 0.0,
+        estimatedDurationMin: 0,
+      );
+      
+      final response = TripResponse(
+        success: true,
+        message: 'Course récupérée',
+        data: TripData(
+          id: tripId,
+          status: tripItem.status,
+          estimatedFare: tripItem.estimatedFare,
+          currency: tripItem.currency,
+        ),
+      );
+      
+      if (mounted) {
+        setState(() {
+          _tripResponse = response;
+          _driverOffers = offers;
+          _isNegotiable = true;
+          _paymentType = 'cash'; // Valeur par défaut résiliente
+          _estimatedDistance = tripItem.estimatedDistanceKm;
+          _estimatedDuration = '${tripItem.estimatedDurationMin} min';
+          _destinationController.text = tripItem.destinationAddress;
+        });
+        
+        // 3. Lancer le polling temps réel
+        _startBidsPolling(tripId);
+      }
+    } catch (e) {
+      debugPrint('Error resuming active trip session: $e');
     }
   }
 
@@ -873,6 +974,11 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           _buildServiceSelection(catalogueAsync),
 
           const SizedBox(height: 24),
+
+          if (_selectedService != null) ...[
+            _buildNegotiationSection(),
+            const SizedBox(height: 24),
+          ],
           
           // Sélection du paiement
           _buildPaymentSelection(),
@@ -1157,6 +1263,11 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                     ),
                   ),
                   
+                  if (_isNegotiable) ...[
+                    const SizedBox(height: 14),
+                    _buildDriverOffersSection(),
+                  ],
+                  
                   const SizedBox(height: 14),
                   
                   // Centered, sleek, and compact Pill button
@@ -1198,6 +1309,409 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDriverOffersSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.gavel_rounded, size: 14, color: _AppColors.primary),
+                SizedBox(width: 6),
+                Text(
+                  'Offres des chauffeurs',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: _AppColors.gray900,
+                  ),
+                ),
+              ],
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: _driverOffers.isEmpty ? _AppColors.gray100 : _AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${_driverOffers.length} offre(s)',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: _driverOffers.isEmpty ? _AppColors.gray400 : _AppColors.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_driverOffers.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            decoration: BoxDecoration(
+              color: _AppColors.gray50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _AppColors.gray100),
+            ),
+            child: Column(
+              children: const [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(_AppColors.primary),
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Recherche de chauffeurs à proximité...',
+                  style: TextStyle(fontSize: 11, color: _AppColors.gray400),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            constraints: const BoxConstraints(maxHeight: 180),
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: _driverOffers.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final offer = _driverOffers[index];
+                return _buildDriverOfferCard(offer);
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDriverOfferCard(BidOffer offer) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _AppColors.gray200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Photo du livreur / Initiale
+          const CircleAvatar(
+            radius: 20,
+            backgroundColor: _AppColors.accentLight,
+            child: Icon(Icons.person, color: _AppColors.accent, size: 20),
+          ),
+          const SizedBox(width: 10),
+          
+          // Détails chauffeur
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      offer.driverName,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: _AppColors.gray900,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
+                        Text(
+                          offer.driverRating.toStringAsFixed(1),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: _AppColors.gray600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                Text(
+                  offer.driverVehicle,
+                  style: const TextStyle(fontSize: 10, color: _AppColors.gray400),
+                ),
+              ],
+            ),
+          ),
+          
+          // Prix proposé & Actions
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${offer.proposedFare.toStringAsFixed(2)} ${_selectedService?.currency ?? "TND"}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: _AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Décliner
+                  GestureDetector(
+                    onTap: () async {
+                      try {
+                        await TripService.rejectOffer(offer.id);
+                        final offers = await TripService.getTripOffers(_tripResponse!.data!.id);
+                        setState(() {
+                          _driverOffers = offers;
+                        });
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Erreur: $e'), backgroundColor: _AppColors.red),
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(
+                        color: _AppColors.gray100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close, size: 14, color: _AppColors.gray600),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  
+                  // Contre-offre (Counter)
+                  GestureDetector(
+                    onTap: () => _showCounterOfferSheet(offer),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _AppColors.accentLight,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Contre',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _AppColors.accentMid,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  
+                  // Accepter
+                  GestureDetector(
+                    onTap: () async {
+                      try {
+                        await TripService.acceptOffer(offer.id);
+                        _offersTimer?.cancel();
+                        HapticFeedback.heavyImpact();
+                        if (!mounted) return;
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ClientActiveRideScreen(
+                              tripId: _tripResponse!.data!.id,
+                              lockedFare: offer.proposedFare,
+                              currency: _selectedService?.currency ?? _tripResponse!.data!.currency,
+                              driverName: offer.driverName,
+                              driverPhoto: offer.driverPhoto,
+                              driverRating: offer.driverRating,
+                              driverVehicle: offer.driverVehicle,
+                              destination: _destinationController.text,
+                            ),
+                          ),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Erreur: $e'), backgroundColor: _AppColors.red),
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _AppColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Accepter',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCounterOfferSheet(BidOffer offer) {
+    double counterFare = offer.proposedFare;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: _AppColors.gray200,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Contre-proposer un tarif',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: _AppColors.gray900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Chauffeur: ${offer.driverName} (Proposé: ${offer.proposedFare.toStringAsFixed(2)} TND)',
+                    style: const TextStyle(fontSize: 12, color: _AppColors.gray400),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _CircleButton(
+                        size: 40,
+                        color: _AppColors.gray50,
+                        border: Border.all(color: _AppColors.gray200),
+                        onTap: () {
+                          if (counterFare > 1.0) {
+                            setSheetState(() {
+                              counterFare = double.parse((counterFare - 0.5).toStringAsFixed(2));
+                            });
+                          }
+                        },
+                        child: const Icon(Icons.remove, color: _AppColors.gray600),
+                      ),
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _AppColors.gray50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: _AppColors.gray200),
+                        ),
+                        child: Text(
+                          '${counterFare.toStringAsFixed(2)} TND',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: _AppColors.gray900,
+                          ),
+                        ),
+                      ),
+                      _CircleButton(
+                        size: 40,
+                        color: _AppColors.gray50,
+                        border: Border.all(color: _AppColors.gray200),
+                        onTap: () {
+                          setSheetState(() {
+                            counterFare = double.parse((counterFare + 0.5).toStringAsFixed(2));
+                          });
+                        },
+                        child: const Icon(Icons.add, color: _AppColors.gray600),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () async {
+                        try {
+                          await TripService.counterOffer(offer.id, counterFare);
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Contre-proposition envoyée !'), backgroundColor: _AppColors.green),
+                          );
+                          final offers = await TripService.getTripOffers(_tripResponse!.data!.id);
+                          setState(() {
+                            _driverOffers = offers;
+                          });
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Erreur: $e'), backgroundColor: _AppColors.red),
+                          );
+                        }
+                      },
+                      child: const Text(
+                        'Envoyer la contre-proposition',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
   
@@ -1523,6 +2037,176 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildNegotiationSection() {
+    if (_selectedService == null) return const SizedBox.shrink();
+    final defaultPrice = _selectedService!.basePrice ?? 0.0;
+    final currency = _selectedService!.currency;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _AppColors.gray50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _isNegotiable ? _AppColors.primary.withOpacity(0.3) : _AppColors.gray200,
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: _isNegotiable ? _AppColors.primary.withOpacity(0.1) : _AppColors.gray200,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.gavel_rounded,
+                      size: 16,
+                      color: _isNegotiable ? _AppColors.primary : _AppColors.gray600,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Négociation de prix',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: _AppColors.gray900,
+                        ),
+                      ),
+                      Text(
+                        'Proposer votre propre tarif',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _AppColors.gray400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Switch.adaptive(
+                value: _isNegotiable,
+                activeColor: _AppColors.primary,
+                onChanged: (val) {
+                  setState(() {
+                    _isNegotiable = val;
+                    if (val) {
+                      _customOfferedFare = defaultPrice;
+                    } else {
+                      _customOfferedFare = null;
+                    }
+                  });
+                },
+              ),
+            ],
+          ),
+          if (_isNegotiable) ...[
+            const SizedBox(height: 16),
+            const Divider(height: 1, color: _AppColors.gray200),
+            const SizedBox(height: 16),
+            const Text(
+              'Votre proposition de départ :',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _AppColors.gray600,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _CircleButton(
+                  size: 38,
+                  color: _AppColors.white,
+                  border: Border.all(color: _AppColors.gray200),
+                  onTap: () {
+                    if (_customOfferedFare != null && _customOfferedFare! > 1.0) {
+                      setState(() {
+                        _customOfferedFare = double.parse((_customOfferedFare! - 0.5).toStringAsFixed(2));
+                      });
+                    }
+                  },
+                  child: const Icon(Icons.remove, color: _AppColors.gray600, size: 18),
+                ),
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _AppColors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _AppColors.gray200),
+                    ),
+                    child: Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            (_customOfferedFare ?? defaultPrice).toStringAsFixed(2),
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: _AppColors.gray900,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            currency ?? 'TND',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: _AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                _CircleButton(
+                  size: 38,
+                  color: _AppColors.white,
+                  border: Border.all(color: _AppColors.gray200),
+                  onTap: () {
+                    setState(() {
+                      _customOfferedFare = double.parse(((_customOfferedFare ?? defaultPrice) + 0.5).toStringAsFixed(2));
+                    });
+                  },
+                  child: const Icon(Icons.add, color: _AppColors.gray600, size: 18),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.info_outline_rounded, size: 12, color: _AppColors.gray400),
+                const SizedBox(width: 4),
+                Text(
+                  'Tarif estimé standard : ${defaultPrice.toStringAsFixed(2)} $currency',
+                  style: const TextStyle(fontSize: 11, color: _AppColors.gray400),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -1853,7 +2537,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     return GestureDetector(
       onTap: service.isActive
           ? () {
-              setState(() => _selectedService = service);
+              setState(() {
+                _selectedService = service;
+                _customOfferedFare = service.basePrice;
+              });
               if (!_serviceSectionExpanded) {
                 setState(() {
                   _serviceSectionExpanded = true;
@@ -2088,12 +2775,14 @@ class _CircleButton extends StatelessWidget {
   final VoidCallback? onTap;
   final Color color;
   final double size;
+  final BoxBorder? border;
 
   const _CircleButton({
     required this.child,
     required this.color,
     this.onTap,
     this.size = 36,
+    this.border,
   });
 
   @override
@@ -2106,6 +2795,7 @@ class _CircleButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
+          border: border,
         ),
         child: child,
       ),

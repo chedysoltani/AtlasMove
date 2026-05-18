@@ -16,6 +16,8 @@ class TripService {
     required double estimatedDistanceKm,
     required int estimatedDurationMin,
     required String paymentType, // "card" | "cash"
+    bool isNegotiable = true,
+    double? offeredFare,
   }) async {
     // LOG: Début de la fonction
     debugPrint('=== TripService.createTrip() START ===');
@@ -33,6 +35,8 @@ class TripService {
         'estimated_distance_km': double.parse(estimatedDistanceKm.toStringAsFixed(2)), // 2 décimales max
         'estimated_duration_min': estimatedDurationMin,
         'payment_type': paymentType,
+        'is_negotiable': isNegotiable,
+        if (offeredFare != null) 'offered_fare': offeredFare,
       };
       
       debugPrint('Données envoyées: $requestData');
@@ -318,6 +322,140 @@ class TripService {
       );
     } finally {
       debugPrint('=== TripService.getClientTripHistory() END ===');
+    }
+  }
+
+  // --- SYSTÈME DE NÉGOCIATION (BIDDING SYSTEM) ---
+
+  /// Soumettre une offre de prix (Livreur)
+  static Future<void> submitDriverOffer(String tripId, double proposedFare) async {
+    debugPrint('=== TripService.submitDriverOffer() START ===');
+    debugPrint('Trip ID: $tripId, Proposed Fare: $proposedFare');
+
+    try {
+      final response = await HttpClient.post(
+        '/l/trips/$tripId/offers',
+        body: {'proposedFare': proposedFare},
+      );
+
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      
+      if (!response.isSuccess) {
+        debugPrint('❌ Failed to submit driver offer. Status: ${response.statusCode}');
+        throw Exception(response.json['message'] ?? 'Failed to submit offer');
+      }
+      debugPrint('✅ Driver offer submitted successfully');
+    } catch (e) {
+      debugPrint('❌ Erreur lors de la soumission de l\'offre: $e');
+      throw Exception(e.toString());
+    } finally {
+      debugPrint('=== TripService.submitDriverOffer() END ===');
+    }
+  }
+
+  /// Accepter une offre (Client ou Livreur suite à contre-proposition)
+  static Future<void> acceptOffer(String offerId) async {
+    debugPrint('=== TripService.acceptOffer() START ===');
+    debugPrint('Offer ID: $offerId');
+
+    try {
+      final response = await HttpClient.post('/m/trips/offers/$offerId/accept');
+
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      
+      if (!response.isSuccess) {
+        debugPrint('❌ Failed to accept offer. Status: ${response.statusCode}');
+        throw Exception(response.json['message'] ?? 'Failed to accept offer');
+      }
+      debugPrint('✅ Offer accepted successfully');
+    } catch (e) {
+      debugPrint('❌ Erreur lors de l\'acceptation de l\'offre: $e');
+      throw Exception(e.toString());
+    } finally {
+      debugPrint('=== TripService.acceptOffer() END ===');
+    }
+  }
+
+  /// Proposer un contre-tarif (Client)
+  static Future<void> counterOffer(String offerId, double proposedFare) async {
+    debugPrint('=== TripService.counterOffer() START ===');
+    debugPrint('Offer ID: $offerId, Proposed Fare: $proposedFare');
+
+    try {
+      final response = await HttpClient.post(
+        '/m/trips/offers/$offerId/counter',
+        body: {'proposedFare': proposedFare},
+      );
+
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      
+      if (!response.isSuccess) {
+        debugPrint('❌ Failed to counter offer. Status: ${response.statusCode}');
+        throw Exception(response.json['message'] ?? 'Failed to propose counter fare');
+      }
+      debugPrint('✅ Counter offer sent successfully');
+    } catch (e) {
+      debugPrint('❌ Erreur lors de la contre-proposition: $e');
+      throw Exception(e.toString());
+    } finally {
+      debugPrint('=== TripService.counterOffer() END ===');
+    }
+  }
+
+  /// Rejeter/Décliner une offre (Client ou Livreur)
+  static Future<void> rejectOffer(String offerId) async {
+    debugPrint('=== TripService.rejectOffer() START ===');
+    debugPrint('Offer ID: $offerId');
+
+    try {
+      final response = await HttpClient.post('/m/trips/offers/$offerId/reject');
+
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      
+      if (!response.isSuccess) {
+        debugPrint('❌ Failed to reject offer. Status: ${response.statusCode}');
+        throw Exception(response.json['message'] ?? 'Failed to reject offer');
+      }
+      debugPrint('✅ Offer rejected successfully');
+    } catch (e) {
+      debugPrint('❌ Erreur lors du rejet de l\'offre: $e');
+      throw Exception(e.toString());
+    } finally {
+      debugPrint('=== TripService.rejectOffer() END ===');
+    }
+  }
+
+  /// Récupérer les offres (bids) pour un trajet (Client)
+  static Future<List<BidOffer>> getTripOffers(String tripId) async {
+    debugPrint('=== TripService.getTripOffers() START ===');
+    try {
+      final response = await HttpClient.get('/m/trips/$tripId/offers');
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      
+      if (response.isSuccess) {
+        final rawData = response.json['data'];
+        List<dynamic> offersJson = [];
+        
+        if (rawData is List) {
+          offersJson = rawData;
+        } else if (rawData is Map) {
+          if (rawData['data'] is List) {
+            offersJson = rawData['data'];
+          } else if (rawData['offers'] is List) {
+            offersJson = rawData['offers'];
+          }
+        }
+        
+        debugPrint('📊 parsed offers count: ${offersJson.length}');
+        return offersJson.map((json) => BidOffer.fromJson(json as Map<String, dynamic>)).toList();
+      } else {
+        throw Exception('Failed to fetch offers');
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur getTripOffers: $e');
+      return [];
+    } finally {
+      debugPrint('=== TripService.getTripOffers() END ===');
     }
   }
 }
