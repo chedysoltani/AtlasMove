@@ -186,12 +186,29 @@ class TripService {
       if (response.isSuccess) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
         
-        // La structure de l'API peut retourner null ou un message 404
-        if (responseData['data'] == null) return null;
-        
-        return AvailableTrip.fromJson(responseData['data']);
+        // L'API renvoie: { "data": { "message": "...", "data": { ...trip... } } }
+        // Il faut donc désimbriquer deux fois
+        final outer = responseData['data'];
+        if (outer == null) return null;
+
+        // Cas 1 : format { message, data: {...trip...} }
+        if (outer is Map<String, dynamic> && outer.containsKey('data') && outer['data'] is Map) {
+          final tripJson = outer['data'] as Map<String, dynamic>;
+          debugPrint('✅ Trip parsé depuis data.data: id=${tripJson['id']}');
+          return AvailableTrip.fromJson(tripJson);
+        }
+
+        // Cas 2 : format direct { ...trip... }
+        if (outer is Map<String, dynamic> && outer.containsKey('id')) {
+          debugPrint('✅ Trip parsé depuis data directement: id=${outer['id']}');
+          return AvailableTrip.fromJson(outer);
+        }
+
+        debugPrint('⚠️ Structure de réponse inattendue: $outer');
+        return null;
       } else if (response.statusCode == 404) {
         // Pas de course active
+        debugPrint('ℹ️ Aucune course active (404)');
         return null;
       } else {
         debugPrint('❌ Failed to get active trip. Status: ${response.statusCode}');
@@ -199,13 +216,64 @@ class TripService {
       }
     } catch (e) {
       debugPrint('❌ Erreur lors de la récupération de la course active: $e');
-      // Pour les erreurs de connexion, on peut retourner null pour ne pas bloquer l'appli
-      // mais on devrait idéalement différencier entre pas de course (404) et pas d'internet.
       return null;
     } finally {
       debugPrint('=== TripService.getActiveTrip() END ===');
     }
   }
+
+  static Future<List<AvailableTrip>> getDriverTrips({int page = 1, int limit = 1}) async {
+    debugPrint('=== TripService.getDriverTrips() START ===');
+    debugPrint('Params: page=$page, limit=$limit');
+    
+    try {
+      final queryParams = {
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+      
+      final response = await HttpClient.get('/l/trips', queryParams: queryParams);
+      
+      debugPrint('Status Code: ${response.statusCode}');
+      
+      if (response.isSuccess) {
+        final dynamic decoded = jsonDecode(response.body);
+        List<dynamic> tripsJson = [];
+        
+        if (decoded is Map) {
+          if (decoded['data'] != null) {
+            final data = decoded['data'];
+            if (data is Map && data['data'] is List) {
+              tripsJson = data['data'];
+            } else if (data is List) {
+              tripsJson = data;
+            }
+          } else if (decoded['trips'] is List) {
+            tripsJson = decoded['trips'];
+          }
+        } else if (decoded is List) {
+          tripsJson = decoded;
+        }
+        
+        debugPrint('getDriverTrips parsed JSON list of length: ${tripsJson.length}');
+        return tripsJson.map((json) => AvailableTrip.fromJson(json as Map<String, dynamic>)).toList();
+      } else {
+        throw TripException(
+          message: response.json['message'] ?? 'Failed to fetch driver trips',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      debugPrint('ERREUR fetching driver trips: $e');
+      throw TripException(
+        message: e.toString(),
+        statusCode: null,
+      );
+    } finally {
+      debugPrint('=== TripService.getDriverTrips() END ===');
+    }
+  }
+
 
   static Future<void> updateTripStatus(String tripId, String status) async {
     debugPrint('=== TripService.updateTripStatus() START ===');

@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/notification_model.dart';
+import '../models/trip_models.dart';
+import '../providers/auth_provider.dart';
 import '../services/notification_service.dart';
+import '../services/trip_service.dart';
+import '../screens/driver_active_ride.dart';
 import '../utils/app_theme.dart';
 
 class NotificationSheet extends StatefulWidget {
@@ -132,7 +137,9 @@ class _NotificationSheetState extends State<NotificationSheet> {
   @override
   void initState() {
     super.initState();
-    _refreshNotifications();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshNotifications();
+    });
   }
 
   Future<void> _refreshNotifications() async {
@@ -254,10 +261,17 @@ class _NotificationSheetState extends State<NotificationSheet> {
     }
   }
 
-  void _handleNotificationTap(NotificationItem notification) {
+  Future<void> _handleNotificationTap(NotificationItem notification) async {
     // Marquer comme lu
     if (notification.status == NotificationStatus.unread) {
       _notificationService.markAsRead(notification.id);
+    }
+    
+    // Si c'est un livreur et que la notification conduit à une course, lancer le flow dédié sans fermer le sheet immédiatement
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.isDeliveryUser && (notification.actionUrl?.contains('/trips/') ?? false)) {
+      await _handleDriverTripNotificationClick();
+      return;
     }
     
     // Fermer le sheet
@@ -267,10 +281,38 @@ class _NotificationSheetState extends State<NotificationSheet> {
     _navigateDeepLink(notification.actionUrl);
   }
 
+  Future<void> _handleDriverTripNotificationClick() async {
+    final activeTrip = await showDialog<AvailableTrip>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const _DriverTripLoaderDialog(),
+    );
+
+    if (activeTrip != null && mounted) {
+      debugPrint('🚀 Course active récupérée : ${activeTrip.id}. Redirection vers DriverActiveRideScreen...');
+      // Rediriger vers la course active
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DriverActiveRideScreen(trip: activeTrip),
+        ),
+      );
+    }
+  }
+
   void _navigateDeepLink(String? actionUrl) {
     if (actionUrl == null || actionUrl.isEmpty) return;
 
     final path = actionUrl.toLowerCase().trim();
+
+    // Intercepter si c'est un livreur pour éviter le 403 et ouvrir la carte directement
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.isDeliveryUser) {
+      if (path.contains('/trips/') || path.contains('/driver_active_ride')) {
+        _handleDriverTripNotificationClick();
+        return;
+      }
+    }
 
     if (path.contains('/trips/') && path.contains('/offers')) {
       final parts = path.split('/');
@@ -617,6 +659,226 @@ class _NotificationSheetState extends State<NotificationSheet> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverTripLoaderDialog extends StatefulWidget {
+  const _DriverTripLoaderDialog();
+
+  @override
+  State<_DriverTripLoaderDialog> createState() => _DriverTripLoaderDialogState();
+}
+
+class _DriverTripLoaderDialogState extends State<_DriverTripLoaderDialog> {
+  int _attempt = 1;
+  static const int _maxAttempts = 3;
+  String _statusMessage = "Récupération de votre course active...";
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startFetchFlow();
+  }
+
+  Future<void> _startFetchFlow() async {
+    setState(() {
+      _hasError = false;
+      if (_attempt == 1) {
+        _statusMessage = "Connexion au service...";
+      } else {
+        _statusMessage = "Tentative $_attempt de $_maxAttempts...";
+      }
+    });
+
+    try {
+      // 1. Tenter d'obtenir la course active directe
+      setState(() => _statusMessage = "Recherche de la course active...");
+      AvailableTrip? activeTrip = await TripService.getActiveTrip();
+
+      // 2. Si non trouvé, faire le fallback sur getDriverTrips(page: 1, limit: 1)
+      if (activeTrip == null) {
+        setState(() => _statusMessage = "Vérification des dernières courses...");
+        final driverTrips = await TripService.getDriverTrips(page: 1, limit: 1);
+        if (driverTrips.isNotEmpty) {
+          final candidate = driverTrips.first;
+          // Vérifier si le statut est actif
+          if (candidate.status != 'completed' && candidate.status != 'cancelled') {
+            activeTrip = candidate;
+          }
+        }
+      }
+
+      if (activeTrip != null) {
+        if (!mounted) return;
+        // Succès ! On ferme le loader et on renvoie la course
+        Navigator.of(context).pop(activeTrip);
+      } else {
+        // Pas de course active trouvée
+        if (_attempt < _maxAttempts) {
+          _attempt++;
+          setState(() {
+            _statusMessage = "Aucune course active. Nouvelle tentative...";
+          });
+          await Future.delayed(const Duration(seconds: 2));
+          _startFetchFlow();
+        } else {
+          setState(() {
+            _hasError = true;
+            _statusMessage = "Aucune course active trouvée.";
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching active trip (attempt $_attempt): $e');
+      if (_attempt < _maxAttempts) {
+        _attempt++;
+        setState(() {
+          _statusMessage = "Erreur de connexion. Nouvelle tentative...";
+        });
+        await Future.delayed(const Duration(seconds: 2));
+        _startFetchFlow();
+      } else {
+        setState(() {
+          _hasError = true;
+          _statusMessage = "Erreur lors de la récupération de la course.";
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icône avec cercle pulsant ou animation
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: _hasError ? Colors.red.withOpacity(0.1) : AppTheme.primaryColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: _hasError
+                    ? const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.red,
+                        size: 36,
+                      )
+                    : const SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3.5,
+                          valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Titre
+            Text(
+              _hasError ? "Échec de récupération" : "Récupération de course",
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: AppTheme.secondaryColor,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 10),
+            
+            // Message
+            Text(
+              _statusMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+                height: 1.4,
+              ),
+            ),
+            
+            if (_hasError) ...[
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Bouton Annuler
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                    ),
+                    child: Text(
+                      "Fermer",
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  
+                  // Bouton Réessayer
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _attempt = 1;
+                      });
+                      _startFetchFlow();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      "Réessayer",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              const SizedBox(height: 20),
+              // Bouton Annuler pendant le chargement
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  "Annuler",
+                  style: TextStyle(
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
