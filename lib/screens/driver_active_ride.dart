@@ -26,12 +26,14 @@ class DriverActiveRideScreen extends ConsumerStatefulWidget {
 
 class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen> {
   late RidePhase _currentPhase;
+  bool _showHandle = true; // flag to show/hide the draggable handle
+
   bool _isMapReady = false;
   double _currentDistance = 0.0;
   String _estimatedTime = 'Calcul...';
   bool _isFetchingRoute = false;
   DateTime? _lastRouteFetchTime;
-
+  
   @override
   void initState() {
     super.initState();
@@ -79,9 +81,10 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   }
 
   Future<void> _updateRouteDetails(LatLng currentPos) async {
-    final targetLatLng = _currentPhase == RidePhase.completed
-        ? LatLng(widget.trip.destinationLatitude, widget.trip.destinationLongitude)
-        : LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude);
+    // arriving → pickup, started/completed → destination
+    final targetLatLng = _currentPhase == RidePhase.arriving
+        ? LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude)
+        : LatLng(widget.trip.destinationLatitude, widget.trip.destinationLongitude);
 
     // Throttle route fetching to once every 10 seconds to avoid API spam
     final now = DateTime.now();
@@ -102,9 +105,9 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       final targetMarker = Marker(
         markerId: const MarkerId('target'),
         position: targetLatLng,
-        infoWindow: InfoWindow(title: _currentPhase == RidePhase.completed ? 'Destination' : 'Client'),
+        infoWindow: InfoWindow(title: _currentPhase == RidePhase.arriving ? 'Client' : 'Destination'),
         icon: BitmapDescriptor.defaultMarkerWithHue(
-          _currentPhase == RidePhase.completed ? BitmapDescriptor.hueRed : BitmapDescriptor.hueGreen
+          _currentPhase == RidePhase.arriving ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed
         ),
       );
 
@@ -140,8 +143,9 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       mapNotifier.addMarker(targetMarker);
       mapNotifier.addPolyline(routePolyline);
 
-      // Frame bounds to include driver and target
-      if (points.isNotEmpty && mapStateReady(ref.read(mapProvider))) {
+      // Only reframe the camera when the user hasn't manually panned away
+      final mapState = ref.read(mapProvider);
+      if (points.isNotEmpty && mapStateReady(mapState) && mapState.isFollowingUser) {
         final bounds = LatLngBounds(
           southwest: LatLng(
             math.min(currentPos.latitude, targetLatLng.latitude),
@@ -152,8 +156,8 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
             math.max(currentPos.longitude, targetLatLng.longitude),
           ),
         );
-        ref.read(mapProvider).mapController?.animateCamera(
-          CameraUpdate.newLatLngBounds(bounds, 100), // padding
+        mapState.mapController?.animateCamera(
+          CameraUpdate.newLatLngBounds(bounds, 100),
         );
       }
       
@@ -326,11 +330,23 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
                   color: Colors.grey.shade100,
                   shape: BoxShape.circle,
                 ),
-                child: IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                  splashRadius: 24,
-                ),
+                 child: Row(
+                   children: [
+                     IconButton(
+                       onPressed: () => Navigator.pop(context),
+                       icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                       splashRadius: 24,
+                     ),
+                     // Toggle handle visibility button
+                     IconButton(
+                       onPressed: () {
+                         setState(() => _showHandle = !_showHandle);
+                       },
+                       icon: Icon(_showHandle ? Icons.remove : Icons.add, color: Colors.black87),
+                       tooltip: _showHandle ? 'Hide handle' : 'Show handle',
+                     ),
+                   ],
+                 ),
               ),
               const SizedBox(width: 12),
               const Expanded(
@@ -444,40 +460,41 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
+               // Handle
+               if (_showHandle)
+                 Center(
+                   child: Container(
+                     width: 48,
+                     height: 3,
+                     decoration: BoxDecoration(
+                       color: Colors.grey.shade300,
+                       borderRadius: BorderRadius.circular(10),
+                     ),
+                   ),
+                 ),
               
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               
               // Customer Info Profile
               Row(
                 children: [
                   Container(
-                    width: 56,
-                    height: 56,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
                       color: AppTheme.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
                     ),
                     child: const Icon(
                       Icons.person_rounded,
                       color: AppTheme.primaryColor,
-                      size: 28,
+                      size: 24,
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -489,23 +506,23 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
                           widget.trip.clientName ?? "Client Inconnu",
                           style: const TextStyle(
                             color: Colors.black87,
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: -0.5,
+                            letterSpacing: -0.4,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             widget.trip.serviceName,
                             style: TextStyle(
                               color: Colors.grey.shade700,
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -516,7 +533,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
                 ],
               ),
               
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               
               // Route Progress
               _buildRouteProgress(),
@@ -526,7 +543,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
               // Trip Info
               _buildTripInfo(),
               
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
               
               // Action Button with AnimatedSwitcher for smooth phase changes
               AnimatedSwitcher(
@@ -548,6 +565,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
           children: [
             Text(
               _currentPhase == RidePhase.arriving ? 'Vers le client' : 'Vers la destination',
+            // arriving→pickup  |  started/completed→destination
               style: const TextStyle(
                 color: Colors.black87,
                 fontSize: 16,
@@ -602,7 +620,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
   Widget _buildTripInfo() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(16),
@@ -670,15 +688,15 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
     switch (_currentPhase) {
       case RidePhase.arriving:
-        buttonText = 'Je suis en route';
+        buttonText = 'Arrivé chez le client';
         onPressed = () {
-           _updatePhase(RidePhase.started, 'livreur_en_route');
+          _updatePhase(RidePhase.started, 'arriving');
         };
         break;
       case RidePhase.started:
         buttonText = 'Démarrer la course';
         onPressed = () {
-           _updatePhase(RidePhase.completed, 'in_progress'); 
+          _updatePhase(RidePhase.completed, 'in_progress');
         };
         break;
       case RidePhase.completed:
@@ -769,11 +787,11 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   String _getPhaseMessage(RidePhase phase) {
     switch (phase) {
       case RidePhase.arriving:
-        return 'En attente de départ...';
+        return 'En route vers le client...';
       case RidePhase.started:
-        return 'Vous êtes en route vers le point de collecte !';
+        return 'Arrivé chez le client. Démarrez la course !';
       case RidePhase.completed:
-        return 'Course démarrée, en route vers la destination !';
+        return 'Course en cours — en route vers la destination !';
     }
   }
 

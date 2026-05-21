@@ -11,109 +11,79 @@ class LocationTrackingService {
 
   final LocationService _locationService = LocationService();
   final String _baseUrl = 'https://api.atla.business/api/v1/l/trips/location';
-  
+
+  // Minimum interval between API sends: 4 seconds
+  static const _minSendInterval = Duration(seconds: 4);
+  // Heartbeat: send at least once every 8 seconds even without movement
+  static const _heartbeatInterval = Duration(seconds: 8);
+
   bool _isTracking = false;
-  Stream<Position>? _positionStream;
-  Timer? _periodicTimer;
+  StreamSubscription<Position>? _positionSub;
+  Timer? _heartbeatTimer;
+  DateTime? _lastSentAt;
+  Position? _lastSentPosition;
 
   // Getters
   bool get isTracking => _isTracking;
 
   /// Start tracking and sending location to API
   Future<void> startLocationTracking(String token) async {
-    if (_isTracking) {
-      print('DEBUG: Location tracking already started');
-      return;
-    }
+    if (_isTracking) return;
 
-    print('DEBUG: Starting location tracking with token: ${token.substring(0, 10)}...');
-    
     try {
-      // Get initial position
       final position = await _locationService.getCurrentPosition();
       if (position != null) {
         await _sendLocationToApi(position, token);
       }
 
-      // Start continuous tracking with periodic updates
-      await _startPeriodicLocationUpdates(token);
-      
+      await _startTracking(token);
       _isTracking = true;
-      print('DEBUG: Location tracking started successfully (updates every minute)');
     } catch (e) {
       print('DEBUG: Error starting location tracking: $e');
       _isTracking = false;
     }
   }
 
-  /// Start periodic location updates every minute
-  Future<void> _startPeriodicLocationUpdates(String token) async {
-    print('DEBUG: Starting periodic location updates (every 60 seconds)');
-    
-    // Use a timer to send location every minute
-    _periodicTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
-      if (!_isTracking) {
-        timer.cancel();
-        print('DEBUG: Periodic updates stopped');
-        return;
-      }
-      
-      try {
-        print('DEBUG: === Minute update - Getting current position ===');
-        final position = await _locationService.getCurrentPosition();
-        
-        if (position != null) {
-          print('DEBUG: Minute update - Position: ${position.latitude}, ${position.longitude}');
-          final success = await _sendLocationToApi(position, token);
-          
-          if (success) {
-            print('DEBUG: Minute update - Location sent successfully');
-          } else {
-            print('DEBUG: Minute update - Failed to send location');
-          }
-        } else {
-          print('DEBUG: Minute update - Unable to get position');
+  Future<void> _startTracking(String token) async {
+    await _positionSub?.cancel();
+    _heartbeatTimer?.cancel();
+
+    await _locationService.startLocationUpdates();
+
+    // Movement-based: send when moved, but throttle to once per 4 seconds
+    _positionSub = _locationService.positionStream?.listen(
+      (Position position) async {
+        final now = DateTime.now();
+        if (_lastSentAt != null &&
+            now.difference(_lastSentAt!) < _minSendInterval) {
+          return; // too soon — skip this update
         }
-        
-        print('DEBUG: === Next update in 60 seconds ===');
-      } catch (e) {
-        print('DEBUG: Minute update error: $e');
+        await _sendLocationToApi(position, token);
+      },
+      onError: (error) => print('DEBUG: position stream error: $error'),
+    );
+
+    // Heartbeat: guarantee at least one update every 8 seconds even when stationary
+    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) async {
+      if (!_isTracking) return;
+      final position = await _locationService.getCurrentPosition();
+      if (position != null) {
+        await _sendLocationToApi(position, token);
       }
     });
-
-    // Also listen to movement-based updates for more responsive tracking
-    await _locationService.startLocationUpdates();
-    _positionStream = _locationService.positionStream;
-    
-    _positionStream?.listen(
-      (Position position) {
-        print('DEBUG: Movement-based update: ${position.latitude}, ${position.longitude}');
-        // Only send if significant movement (more than 50 meters from last position)
-        _sendLocationToApi(position, token);
-      },
-      onError: (error) {
-        print('DEBUG: Error in position stream: $error');
-      },
-    );
   }
 
   /// Stop location tracking
   void stopLocationTracking() {
-    if (!_isTracking) {
-      print('DEBUG: Location tracking not active');
-      return;
-    }
-
-    // Cancel periodic timer
-    _periodicTimer?.cancel();
-    _periodicTimer = null;
-    
-    // Stop location updates
+    if (!_isTracking) return;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _positionSub?.cancel();
+    _positionSub = null;
     _locationService.stopLocationUpdates();
-    _positionStream = null;
     _isTracking = false;
-    
-    print('DEBUG: Location tracking stopped (periodic timer cancelled)');
+    _lastSentAt = null;
+    _lastSentPosition = null;
   }
 
   /// Send location data to API
@@ -146,7 +116,8 @@ class LocationTrackingService {
       print('DEBUG: API Response Body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        print('DEBUG: Location sent successfully');
+        _lastSentAt = DateTime.now();
+        _lastSentPosition = position;
         return true;
       } else {
         print('DEBUG: Failed to send location. Status: ${response.statusCode}');
@@ -200,8 +171,6 @@ class LocationTrackingService {
 
   /// Dispose resources
   void dispose() {
-    _periodicTimer?.cancel();
-    _periodicTimer = null;
     stopLocationTracking();
   }
 }

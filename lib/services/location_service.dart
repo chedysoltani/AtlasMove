@@ -156,7 +156,7 @@ class LocationService {
 
   /// Ouvrir les paramètres de l'application
   Future<void> openAppSettings() async {
-    await openAppSettings();
+    await Geolocator.openAppSettings();
   }
 
   /// Ouvrir les paramètres de localisation du système

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -85,6 +86,7 @@ class MapState {
 
 class MapNotifier extends StateNotifier<MapState> {
   final LocationService _locationService = LocationService();
+  StreamSubscription<Position>? _positionSub;
 
   MapNotifier() : super(const MapState());
 
@@ -165,11 +167,12 @@ class MapNotifier extends StateNotifier<MapState> {
 
   /// Démarrer le suivi de la position
   Future<void> _startLocationTracking() async {
+    await _positionSub?.cancel();
     await _locationService.startLocationUpdates();
 
-    _locationService.positionStream?.listen((Position position) {
+    _positionSub = _locationService.positionStream?.listen((Position position) {
       final latLng = LatLng(position.latitude, position.longitude);
-      
+
       final userMarker = Marker(
         markerId: const MarkerId('current_position'),
         position: latLng,
@@ -182,12 +185,10 @@ class MapNotifier extends StateNotifier<MapState> {
         markers: {...state.markers.where((m) => m.markerId.value != 'current_position'), userMarker},
       );
 
-      // Centrer la caméra sur la nouvelle position si le suivi est activé
+      // Follow user but preserve current zoom level instead of hardcoding 15
       if (state.isFollowingUser && state.mapController != null) {
         state.mapController?.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(target: latLng, zoom: 15),
-          ),
+          CameraUpdate.newLatLng(latLng),
         );
       }
     });
@@ -255,6 +256,7 @@ class MapNotifier extends StateNotifier<MapState> {
 
   @override
   void dispose() {
+    _positionSub?.cancel();
     _locationService.dispose();
     super.dispose();
   }

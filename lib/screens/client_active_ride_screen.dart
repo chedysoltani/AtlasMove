@@ -77,22 +77,29 @@ class _ClientActiveRideScreenState extends State<ClientActiveRideScreen>
   }
 
   void _startPolling() {
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
       if (!mounted) return;
       try {
-        final history = await TripService.getClientTripHistory(page: 1, limit: 5);
-        for (final t in history.trips) {
-          if (t.id == widget.tripId) {
-            if (mounted && t.status != _status) {
-              setState(() => _status = t.status);
-              if (t.status == 'completed' || t.status == 'cancelled') {
-                _pollTimer?.cancel();
-              }
-            }
-            break;
-          }
+        // Fetch the single active trip — not a history list
+        final trip = await TripService.getActiveTrip();
+        if (!mounted) return;
+
+        final newStatus = trip?.status ?? _status;
+        if (newStatus != _status) {
+          setState(() => _status = newStatus);
         }
-      } catch (_) {}
+
+        if (newStatus == 'completed') {
+          _pollTimer?.cancel();
+          await Future.delayed(const Duration(seconds: 2));
+          if (mounted) Navigator.pushReplacementNamed(context, '/client_trip_history');
+        } else if (newStatus == 'cancelled') {
+          _pollTimer?.cancel();
+          if (mounted) Navigator.pushReplacementNamed(context, '/client_dashboard');
+        }
+      } catch (_) {
+        // Network error: keep polling, status unchanged
+      }
     });
   }
 
