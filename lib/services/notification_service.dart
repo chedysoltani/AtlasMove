@@ -14,6 +14,13 @@ class NotificationService extends ChangeNotifier {
   // Global callback for receiving in-app notification alerts
   static void Function(NotificationItem)? onNewNotificationReceived;
 
+  // Real-time ride tracking callbacks — set by RideStateNotifier for active ride
+  static void Function(Map<String, dynamic>)? onDriverLocationReceived;
+  static void Function(Map<String, dynamic>)? onTripStatusReceived;
+
+  // Referral bonus notification callback — set in main.dart to show in-app overlay
+  static void Function(int pointsGained, String message)? onReferralBonusReceived;
+
   IO.Socket? _socket;
   List<NotificationItem> _notifications = [];
   int _unreadCount = 0;
@@ -75,10 +82,30 @@ class NotificationService extends ChangeNotifier {
         debugPrint('⚠️ NotificationService: Erreur de connexion WebSocket: $data');
       });
 
-      // Écouter les nouvelles notifications
+      // Standard notification events
       _socket!.on('new_notification', (payload) {
-        debugPrint('🔔 NotificationService: Nouvelle notification reçue en temps réel: $payload');
+        debugPrint('🔔 NotificationService: Nouvelle notification reçue: $payload');
         _handleIncomingNotification(payload);
+      });
+
+      // Real-time ride tracking events (from backend NotificationGateway)
+      _socket!.on('driver_location', (payload) {
+        final data = _toMap(payload);
+        if (data != null) onDriverLocationReceived?.call(data);
+      });
+
+      _socket!.on('trip_status_update', (payload) {
+        final data = _toMap(payload);
+        if (data != null) onTripStatusReceived?.call(data);
+      });
+
+      _socket!.on('referral_bonus_received', (payload) {
+        final data = _toMap(payload);
+        if (data != null) {
+          final points = data['pointsGained'] as int? ?? 25;
+          final msg = data['message'] as String? ?? 'Vous avez reçu un bonus de parrainage !';
+          onReferralBonusReceived?.call(points, msg);
+        }
       });
 
     } catch (e) {
@@ -189,6 +216,15 @@ class NotificationService extends ChangeNotifier {
     } catch (e) {
       debugPrint('❌ NotificationService: Erreur pour marquer la notification comme lue: $e');
     }
+  }
+
+  /// Safely parse a Socket.IO payload (String or Map) to Map<String,dynamic>.
+  Map<String, dynamic>? _toMap(dynamic payload) {
+    try {
+      if (payload is Map) return Map<String, dynamic>.from(payload);
+      if (payload is String) return jsonDecode(payload) as Map<String, dynamic>;
+    } catch (_) {}
+    return null;
   }
 
   /// Marquer toutes les notifications comme lues

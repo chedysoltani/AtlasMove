@@ -43,6 +43,7 @@ import 'models/notification_model.dart';
 import 'screens/driver_subscription_screen.dart';
 import 'screens/driver_crypto_select_screen.dart';
 import 'screens/driver_crypto_recharge_screen.dart';
+import 'screens/referral_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -63,8 +64,104 @@ void main() async {
       NotificationSheet.showInAppBanner(context, item);
     }
   };
+
+  // Bonus de parrainage reçu en temps réel
+  NotificationService.onReferralBonusReceived = (pointsGained, message) {
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      _showReferralBonusOverlay(context, pointsGained, message);
+    }
+  };
   
   runApp(const AtlasMoveApp());
+}
+
+/// Shows a celebratory dialog when the driver earns a referral bonus in real time.
+void _showReferralBonusOverlay(BuildContext context, int points, String message) {
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1C2A),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFF97316).withOpacity(0.4), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFF97316).withOpacity(0.15),
+              blurRadius: 30,
+              spreadRadius: 5,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF97316).withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.emoji_events_rounded, color: Color(0xFFF97316), size: 40),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Parrainage Réussi !',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.amber.withOpacity(0.3)),
+              ),
+              child: Text(
+                '+$points points IA',
+                style: const TextStyle(
+                  color: Colors.amber,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF9E9EA7), fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF97316),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+                child: const Text('Super !', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class AtlasMoveApp extends StatelessWidget {
@@ -122,6 +219,7 @@ class AtlasMoveApp extends StatelessWidget {
             '/driver_subscription': (context) => const DriverSubscriptionScreen(),
             '/driver_crypto_select': (context) => const DriverCryptoSelectScreen(),
             '/driver_crypto_recharge': (context) => const DriverCryptoRechargeScreen(),
+            '/referral': (context) => const ReferralScreen(),
           },
         ),
       ),

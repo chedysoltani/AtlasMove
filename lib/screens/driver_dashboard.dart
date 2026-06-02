@@ -6,8 +6,11 @@ import '../widgets/custom_button.dart';
 import '../providers/auth_provider.dart';
 import '../services/location_tracking_service.dart';
 import '../services/notification_service.dart';
+import '../services/trip_service.dart';
 import '../widgets/notification_sheet.dart';
 import '../services/subscription_service.dart';
+import '../models/driver_subscription_models.dart';
+import 'driver_active_ride.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -26,12 +29,15 @@ class _DriverDashboardState extends State<DriverDashboard> {
   final double _todayEarnings = 325.50;
   final int _todayRides = 8;
 
+  final SubscriptionService _subService = SubscriptionService();
+
   @override
   void initState() {
     super.initState();
-    // Initialize location tracking after frame is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeLocationTracking();
+      _resumeActiveRideIfAny();
+      _subService.fetchStatus();
     });
     NotificationService().initialize();
   }
@@ -40,6 +46,20 @@ class _DriverDashboardState extends State<DriverDashboard> {
   void dispose() {
     _locationTrackingService.dispose();
     super.dispose();
+  }
+
+  /// If the driver had an active ride when they closed the app, re-enter it.
+  Future<void> _resumeActiveRideIfAny() async {
+    try {
+      final activeTrip = await TripService.getActiveTrip();
+      if (!mounted || activeTrip == null) return;
+      const resumable = ['accepted', 'arriving', 'in_progress'];
+      if (resumable.contains(activeTrip.status)) {
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => DriverActiveRideScreen(trip: activeTrip),
+        ));
+      }
+    } catch (_) {}
   }
 
   /// Initialize location tracking with authentication token
@@ -182,7 +202,18 @@ class _DriverDashboardState extends State<DriverDashboard> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: AnimatedBuilder(
+        animation: _subService,
+        builder: (context, child) {
+          final isPastDue = _subService.subscription?.isPastDue ?? false;
+          return Column(
+            children: [
+              if (isPastDue) _buildPastDueBanner(context),
+              Expanded(child: child!),
+            ],
+          );
+        },
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,6 +240,45 @@ class _DriverDashboardState extends State<DriverDashboard> {
             
             // Quick Actions
             _buildQuickActions(),
+          ],
+        ),
+      ),
+      ),
+    );
+  }
+
+  Widget _buildPastDueBanner(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFB71C1C),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.red.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_rounded, color: Colors.white, size: 22),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Abonnement impayé — Régularisez pour accéder aux courses',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  height: 1.3,
+                ),
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
           ],
         ),
       ),

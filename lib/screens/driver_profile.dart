@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 
@@ -74,9 +73,14 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
             
             // Statistics
             _buildStatistics(),
-            
+
             const SizedBox(height: 24),
-            
+
+            // Referral section
+            _buildReferralSection(context),
+
+            const SizedBox(height: 24),
+
             // Account Actions
             _buildAccountActions(),
           ],
@@ -418,6 +422,15 @@ class _DriverProfileScreenState extends State<DriverProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildReferralSection(BuildContext context) {
+    return _buildActionButton(
+      'Parrainage & Récompenses',
+      Icons.card_giftcard_rounded,
+      AppTheme.primaryColor,
+      () => Navigator.pushNamed(context, '/referral'),
     );
   }
 

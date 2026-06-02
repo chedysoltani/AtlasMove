@@ -1,138 +1,89 @@
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../models/crypto_asset_model.dart';
+import '../core/network/http_client.dart';
+import '../models/driver_subscription_models.dart';
 
 class SubscriptionService extends ChangeNotifier {
-  // Singleton Pattern
   static final SubscriptionService _instance = SubscriptionService._internal();
   factory SubscriptionService() => _instance;
-  SubscriptionService._internal() {
-    _loadSubscriptionState();
-  }
+  SubscriptionService._internal();
 
-  bool _isSubscribed = false;
-  bool _isTrialActive = false;
-  bool _hasUsedTrial = false;
-  DateTime? _expiryDate;
+  DriverSubscriptionStatus? _status;
   bool _isLoading = false;
+  String? _error;
 
-  // Getters
-  bool get isSubscribed => _isSubscribed;
-  bool get isTrialActive => _isTrialActive;
-  bool get hasUsedTrial => _hasUsedTrial;
-  DateTime? get expiryDate => _expiryDate;
+  DriverSubscriptionStatus? get status => _status;
   bool get isLoading => _isLoading;
+  String? get error => _error;
 
-  // Check subscription validity
-  bool get isSubscriptionValid {
-    if (_isSubscribed || _isTrialActive) {
-      if (_expiryDate != null) {
-        return _expiryDate!.isAfter(DateTime.now());
-      }
-    }
-    return false;
-  }
+  bool get hasActiveSubscription => _status?.hasActiveSubscription ?? false;
+  DriverSubscription? get subscription => _status?.subscription;
+  LoyaltyProgram? get loyaltyProgram => _status?.loyaltyProgram;
 
-  // Load state from SharedPreferences
-  Future<void> _loadSubscriptionState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _isSubscribed = prefs.getBool('driver_sub_active') ?? false;
-      _isTrialActive = prefs.getBool('driver_trial_active') ?? false;
-      _hasUsedTrial = prefs.getBool('driver_has_used_trial') ?? false;
-      
-      final expiryStr = prefs.getString('driver_sub_expiry');
-      if (expiryStr != null) {
-        _expiryDate = DateTime.parse(expiryStr);
-        // Autovalider si expiré
-        if (_expiryDate!.isBefore(DateTime.now())) {
-          _isSubscribed = false;
-          _isTrialActive = false;
-          await prefs.setBool('driver_sub_active', false);
-          await prefs.setBool('driver_trial_active', false);
-        }
-      }
-      notifyListeners();
-    } catch (e) {
-      debugPrint('⚠️ SubscriptionService: Erreur de chargement: $e');
-    }
-  }
+  // Legacy compatibility getters used by existing screens
+  bool get isSubscriptionValid => hasActiveSubscription;
+  bool get isSubscribed => subscription?.isActive ?? false;
+  bool get isTrialActive => subscription?.isTrial ?? false;
+  bool get hasUsedTrial => subscription != null;
+  DateTime? get expiryDate => subscription?.expiresAt;
 
-  // Activer le 1er mois d'essai gratuit
-  Future<bool> activateFreeTrial() async {
-    if (_hasUsedTrial) return false;
+  Future<void> fetchStatus() async {
     _isLoading = true;
+    _error = null;
     notifyListeners();
 
     try {
-      // Simuler un appel API
-      await Future.delayed(const Duration(milliseconds: 1500));
-
-      final prefs = await SharedPreferences.getInstance();
-      _isTrialActive = true;
-      _hasUsedTrial = true;
-      _expiryDate = DateTime.now().add(const Duration(days: 30));
-
-      await prefs.setBool('driver_trial_active', true);
-      await prefs.setBool('driver_has_used_trial', true);
-      await prefs.setString('driver_sub_expiry', _expiryDate!.toIso8601String());
-
+      final response = await HttpClient.get('/m/livreur/subscription/status');
+      _status = DriverSubscriptionStatus.fromJson(response.json);
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('⚠️ SubscriptionService fetchStatus: $e');
+    } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<bool> subscribe({String currency = 'USD'}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await HttpClient.post(
+        '/m/livreur/subscription/subscribe',
+        body: {'currency': currency},
+      );
+      await fetchStatus();
       return true;
     } catch (e) {
+      _error = e.toString();
       _isLoading = false;
       notifyListeners();
       return false;
     }
   }
 
-  // Simuler et confirmer le paiement par cryptomonnaie
-  Future<bool> confirmCryptoPayment(CryptoAsset asset, String txHash) async {
+  /// Legacy method kept for crypto recharge screen compatibility.
+  /// Refreshes subscription status after a crypto payment confirmation.
+  Future<bool> confirmCryptoPayment(dynamic asset, String txHash) async {
+    await fetchStatus();
+    return hasActiveSubscription;
+  }
+
+  Future<bool> cancelRenewal() async {
     _isLoading = true;
+    _error = null;
     notifyListeners();
 
     try {
-      // Simuler la validation par la blockchain (3 secondes pour de la crédibilité)
-      await Future.delayed(const Duration(seconds: 3));
-
-      final prefs = await SharedPreferences.getInstance();
-      _isSubscribed = true;
-      _isTrialActive = false; // Désactive l'essai car abonné payant
-      
-      // Ajouter 30 jours à la date actuelle ou à la date d'expiration restante si valide
-      DateTime baseDate = DateTime.now();
-      if (_expiryDate != null && _expiryDate!.isAfter(DateTime.now())) {
-        baseDate = _expiryDate!;
-      }
-      _expiryDate = baseDate.add(const Duration(days: 30));
-
-      await prefs.setBool('driver_sub_active', true);
-      await prefs.setBool('driver_trial_active', false);
-      await prefs.setString('driver_sub_expiry', _expiryDate!.toIso8601String());
-
-      _isLoading = false;
-      notifyListeners();
+      await HttpClient.post('/m/livreur/subscription/cancel');
+      await fetchStatus();
       return true;
     } catch (e) {
+      _error = e.toString();
       _isLoading = false;
       notifyListeners();
       return false;
     }
-  }
-
-  // Réinitialiser l'abonnement (pour les tests développeurs)
-  Future<void> resetSubscription() async {
-    final prefs = await SharedPreferences.getInstance();
-    _isSubscribed = false;
-    _isTrialActive = false;
-    _hasUsedTrial = false;
-    _expiryDate = null;
-    
-    await prefs.remove('driver_sub_active');
-    await prefs.remove('driver_trial_active');
-    await prefs.remove('driver_has_used_trial');
-    await prefs.remove('driver_sub_expiry');
-    notifyListeners();
   }
 }

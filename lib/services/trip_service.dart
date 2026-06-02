@@ -526,14 +526,45 @@ class TripService {
       debugPrint('=== TripService.getTripOffers() END ===');
     }
   }
+
+  /// Fetch current driver GPS position for a client's active trip.
+  /// Backend: GET /m/trips/{id}/driver-location
+  static Future<DriverLocationDto?> getDriverLocation(String tripId) async {
+    try {
+      final response = await HttpClient.get('/m/trips/$tripId/driver-location');
+      if (response.isSuccess) {
+        final raw = response.json['data'] ?? response.json;
+        return DriverLocationDto(
+          latitude: (raw['latitude'] as num).toDouble(),
+          longitude: (raw['longitude'] as num).toDouble(),
+          heading: (raw['heading'] as num?)?.toDouble(),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ TripService.getDriverLocation: $e');
+    }
+    return null;
+  }
+}
+
+class DriverLocationDto {
+  final double latitude;
+  final double longitude;
+  final double? heading;
+
+  const DriverLocationDto({
+    required this.latitude,
+    required this.longitude,
+    this.heading,
+  });
 }
 
 class TripException implements Exception {
   final String message;
   final int? statusCode;
-  
+
   TripException({required this.message, this.statusCode});
-  
+
   @override
   String toString() => message;
 }

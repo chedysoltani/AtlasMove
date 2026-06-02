@@ -6,6 +6,7 @@ class ClientRegisterRequest {
   final String phone;
   final String password;
   final String confirmPassword;
+  final String? referralCode;
 
   ClientRegisterRequest({
     required this.firstName,
@@ -14,6 +15,7 @@ class ClientRegisterRequest {
     required this.phone,
     required this.password,
     required this.confirmPassword,
+    this.referralCode,
   });
 
   /// Crée une instance à partir d'un Map
@@ -30,7 +32,7 @@ class ClientRegisterRequest {
 
   /// Convertit l'instance en Map
   Map<String, dynamic> toJson() {
-    return {
+    final map = <String, dynamic>{
       'first_name': firstName,
       'last_name': lastName,
       'email': email,
@@ -38,6 +40,10 @@ class ClientRegisterRequest {
       'password': password,
       'confirm_password': confirmPassword,
     };
+    if (referralCode != null && referralCode!.isNotEmpty) {
+      map['referral_code'] = referralCode;
+    }
+    return map;
   }
 
   /// Validation des données

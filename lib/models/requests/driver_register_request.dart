@@ -12,6 +12,7 @@ class DriverRegisterRequest {
   final File? idCard;
   final File? drivingLicense;
   final File? vehicleRegistration;
+  final String? referralCode;
 
   const DriverRegisterRequest({
     required this.firstName,
@@ -24,6 +25,7 @@ class DriverRegisterRequest {
     this.idCard,
     this.drivingLicense,
     this.vehicleRegistration,
+    this.referralCode,
   });
 
   /// Validation des données
@@ -94,9 +96,12 @@ class DriverRegisterRequest {
     if (vehicleType.trim().isEmpty) {
       return 'Le type de véhicule est obligatoire';
     }
-    final validVehicles = ['voiture', 'moto', 'camion', 'fourgonnette'];
+    final validVehicles = [
+      'voiture', 'moto', 'camion', 'fourgonnette',
+      'bus', 'semi_remorque', 'poids_lourd', 'tracteur',
+    ];
     if (!validVehicles.contains(vehicleType.toLowerCase())) {
-      return 'Type de véhicule invalide (voiture, moto, camion, fourgonnette)';
+      return 'Type de véhicule invalide';
     }
 
     // Validation des fichiers (optionnelle en mode test)
@@ -116,15 +121,21 @@ class DriverRegisterRequest {
   }
 
   /// Convertir en Map pour multipart
-  Map<String, String> get textFields => {
-    'first_name': firstName.trim(),
-    'last_name': lastName.trim(),
-    'email': email.trim(),
-    'phone': phone.trim(),
-    'password': password,
-    'confirm_password': confirmPassword,
-    'vehicle_type': vehicleType.trim(),
-  };
+  Map<String, String> get textFields {
+    final fields = {
+      'first_name': firstName.trim(),
+      'last_name': lastName.trim(),
+      'email': email.trim(),
+      'phone': phone.trim(),
+      'password': password,
+      'confirm_password': confirmPassword,
+      'vehicle_type': vehicleType.trim(),
+    };
+    if (referralCode != null && referralCode!.isNotEmpty) {
+      fields['referral_code'] = referralCode!;
+    }
+    return fields;
+  }
 
   /// Obtenir les fichiers pour multipart
   Map<String, File> get files {

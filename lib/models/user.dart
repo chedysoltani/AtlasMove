@@ -16,7 +16,11 @@ enum VehicleType {
   car,
   motorcycle,
   truck,
-  van;
+  van,
+  bus,
+  semiTrailer,
+  heavyTruck,
+  tractor;
 
   String get displayName {
     switch (this) {
@@ -28,6 +32,35 @@ enum VehicleType {
         return 'Camion';
       case VehicleType.van:
         return 'Fourgonnette';
+      case VehicleType.bus:
+        return 'Bus';
+      case VehicleType.semiTrailer:
+        return 'Semi-remorque';
+      case VehicleType.heavyTruck:
+        return 'Poids lourd';
+      case VehicleType.tractor:
+        return 'Tracteur';
+    }
+  }
+
+  String get apiValue {
+    switch (this) {
+      case VehicleType.car:
+        return 'voiture';
+      case VehicleType.motorcycle:
+        return 'moto';
+      case VehicleType.truck:
+        return 'camion';
+      case VehicleType.van:
+        return 'fourgonnette';
+      case VehicleType.bus:
+        return 'bus';
+      case VehicleType.semiTrailer:
+        return 'semi_remorque';
+      case VehicleType.heavyTruck:
+        return 'poids_lourd';
+      case VehicleType.tractor:
+        return 'tracteur';
     }
   }
 }
@@ -55,6 +88,7 @@ class User {
   final String? permisImage;
   final bool isVerified;
   final bool isAvailable;
+  final String? referralCode;
 
   const User({
     required this.id,
@@ -77,6 +111,7 @@ class User {
     this.dateOfBirth,
     this.country,
     this.countryCode,
+    this.referralCode,
   });
 
   User copyWith({
@@ -160,6 +195,7 @@ class User {
       vehicleType: map['vehicleType'] != null
           ? VehicleType.values.firstWhere(
               (type) => type.name == map['vehicleType'],
+              orElse: () => VehicleType.car,
             )
           : null,
       cinImage: map['cinImage'],
@@ -167,6 +203,7 @@ class User {
       permisImage: map['permisImage'],
       isVerified: map['isVerified'] ?? false,
       isAvailable: map['isAvailable'] ?? false,
+      referralCode: map['referral_code'] ?? map['referralCode'],
     );
   }
 

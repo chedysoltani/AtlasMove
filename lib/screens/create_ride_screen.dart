@@ -143,6 +143,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   final TextEditingController _destinationController = TextEditingController();
   final FocusNode _destinationFocusNode = FocusNode();
   LatLng? _destinationCoordinates;
+  LatLng? _pickupCoordinates; // captured at trip-creation time for live map
   List<String> _addressSuggestions = [];
   bool _isSearching = false;
   double? _estimatedDistance;
@@ -433,7 +434,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         }
       }
 
-      // 5. Appel API
+      // 5. Appel API — snapshot pickup position before the async gap
+      _pickupCoordinates = mapState.currentPosition;
       final response = await TripService.createTrip(
         serviceId: _selectedService!.id,
         pickupAddress: 'Position actuelle',
@@ -1542,6 +1544,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                               driverRating: offer.driverRating,
                               driverVehicle: offer.driverVehicle,
                               destination: _destinationController.text,
+                              pickupLatitude: _pickupCoordinates?.latitude,
+                              pickupLongitude: _pickupCoordinates?.longitude,
                             ),
                           ),
                         );

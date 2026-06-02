@@ -117,6 +117,14 @@ class VehicleSelector extends StatelessWidget {
         return Icons.local_shipping;
       case VehicleType.van:
         return Icons.airport_shuttle;
+      case VehicleType.bus:
+        return Icons.directions_bus;
+      case VehicleType.semiTrailer:
+        return Icons.fire_truck;
+      case VehicleType.heavyTruck:
+        return Icons.agriculture;
+      case VehicleType.tractor:
+        return Icons.agriculture;
     }
   }
 
@@ -130,6 +138,14 @@ class VehicleSelector extends StatelessWidget {
         return 'Pour les gros volumes et meubles';
       case VehicleType.van:
         return 'Pour les livraisons moyennes';
+      case VehicleType.bus:
+        return 'Transport collectif de passagers';
+      case VehicleType.semiTrailer:
+        return 'Logistique lourde longue distance';
+      case VehicleType.heavyTruck:
+        return 'Transport de marchandises volumineuses';
+      case VehicleType.tractor:
+        return 'Transport agricole et industriel';
     }
   }
 }

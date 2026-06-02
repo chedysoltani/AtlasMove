@@ -23,7 +23,8 @@ class _SignupScreenState extends State<SignupScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+  final _referralCodeController = TextEditingController();
+
   UserRole _selectedRole = UserRole.client;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -37,6 +38,7 @@ class _SignupScreenState extends State<SignupScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _referralCodeController.dispose();
     super.dispose();
   }
 
@@ -64,6 +66,7 @@ class _SignupScreenState extends State<SignupScreen> {
     try {
       if (_selectedRole == UserRole.client) {
         // Inscription client via l'API
+        final refCode = _referralCodeController.text.trim().toUpperCase();
         final request = ClientRegisterRequest(
           firstName: _firstNameController.text.trim(),
           lastName: _lastNameController.text.trim(),
@@ -71,6 +74,7 @@ class _SignupScreenState extends State<SignupScreen> {
           phone: _phoneController.text.trim(),
           password: _passwordController.text,
           confirmPassword: _confirmPasswordController.text,
+          referralCode: refCode.isNotEmpty ? refCode : null,
         );
 
         final response = await AuthService.registerClient(request);
@@ -298,13 +302,27 @@ class _SignupScreenState extends State<SignupScreen> {
                       },
                     ),
                     
-                    const SizedBox(height: 30),
-                    
-                    // Section d'information API
-                    
-                    
-                    const SizedBox(height: 40),
-                    
+                    const SizedBox(height: 24),
+
+                    // Referral code (optional)
+                    CustomTextField(
+                      controller: _referralCodeController,
+                      labelText: 'Code de parrainage (facultatif)',
+                      hintText: 'ATLAS-XXXXXX',
+                      prefixIcon: const Icon(Icons.card_giftcard_rounded),
+                      textInputAction: TextInputAction.done,
+                      validator: (value) {
+                        if (value != null && value.trim().isNotEmpty) {
+                          if (!RegExp(r'^ATLAS-[A-Z0-9]{6}$').hasMatch(value.trim().toUpperCase())) {
+                            return 'Format invalide. Ex: ATLAS-J8K9F2';
+                          }
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 36),
+
                     // Signup Button
                     CustomButton(
                       text: _isLoading ? 'Inscription en cours...' : 'S\'inscrire',

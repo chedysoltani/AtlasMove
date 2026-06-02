@@ -25,6 +25,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _vehicleTypeController = TextEditingController();
+  final _referralCodeController = TextEditingController();
 
   File? _idCard;
   File? _drivingLicense;
@@ -44,6 +45,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _vehicleTypeController.dispose();
+    _referralCodeController.dispose();
     super.dispose();
   }
 
@@ -125,6 +127,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
     });
 
     try {
+      final referralCode = _referralCodeController.text.trim().toUpperCase();
       final request = DriverRegisterRequest(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
@@ -136,6 +139,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
         idCard: _idCard,
         drivingLicense: _drivingLicense,
         vehicleRegistration: _vehicleRegistration,
+        referralCode: referralCode.isNotEmpty ? referralCode : null,
       );
 
       final response = await AuthService.registerDriver(request);
@@ -511,6 +515,38 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 24),
+
+              // Code de parrainage (optionnel)
+              const Text(
+                'Parrainage',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Vous avez été recommandé par un ami ? Entrez son code pour lui offrir un bonus.',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: _referralCodeController,
+                labelText: 'Code de parrainage (facultatif)',
+                hintText: 'ATLAS-XXXXXX',
+                prefixIcon: const Icon(Icons.card_giftcard_rounded),
+                textInputAction: TextInputAction.done,
+                validator: (value) {
+                  if (value != null && value.trim().isNotEmpty) {
+                    if (!RegExp(r'^ATLAS-[A-Z0-9]{6}$').hasMatch(value.trim().toUpperCase())) {
+                      return 'Format invalide. Ex: ATLAS-J8K9F2';
+                    }
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 30),
 
