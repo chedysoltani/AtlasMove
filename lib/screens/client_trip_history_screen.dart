@@ -514,7 +514,8 @@ class TripHistoryCard extends StatelessWidget {
     final isCancelable = status == 'pending' || 
                          status == 'searching' || 
                          status == 'accepted' || 
-                         status == 'arriving';
+                         status == 'arriving' ||
+                         status == 'livreur_en_route';
     final isMatching = status == 'pending' || status == 'searching';
 
     return GestureDetector(

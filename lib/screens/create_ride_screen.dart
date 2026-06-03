@@ -1769,6 +1769,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       case 'accepted':
         return _AppColors.green;
       case 'arriving':
+      case 'livreur_en_route':
         return Colors.orange;
       case 'in_progress':
         return _AppColors.accentMid;
@@ -1790,6 +1791,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       case 'accepted':
         return 'Course acceptée';
       case 'arriving':
+      case 'livreur_en_route':
         return 'Livreur en route';
       case 'in_progress':
         return 'Course en cours';

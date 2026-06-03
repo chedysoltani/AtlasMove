@@ -157,11 +157,16 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
   static RideStatus _parse(String s) {
     switch (s.toLowerCase()) {
       case 'accepted':    return RideStatus.accepted;
-      case 'arriving':    return RideStatus.arriving;
+      case 'arriving':
+      case 'livreur_en_route': return RideStatus.arriving;
       case 'in_progress': return RideStatus.inProgress;
       case 'completed':   return RideStatus.completed;
-      case 'cancelled':   return RideStatus.cancelled;
-      default:            return RideStatus.unknown;
+      case 'cancelled':
+      case 'cancelled_by_client':
+      case 'cancelled_by_livreur':
+      case 'cancelled_by_admin':  return RideStatus.cancelled;
+      case 'expired':             return RideStatus.cancelled;
+      default:                    return RideStatus.unknown;
     }
   }
 

@@ -1,16 +1,44 @@
+﻿import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+
 import '../utils/app_theme.dart';
-import '../widgets/custom_button.dart';
 import '../providers/auth_provider.dart';
 import '../services/location_tracking_service.dart';
 import '../services/notification_service.dart';
 import '../services/trip_service.dart';
-import '../widgets/notification_sheet.dart';
 import '../services/subscription_service.dart';
-import '../models/driver_subscription_models.dart';
+import '../widgets/notification_sheet.dart';
 import 'driver_active_ride.dart';
+
+// Style de carte propre style inDrive — routes visibles, design épuré
+const String _mapStyle = '''[
+  {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"poi","stylers":[{"visibility":"off"}]},
+  {"featureType":"transit","stylers":[{"visibility":"off"}]},
+  {"featureType":"landscape","elementType":"geometry.fill","stylers":[{"color":"#f0ede8"}]},
+  {"featureType":"landscape.man_made","elementType":"geometry.fill","stylers":[{"color":"#e8e4de"}]},
+  {"featureType":"road","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
+  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#d4cfc9"},{"weight":"1"}]},
+  {"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
+  {"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"color":"#c8c3bc"}]},
+  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#ffe082"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#f5c518"},{"weight":"1"}]},
+  {"featureType":"road.local","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
+  {"featureType":"road.local","elementType":"geometry.stroke","stylers":[{"color":"#ddd8d0"}]},
+  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#666666"}]},
+  {"featureType":"road","elementType":"labels.text.stroke","stylers":[{"color":"#ffffff"},{"weight":"3"}]},
+  {"featureType":"water","elementType":"geometry.fill","stylers":[{"color":"#aed6f1"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#5b8fa8"}]},
+  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#333333"}]},
+  {"featureType":"administrative.neighborhood","elementType":"labels.text.fill","stylers":[{"color":"#777777"}]},
+  {"featureType":"building","elementType":"geometry.fill","stylers":[{"color":"#e4ddd5"}]},
+  {"featureType":"building","elementType":"geometry.stroke","stylers":[{"color":"#d4ccc4"}]}
+]''';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -19,41 +47,132 @@ class DriverDashboard extends StatefulWidget {
   State<DriverDashboard> createState() => _DriverDashboardState();
 }
 
-class _DriverDashboardState extends State<DriverDashboard> {
+class _DriverDashboardState extends State<DriverDashboard>
+    with TickerProviderStateMixin {
+  // Map
+  GoogleMapController? _mapController;
+  LatLng? _currentPosition;
+  StreamSubscription<Position>? _positionSub;
+  final Set<Marker> _markers = {};
+
+  // State
   bool _isOnline = false;
-  final LocationTrackingService _locationTrackingService = LocationTrackingService();
-  
-  // Statistics
-  final int _totalRides = 156;
-  final double _totalEarnings = 12450.75;
+
+  // Services
+  final LocationTrackingService _locationTrackingService =
+      LocationTrackingService();
+  final SubscriptionService _subService = SubscriptionService();
+
+  // Animation
+  late AnimationController _onlineAnimController;
+
+  // Stats (static for now)
   final double _todayEarnings = 325.50;
   final int _todayRides = 8;
-
-  final SubscriptionService _subService = SubscriptionService();
+  final double _rating = 4.8;
 
   @override
   void initState() {
     super.initState();
+    _onlineAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initLocation();
       _initializeLocationTracking();
       _resumeActiveRideIfAny();
       _subService.fetchStatus();
     });
     NotificationService().initialize();
+
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ));
   }
 
   @override
   void dispose() {
+    _mapController?.dispose();
+    _positionSub?.cancel();
     _locationTrackingService.dispose();
+    _onlineAnimController.dispose();
     super.dispose();
   }
 
-  /// If the driver had an active ride when they closed the app, re-enter it.
+  Future<void> _initLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+
+    final position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    final latLng = LatLng(position.latitude, position.longitude);
+    setState(() {
+      _currentPosition = latLng;
+      _markers.clear();
+      _markers.add(_buildDriverMarker(latLng));
+    });
+
+    _mapController?.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: latLng, zoom: 15.5),
+      ),
+    );
+
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
+    ).listen((pos) {
+      final updated = LatLng(pos.latitude, pos.longitude);
+      setState(() {
+        _currentPosition = updated;
+        _markers.removeWhere((m) => m.markerId.value == 'driver');
+        _markers.add(_buildDriverMarker(updated));
+      });
+      if (_isOnline) {
+        _mapController?.animateCamera(CameraUpdate.newLatLng(updated));
+      }
+    });
+  }
+
+  Marker _buildDriverMarker(LatLng position) {
+    return Marker(
+      markerId: const MarkerId('driver'),
+      position: position,
+      icon: BitmapDescriptor.defaultMarkerWithHue(
+        _isOnline ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueOrange,
+      ),
+      anchor: const Offset(0.5, 0.5),
+    );
+  }
+
+  Future<void> _initializeLocationTracking() async {
+    try {
+      final token =
+          Provider.of<AuthProvider>(context, listen: false).token;
+      if (token == null || token.isEmpty) return;
+      await _locationTrackingService.sendCurrentLocation(token);
+      await _locationTrackingService.startLocationTracking(token);
+    } catch (_) {}
+  }
+
   Future<void> _resumeActiveRideIfAny() async {
     try {
       final activeTrip = await TripService.getActiveTrip();
       if (!mounted || activeTrip == null) return;
-      const resumable = ['accepted', 'arriving', 'in_progress'];
+      const resumable = ['accepted', 'livreur_en_route', 'in_progress'];
       if (resumable.contains(activeTrip.status)) {
         Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => DriverActiveRideScreen(trip: activeTrip),
@@ -62,890 +181,676 @@ class _DriverDashboardState extends State<DriverDashboard> {
     } catch (_) {}
   }
 
-  /// Initialize location tracking with authentication token
-  Future<void> _initializeLocationTracking() async {
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final token = authProvider.token;
-      
-      print('DEBUG: Token livreur = ${token}');
-      print('DEBUG: User livreur = ${authProvider.currentUser?.fullName}');
-
-      if (token == null || token.isEmpty) {
-        print('DEBUG: No authentication token available');
-        _showErrorSnackBar('Erreur: Token d\'authentification non disponible');
-        return;
+  void _toggleOnline() {
+    setState(() {
+      _isOnline = !_isOnline;
+      // Rebuild marker with new color
+      if (_currentPosition != null) {
+        _markers.removeWhere((m) => m.markerId.value == 'driver');
+        _markers.add(_buildDriverMarker(_currentPosition!));
       }
-
-      // Check if location service is available
-      final isLocationAvailable = await _locationTrackingService.isLocationServiceAvailable();
-      if (!isLocationAvailable) {
-        print('DEBUG: Location service not available');
-        _showErrorSnackBar('Veuillez activer les services de localisation');
-        return;
-      }
-
-      // Send current location immediately
-      final success = await _locationTrackingService.sendCurrentLocation(token);
-      if (success) {
-        print('DEBUG: Initial location sent successfully');
-        _showSuccessSnackBar('Localisation envoyée avec succès');
-      } else {
-        print('DEBUG: Failed to send initial location');
-        _showErrorSnackBar('Erreur lors de l\'envoi de la localisation');
-      }
-
-      // Start continuous tracking
-      await _locationTrackingService.startLocationTracking(token);
-      
-    } catch (e) {
-      print('DEBUG: Error initializing location tracking: $e');
-      _showErrorSnackBar('Erreur d\'initialisation de la localisation: ${e.toString()}');
-    }
-  }
-
-  /// Show success message
-  void _showSuccessSnackBar(String message) {
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  /// Show error message
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 3),
-        action: SnackBarAction(
-          label: 'OK',
-          textColor: Colors.white,
-          onPressed: () {},
+        content: Text(
+          _isOnline ? 'Vous êtes maintenant en ligne' : 'Vous êtes hors ligne',
         ),
+        backgroundColor: _isOnline ? Colors.green : Colors.orange,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
       ),
     );
+  }
+
+  void _centerOnMe() {
+    if (_currentPosition != null) {
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: _currentPosition!, zoom: 15.5),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'Dashboard Livreur',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
+      extendBodyBehindAppBar: true,
+      body: Stack(
+        children: [
+          // â”€â”€â”€ FULL SCREEN MAP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          _buildMap(),
+
+          // â”€â”€â”€ TOP BAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: _buildTopBar(),
           ),
-        ),
-        centerTitle: true,
-        actions: [
-          AnimatedBuilder(
-            animation: NotificationService(),
-            builder: (context, _) {
-              final unreadCount = NotificationService().unreadCount;
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  IconButton(
-                    onPressed: () => NotificationSheet.show(context),
-                    icon: const Icon(Icons.notifications_outlined, color: Colors.black),
-                    tooltip: 'Notifications',
-                  ),
-                  if (unreadCount > 0)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: AppTheme.primaryColor,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Text(
-                          '$unreadCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                           textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
+
+          // â”€â”€â”€ PAST DUE BANNER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          Positioned(
+            top: 110,
+            left: 0,
+            right: 0,
+            child: AnimatedBuilder(
+              animation: _subService,
+              builder: (_, __) {
+                if (_subService.subscription?.isPastDue != true) {
+                  return const SizedBox.shrink();
+                }
+                return _buildPastDueBanner();
+              },
+            ),
           ),
-          IconButton(
-            onPressed: () async {
-              // Deconnecter l'utilisateur
-              NotificationService().disconnect();
-              await Provider.of<AuthProvider>(context, listen: false).logout();
-              if (mounted) {
-                Navigator.of(context).pushReplacementNamed('/login');
-              }
-            },
-            icon: const Icon(Icons.logout, color: Colors.red),
-            tooltip: 'Déconnexion',
+
+          // â”€â”€â”€ CENTER ON ME BUTTON â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          Positioned(
+            right: 16,
+            bottom: 240,
+            child: _buildMapButton(
+              icon: Icons.my_location_rounded,
+              onTap: _centerOnMe,
+            ),
+          ),
+
+          // â”€â”€â”€ BOTTOM PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: _buildBottomPanel(),
           ),
         ],
       ),
-      body: AnimatedBuilder(
-        animation: _subService,
-        builder: (context, child) {
-          final isPastDue = _subService.subscription?.isPastDue ?? false;
-          return Column(
-            children: [
-              if (isPastDue) _buildPastDueBanner(context),
-              Expanded(child: child!),
-            ],
-          );
-        },
-        child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Status Card
-            _buildStatusCard(),
-            
-            const SizedBox(height: 16),
-
-            // Subscription Banner
-            _buildSubscriptionBanner(),
-            
-            const SizedBox(height: 16),
-            
-            // Statistics Grid
-            _buildStatisticsGrid(),
-            
-            const SizedBox(height: 16),
-            
-            // Recent Activity
-            _buildRecentActivity(),
-            
-            const SizedBox(height: 16),
-            
-            // Quick Actions
-            _buildQuickActions(),
-          ],
-        ),
-      ),
-      ),
     );
   }
 
-  Widget _buildPastDueBanner(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFB71C1C),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.red.withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // MAP
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  Widget _buildMap() {
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(
+        target: _currentPosition ?? const LatLng(36.8065, 10.1815),
+        zoom: 15.5,
+      ),
+      style: _mapStyle,
+      onMapCreated: (controller) {
+        _mapController = controller;
+        if (_currentPosition != null) {
+          controller.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(target: _currentPosition!, zoom: 15.5),
             ),
-          ],
-        ),
+          );
+        }
+      },
+      markers: _markers,
+      myLocationEnabled: false,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      compassEnabled: false,
+      tiltGesturesEnabled: false,
+    );
+  }
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // TOP BAR
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  Widget _buildTopBar() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
-            const Icon(Icons.warning_rounded, color: Colors.white, size: 22),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Abonnement impayé — Régularisez pour accéder aux courses',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  height: 1.3,
-                ),
+            // Logo / App name
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _isOnline ? Colors.green : Colors.grey,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isOnline ? 'En ligne' : 'Hors ligne',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _isOnline ? Colors.green.shade700 : Colors.grey.shade600,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
+
+            const Spacer(),
+
+            // Notification button
+            AnimatedBuilder(
+              animation: NotificationService(),
+              builder: (_, __) {
+                final count = NotificationService().unreadCount;
+                return _buildTopIconButton(
+                  icon: Icons.notifications_outlined,
+                  badge: count,
+                  onTap: () => NotificationSheet.show(context),
+                );
+              },
+            ),
+
+            const SizedBox(width: 8),
+
+            // Menu button
+            _buildTopIconButton(
+              icon: Icons.menu_rounded,
+              onTap: _showMenu,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatusCard() {
-    final isLocationTracking = _locationTrackingService.isTracking;
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryColor,
-            AppTheme.primaryColor.withOpacity(0.8),
+  Widget _buildTopIconButton({
+    required IconData icon,
+    int badge = 0,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(icon, size: 22, color: Colors.black87),
+            if (badge > 0)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.primaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // MAP FAB BUTTON
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  Widget _buildMapButton({required IconData icon, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(icon, size: 22, color: Colors.black87),
+      ),
+    );
+  }
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // BOTTOM PANEL
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  Widget _buildBottomPanel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 24,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Statut Actuel',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
+          // Drag handle
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 4),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+            child: Column(
+              children: [
+                // Stats row
+                Row(
+                  children: [
+                    _buildStatChip(
+                      icon: Icons.attach_money_rounded,
+                      value: '${_todayEarnings.toStringAsFixed(0)} TND',
+                      label: "Aujourd'hui",
+                      color: Colors.green,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _isOnline ? 'En ligne' : 'Hors ligne',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(width: 10),
+                    _buildStatChip(
+                      icon: Icons.directions_car_rounded,
+                      value: '$_todayRides',
+                      label: 'Courses',
+                      color: Colors.blue,
                     ),
-                  ),
-                ],
-              ),
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: _isOnline ? Colors.green : Colors.grey,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: (_isOnline ? Colors.green : Colors.grey).withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+                    const SizedBox(width: 10),
+                    _buildStatChip(
+                      icon: Icons.star_rounded,
+                      value: '$_rating',
+                      label: 'Note',
+                      color: Colors.orange,
                     ),
                   ],
                 ),
-                child: Icon(
-                  _isOnline ? Icons.online_prediction : Icons.offline_bolt,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 12),
-          
-          // Location tracking status
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  isLocationTracking ? Icons.location_on : Icons.location_off,
-                  color: Colors.white,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  isLocationTracking ? 'Localisation active' : 'Localisation inactive',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          CustomButton(
-            text: _isOnline ? 'Se déconnecter' : 'Se connecter',
-            onPressed: () {
-              setState(() {
-                _isOnline = !_isOnline;
-              });
-              _showStatusChangeMessage();
-            },
-            height: 44,
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSubscriptionBanner() {
-    final subService = SubscriptionService();
-    return AnimatedBuilder(
-      animation: subService,
-      builder: (context, _) {
-        final isValid = subService.isSubscriptionValid;
-        final isTrial = subService.isTrialActive;
+                const SizedBox(height: 16),
 
-        if (isValid) {
-          return InkWell(
-            onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF161722),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.successColor.withOpacity(0.3), width: 1),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
+                // Online / Offline toggle button
+                GestureDetector(
+                  onTap: _toggleOnline,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: double.infinity,
+                    height: 58,
                     decoration: BoxDecoration(
-                      color: AppTheme.successColor.withOpacity(0.12),
-                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: _isOnline
+                            ? [
+                                const Color(0xFF1DB954),
+                                const Color(0xFF17A345),
+                              ]
+                            : [
+                                AppTheme.primaryColor,
+                                const Color(0xFFE55A2B),
+                              ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (_isOnline ? Colors.green : AppTheme.primaryColor)
+                              .withValues(alpha: 0.35),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                    child: const Icon(Icons.verified_rounded, color: AppTheme.successColor, size: 16),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
-                          'Abonnement Premium Actif ✨',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Icon(
+                            _isOnline
+                                ? Icons.pause_circle_filled_rounded
+                                : Icons.play_circle_filled_rounded,
+                            key: ValueKey(_isOnline),
                             color: Colors.white,
+                            size: 26,
                           ),
                         ),
-                        const SizedBox(height: 1),
-                        Text(
-                          isTrial ? 'Mois gratuit (expire bientôt)' : 'Abonnement valide',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade500,
+                        const SizedBox(width: 10),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Text(
+                            _isOnline
+                                ? 'Passer hors ligne'
+                                : 'Démarrer — Aller en ligne',
+                            key: ValueKey(_isOnline),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white30, size: 12),
-                ],
-              ),
-            ),
-          );
-        } else {
-          return InkWell(
-            onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1D2D),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.4), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  )
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withOpacity(0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.star_rounded, color: AppTheme.primaryColor, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'Activez votre Compte Livreur',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Votre abonnement est inactif. Activez dès maintenant votre 1er mois GRATUIT (puis 90\$/mois) pour commencer à recevoir des courses avec 0% de commission !',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade400,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Activer l\'abonnement',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryColor,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_forward_rounded, color: AppTheme.primaryColor, size: 14),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-      },
-    );
-  }
-
-  Widget _buildStatisticsGrid() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.5,
-      children: [
-        _buildStatCard(
-          'Courses totales',
-          _totalRides.toString(),
-          Icons.local_taxi,
-          Colors.blue,
-        ),
-        _buildStatCard(
-          'Revenus totaux',
-          '${_totalEarnings.toStringAsFixed(2)} MAD',
-          Icons.attach_money,
-          Colors.green,
-        ),
-        _buildStatCard(
-          "Revenus d'aujourd'hui",
-          '${_todayEarnings.toStringAsFixed(2)} MAD',
-          Icons.today,
-          Colors.orange,
-        ),
-        _buildStatCard(
-          "Courses d'aujourd'hui",
-          _todayRides.toString(),
-          Icons.directions_car,
-          Colors.purple,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 18,
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                Icons.trending_up,
-                color: Colors.green,
-                size: 14,
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 8),
-          
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontSize: 11,
-            ),
-          ),
-          
-          const SizedBox(height: 2),
-          
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.black,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildRecentActivity() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Activité récente',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Activity List
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            children: [
-              _buildActivityItem(
-                'Course terminée',
-                'Centre Commercial -> Rue Mohamed',
-                '45.50 MAD',
-                Icons.check_circle,
-                Colors.green,
-                'Il y a 2 heures',
-              ),
-              _buildDivider(),
-              _buildActivityItem(
-                'Course annulée',
-                'Aéroport -> Hôtel',
-                '0.00 MAD',
-                Icons.cancel,
-                Colors.red,
-                'Il y a 4 heures',
-              ),
-              _buildDivider(),
-              _buildActivityItem(
-                'Course terminée',
-                'Gare -> Quartier Nord',
-                '32.00 MAD',
-                Icons.check_circle,
-                Colors.green,
-                'Il y a 6 heures',
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+                const SizedBox(height: 12),
 
-  Widget _buildActivityItem(
-    String title,
-    String route,
-    String price,
-    IconData icon,
-    Color color,
-    String time,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 18,
-            ),
-          ),
-          
-          const SizedBox(width: 10),
-          
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  route,
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                price,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                time,
-                style: const TextStyle(
-                  color: Colors.grey,
-                  fontSize: 9,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Divider(
-      height: 1,
-      color: Colors.grey.shade200,
-      indent: 68,
-    );
-  }
-
-  Widget _buildQuickActions() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Actions rapides',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        
-        const SizedBox(height: 12),
-        
-        Row(
-          children: [
-            Expanded(
-              child: CustomButton(
-                text: 'Voir les courses',
-                onPressed: () {
-                  Navigator.pushNamed(context, '/driver_rides');
-                },
-                height: 44,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: CustomButton(
-                text: 'Revenus',
-                onPressed: () {
-                  Navigator.pushNamed(context, '/driver_earnings');
-                },
-                height: 44,
-              ),
-            ),
-          ],
-        ),
-        
-        const SizedBox(height: 12),
-        
-        Row(
-          children: [
-            Expanded(
-              child: CustomButton(
-                text: 'Services',
-                onPressed: () {
-                  Navigator.pushNamed(context, '/services_catalogue');
-                },
-                height: 44,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: CustomButton(
-                text: 'Historique',
-                onPressed: () {
-                  Navigator.pushNamed(context, '/services_assignments');
-                },
-                height: 44,
-                type: ButtonType.secondary,
-              ),
-            ),
-          ],
-        ),
-        
-        const SizedBox(height: 12),
-        
-        // Location refresh button
-        CustomButton(
-          text: '🔄 Actualiser la localisation',
-          onPressed: _refreshLocation,
-          height: 44,
-          type: ButtonType.secondary,
-        ),
-
-        const SizedBox(height: 12),
-
-        // Partnership Offer Button
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.orange.shade700,
-                Colors.orange.shade400,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.orange.withOpacity(0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => Navigator.pushNamed(context, '/driver_offer'),
-              borderRadius: BorderRadius.circular(12),
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                // Quick action row
+                Row(
                   children: [
-                    Icon(Icons.star, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Offre Partenariat & Progression',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
+                    _buildQuickAction(
+                      icon: Icons.history_rounded,
+                      label: 'Historique',
+                      onTap: () => Navigator.pushNamed(context, '/services_assignments'),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildQuickAction(
+                      icon: Icons.person_rounded,
+                      label: 'Profil',
+                      onTap: () => Navigator.pushNamed(context, '/driver_profile'),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildQuickAction(
+                      icon: Icons.card_membership_rounded,
+                      label: 'Abonnement',
+                      onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
+                      highlight: !(_subService.isSubscriptionValid),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildQuickAction(
+                      icon: Icons.star_rounded,
+                      label: 'Offre',
+                      onTap: () => Navigator.pushNamed(context, '/driver_offer'),
+                      highlightColor: Colors.orange,
                     ),
                   ],
                 ),
-              ),
+
+                const SizedBox(height: 24),
+              ],
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  /// Refresh location manually
-  Future<void> _refreshLocation() async {
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final token = authProvider.token;
-      
-      if (token == null || token.isEmpty) {
-        _showErrorSnackBar('Erreur: Token d\'authentification non disponible');
-        return;
-      }
-
-      print('DEBUG: Manual location refresh requested');
-      
-      final success = await _locationTrackingService.sendCurrentLocation(token);
-      if (success) {
-        print('DEBUG: Manual location refresh successful');
-        _showSuccessSnackBar('Localisation actualisée avec succès');
-      } else {
-        print('DEBUG: Manual location refresh failed');
-        _showErrorSnackBar('Erreur lors de l\'actualisation de la localisation');
-      }
-    } catch (e) {
-      print('DEBUG: Error in manual location refresh: $e');
-      _showErrorSnackBar('Erreur: ${e.toString()}');
-    }
-  }
-
-  void _showStatusChangeMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_isOnline ? 'Vous êtes maintenant en ligne' : 'Vous êtes maintenant hors ligne'),
-        backgroundColor: _isOnline ? Colors.green : Colors.orange,
-        duration: const Duration(seconds: 2),
+        ],
       ),
     );
+  }
+
+  Widget _buildStatChip({
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAction({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool highlight = false,
+    Color? highlightColor,
+  }) {
+    final color = highlightColor ??
+        (highlight ? AppTheme.primaryColor : Colors.grey.shade700);
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: highlight || highlightColor != null
+                ? color.withValues(alpha: 0.08)
+                : Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: highlight || highlightColor != null
+                  ? color.withValues(alpha: 0.25)
+                  : Colors.grey.shade200,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // PAST DUE BANNER
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  Widget _buildPastDueBanner() {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFB71C1C),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.red.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.warning_rounded, color: Colors.white, size: 20),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Abonnement impayé — Régularisez pour accéder aux courses',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // MENU
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  void _showMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _buildMenuSheet(),
+    );
+  }
+
+  Widget _buildMenuSheet() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildMenuTile(Icons.person_rounded, 'Mon Profil', () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/driver_profile');
+            }),
+            _buildMenuTile(Icons.card_membership_rounded, 'Abonnement', () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/driver_subscription');
+            }),
+            _buildMenuTile(Icons.star_rounded, 'Offre Partenariat', () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/driver_offer');
+            }),
+            _buildMenuTile(Icons.refresh_rounded, 'Actualiser localisation', () {
+              Navigator.pop(context);
+              _refreshLocation();
+            }),
+            const Divider(height: 24),
+            _buildMenuTile(
+              Icons.logout_rounded,
+              'Déconnexion',
+              () async {
+                Navigator.pop(context);
+                NotificationService().disconnect();
+                await Provider.of<AuthProvider>(context, listen: false).logout();
+                if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+              },
+              color: Colors.red,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuTile(IconData icon, String label, VoidCallback onTap,
+      {Color? color}) {
+    final c = color ?? Colors.black87;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: c.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: c, size: 20),
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+          color: c,
+        ),
+      ),
+      trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: c.withValues(alpha: 0.4)),
+      onTap: onTap,
+    );
+  }
+
+  Future<void> _refreshLocation() async {
+    try {
+      final token = Provider.of<AuthProvider>(context, listen: false).token;
+      if (token == null || token.isEmpty) return;
+      await _locationTrackingService.sendCurrentLocation(token);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Localisation actualisée'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {}
   }
 }

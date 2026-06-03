@@ -85,16 +85,23 @@ enum TripStatus {
   pending('pending', 'En attente'),
   searching('searching', 'Recherche de livreur'),
   accepted('accepted', 'Course acceptée'),
-  arriving('arriving', 'Livreur en route'),
+  arriving('livreur_en_route', 'Livreur en route'),
   inProgress('in_progress', 'Course en cours'),
   completed('completed', 'Course terminée'),
-  cancelled('cancelled', 'Course annulée');
-  
+  cancelled('cancelled', 'Course annulée'),
+  expired('expired', 'Course expirée');
+
   const TripStatus(this.value, this.label);
   final String value;
   final String label;
-  
+
   static TripStatus fromString(String value) {
+    // Handle all backend cancelled variants
+    if (value == 'cancelled_by_client' ||
+        value == 'cancelled_by_livreur' ||
+        value == 'cancelled_by_admin') {
+      return TripStatus.cancelled;
+    }
     return TripStatus.values.firstWhere(
       (status) => status.value == value,
       orElse: () => TripStatus.pending,

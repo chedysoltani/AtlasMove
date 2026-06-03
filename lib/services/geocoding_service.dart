@@ -1,6 +1,6 @@
-import 'dart:async';
-import 'dart:convert';
+﻿import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -29,167 +29,176 @@ class GeocodingService {
   static const String _geocodeBaseUrl =
       'https://maps.googleapis.com/maps/api/geocode';
 
-  static String get _apiKey =>
-      dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+  static String get _apiKey => dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
 
-  // Cache pour les suggestions
-  static final Map<String, List<SearchResult>> _cache = {};
+  // Headers requis pour les appels REST avec une clé Android restreinte
+  static Map<String, String> get _headers => {
+        'X-Android-Package': 'com.example.atlasmove',
+        'X-Android-Cert': 'FCF536AFE52BF36EFDAE04FCFF1E3B858ED9EB07',
+        'Accept': 'application/json',
+      };
 
-  /// Convertir une adresse en coordonnées (Google Geocoding API)
-  static Future<LatLng?> getAddressCoordinates(String address) async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse(
-              '$_geocodeBaseUrl/json'
-              '?address=${Uri.encodeComponent(address)}'
-              '&key=$_apiKey',
-            ),
-          )
-          .timeout(const Duration(seconds: 10));
+  // Cache suggestions : displayName → placeId
+  static final Map<String, String> _placeIdCache = {};
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
-          final loc = data['results'][0]['geometry']['location'];
-          return LatLng(loc['lat'], loc['lng']);
-        }
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
+  // Cache résultats de recherche
+  static final Map<String, List<String>> _suggestionsCache = {};
 
-  /// Convertir des coordonnées en adresse (Google Reverse Geocoding API)
-  static Future<String?> getAddressFromCoordinates(LatLng coordinates) async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse(
-              '$_geocodeBaseUrl/json'
-              '?latlng=${coordinates.latitude},${coordinates.longitude}'
-              '&key=$_apiKey'
-              '&language=fr',
-            ),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
-          return data['results'][0]['formatted_address'];
-        }
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /// Recherche de suggestions d'adresses (Google Places Autocomplete)
+  /// Recherche rapide — retourne juste les noms (pas de coords ici, c'est rapide)
   static Future<List<String>> searchAddressSuggestions(
     String query, {
     LatLng? userLocation,
     double radiusKm = 50,
   }) async {
     try {
-      if (query.trim().length < 2) return [];
+      final q = query.trim();
+      if (q.length < 2) return [];
 
       final cacheKey = userLocation != null
-          ? '${query.trim().toLowerCase()}|${userLocation.latitude}|${userLocation.longitude}'
-          : query.trim().toLowerCase();
+          ? '$q|${userLocation.latitude.toStringAsFixed(3)}|${userLocation.longitude.toStringAsFixed(3)}'
+          : q;
 
-      if (_cache.containsKey(cacheKey)) {
-        return _cache[cacheKey]!.map((r) => r.displayName).toList();
+      if (_suggestionsCache.containsKey(cacheKey)) {
+        return _suggestionsCache[cacheKey]!;
       }
 
-      final results = await searchPlaces(query, userLocation: userLocation);
-
-      _cache[cacheKey] = results;
-      if (_cache.length > 100) _cache.clear();
-
-      return results.map((r) => r.displayName).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  /// Recherche complète retournant des SearchResult avec coordonnées
-  static Future<List<SearchResult>> searchPlaces(
-    String query, {
-    LatLng? userLocation,
-  }) async {
-    try {
-      if (query.trim().length < 2) return [];
-
       String url = '$_placesBaseUrl/autocomplete/json'
-          '?input=${Uri.encodeComponent(query)}'
+          '?input=${Uri.encodeComponent(q)}'
           '&key=$_apiKey'
           '&language=fr'
           '&types=geocode|establishment';
 
       if (userLocation != null) {
-        final radiusMeters = 50000;
-        url +=
-            '&location=${userLocation.latitude},${userLocation.longitude}'
-            '&radius=$radiusMeters';
+        url += '&location=${userLocation.latitude},${userLocation.longitude}'
+            '&radius=50000';
       }
 
+      debugPrint('GEO: autocomplete → $url');
+
       final response = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 10));
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(const Duration(seconds: 8));
+
+      debugPrint('GEO: status=${response.statusCode} body=${response.body.substring(0, response.body.length.clamp(0, 300))}');
 
       if (response.statusCode != 200) return [];
 
       final data = json.decode(response.body);
-      if (data['status'] != 'OK' && data['status'] != 'ZERO_RESULTS') return [];
+      final status = data['status'] as String;
+      debugPrint('GEO: Google status = $status');
 
-      final predictions = data['predictions'] as List;
-      final results = <SearchResult>[];
-
-      for (final prediction in predictions.take(8)) {
-        final placeId = prediction['place_id'];
-        final description = prediction['description'] ?? '';
-
-        if (description.isEmpty) continue;
-
-        // Obtenir les coordonnées via Place Details
-        final coords = await _getPlaceCoordinates(placeId);
-        if (coords == null) continue;
-
-        results.add(SearchResult(
-          displayName: description,
-          coordinates: coords,
-          placeId: placeId,
-        ));
+      if (status == 'ZERO_RESULTS') return [];
+      if (status != 'OK') {
+        debugPrint('GEO ERROR: ${data['error_message'] ?? status}');
+        // Fallback vers Nominatim si Google échoue
+        return await _nominatimFallback(q, userLocation);
       }
 
-      return results;
+      final predictions = data['predictions'] as List;
+      final names = <String>[];
+
+      for (final p in predictions.take(6)) {
+        final desc = (p['description'] ?? '') as String;
+        final placeId = (p['place_id'] ?? '') as String;
+        if (desc.isEmpty) continue;
+        names.add(desc);
+        if (placeId.isNotEmpty) _placeIdCache[desc] = placeId;
+      }
+
+      _suggestionsCache[cacheKey] = names;
+      if (_suggestionsCache.length > 80) _suggestionsCache.clear();
+
+      return names;
     } catch (e) {
-      return [];
+      debugPrint('GEO EXCEPTION searchAddressSuggestions: $e');
+      return await _nominatimFallback(query.trim(), userLocation);
     }
   }
 
-  /// Obtenir les coordonnées d'un lieu via son place_id
-  static Future<LatLng?> _getPlaceCoordinates(String placeId) async {
+  /// Convertir un nom de lieu en coordonnées
+  /// Utilise le placeId en cache si disponible, sinon Geocoding API, sinon Nominatim
+  static Future<LatLng?> getAddressCoordinates(String address) async {
     try {
+      // 1. placeId depuis l'autocomplétion (le plus précis)
+      final placeId = _placeIdCache[address];
+      if (placeId != null) {
+        final coords = await _coordsFromPlaceId(placeId);
+        if (coords != null) return coords;
+      }
+
+      // 2. Google Geocoding API
+      final url = '$_geocodeBaseUrl/json'
+          '?address=${Uri.encodeComponent(address)}'
+          '&key=$_apiKey'
+          '&language=fr';
+
+      debugPrint('GEO: geocode → $url');
+
       final response = await http
-          .get(
-            Uri.parse(
-              '$_placesBaseUrl/details/json'
-              '?place_id=$placeId'
-              '&fields=geometry'
-              '&key=$_apiKey',
-            ),
-          )
-          .timeout(const Duration(seconds: 10));
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(const Duration(seconds: 8));
+
+      debugPrint('GEO: geocode status=${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+          final loc = data['results'][0]['geometry']['location'];
+          return LatLng(loc['lat'] as double, loc['lng'] as double);
+        }
+        debugPrint('GEO: geocode Google status = ${data['status']}');
+      }
+
+      // 3. Fallback Nominatim
+      return await _nominatimCoords(address);
+    } catch (e) {
+      debugPrint('GEO EXCEPTION getAddressCoordinates: $e');
+      return await _nominatimCoords(address);
+    }
+  }
+
+  /// Convertir des coordonnées en adresse lisible
+  static Future<String?> getAddressFromCoordinates(LatLng coordinates) async {
+    try {
+      final url = '$_geocodeBaseUrl/json'
+          '?latlng=${coordinates.latitude},${coordinates.longitude}'
+          '&key=$_apiKey'
+          '&language=fr';
+
+      final response = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+          return data['results'][0]['formatted_address'] as String;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('GEO EXCEPTION getAddressFromCoordinates: $e');
+      return null;
+    }
+  }
+
+  /// Obtenir les coordonnées depuis un placeId Google
+  static Future<LatLng?> _coordsFromPlaceId(String placeId) async {
+    try {
+      final url = '$_placesBaseUrl/details/json'
+          '?place_id=$placeId'
+          '&fields=geometry'
+          '&key=$_apiKey';
+
+      final response = await http
+          .get(Uri.parse(url), headers: _headers)
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == 'OK') {
           final loc = data['result']['geometry']['location'];
-          return LatLng(loc['lat'], loc['lng']);
+          return LatLng(loc['lat'] as double, loc['lng'] as double);
         }
       }
       return null;
@@ -198,20 +207,92 @@ class GeocodingService {
     }
   }
 
-  /// Obtenir les coordonnées d'un lieu depuis son nom affiché
-  static Future<LatLng?> getCoordinatesFromDisplayName(
-      String displayName) async {
+  /// Obtenir les coordonnées via Nominatim (fallback)
+  static Future<LatLng?> _nominatimCoords(String address) async {
     try {
-      // D'abord chercher dans le cache
-      for (final results in _cache.values) {
-        final match = results.where((r) => r.displayName == displayName);
-        if (match.isNotEmpty) return match.first.coordinates;
-      }
+      debugPrint('GEO: Nominatim coords pour "$address"');
+      final url = 'https://nominatim.openstreetmap.org/search'
+          '?format=json'
+          '&q=${Uri.encodeComponent(address)}'
+          '&limit=1';
 
-      // Sinon utiliser le geocoding
-      return await getAddressCoordinates(displayName);
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'User-Agent': 'AtlasMove/1.0'},
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final List data = json.decode(response.body);
+        if (data.isNotEmpty) {
+          return LatLng(
+            double.parse(data[0]['lat'] as String),
+            double.parse(data[0]['lon'] as String),
+          );
+        }
+      }
+      return null;
     } catch (e) {
       return null;
     }
+  }
+
+  /// Fallback OpenStreetMap Nominatim si Google échoue
+  static Future<List<String>> _nominatimFallback(
+      String query, LatLng? userLocation) async {
+    try {
+      debugPrint('GEO: fallback Nominatim pour "$query"');
+      String url = 'https://nominatim.openstreetmap.org/search'
+          '?format=json'
+          '&q=${Uri.encodeComponent(query)}'
+          '&limit=6'
+          '&addressdetails=1';
+
+      if (userLocation != null) {
+        url += '&viewbox=${userLocation.longitude - 0.5},${userLocation.latitude + 0.5}'
+            ',${userLocation.longitude + 0.5},${userLocation.latitude - 0.5}'
+            '&bounded=0';
+      }
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'User-Agent': 'AtlasMove/1.0'},
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final List data = json.decode(response.body);
+        return data
+            .map((item) => (item['display_name'] ?? '') as String)
+            .where((s) => s.isNotEmpty)
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Recherche complète avec coordonnées (utilisé si besoin)
+  static Future<List<SearchResult>> searchPlaces(
+    String query, {
+    LatLng? userLocation,
+  }) async {
+    final names = await searchAddressSuggestions(query, userLocation: userLocation);
+    final results = <SearchResult>[];
+    for (final name in names) {
+      final coords = await getAddressCoordinates(name);
+      if (coords != null) {
+        results.add(SearchResult(
+          displayName: name,
+          coordinates: coords,
+          placeId: _placeIdCache[name],
+        ));
+      }
+    }
+    return results;
+  }
+
+  /// Obtenir les coordonnées depuis un nom affiché (cherche dans le cache d'abord)
+  static Future<LatLng?> getCoordinatesFromDisplayName(String displayName) async {
+    return getAddressCoordinates(displayName);
   }
 }
