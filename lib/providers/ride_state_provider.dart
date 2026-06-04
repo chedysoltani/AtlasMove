@@ -112,6 +112,11 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
   // ── Fallback REST poll ──────────────────────────────────────────────────────
 
   Future<void> _poll(String tripId) async {
+    // Stop polling for terminal states
+    if (state.status == RideStatus.completed || state.status == RideStatus.cancelled) {
+      _cancelTimers();
+      return;
+    }
     // Only hit REST when WebSocket is down OR driver location has gone stale
     final wsUp = NotificationService().isConnected;
     final locationFresh = !(state.driverLocation?.isStale ?? true);
@@ -148,7 +153,11 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
     _stallTimer?.cancel();
     // After 15 s with no update, consumers re-check driverLocation.isStale
     _stallTimer = Timer(const Duration(seconds: 15), () {
-      if (mounted) state = state.copyWith(); // force rebuild so UI re-evaluates isStale
+      if (mounted &&
+          state.status != RideStatus.completed &&
+          state.status != RideStatus.cancelled) {
+        state = state.copyWith(); // force rebuild so UI re-evaluates isStale
+      }
     });
   }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -75,9 +76,12 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   Set<Polyline> _polylines = {};
   DateTime?  _lastRouteFetch;
   bool       _fetchingRoute = false;
+  BitmapDescriptor? _driverIcon;
+  BitmapDescriptor? _pickupIcon;
 
-  // ── Cancellation ────────────────────────────────────────────────────────────
+  // ── Cancellation / navigation ────────────────────────────────────────────────
   bool _isCancelling = false;
+  bool _hasNavigated = false;
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   bool get _hasPickupCoords =>
@@ -118,6 +122,9 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
       duration: const Duration(milliseconds: 700),
     )..addListener(() => setState(() {}));
 
+    // Load custom markers
+    _loadIcons();
+
     // Start WebSocket + fallback polling via provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(activeRideProvider.notifier)
@@ -133,6 +140,56 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     _mapController?.dispose();
     super.dispose();
   }
+
+  // ── Custom icons ─────────────────────────────────────────────────────────────
+  Future<void> _loadIcons() async {
+    // Driver: caricon.png resized to 60×60 dp
+    final carData = await rootBundle.load('assets/images/caricon.png');
+    final carCodec = await ui.instantiateImageCodec(
+        carData.buffer.asUint8List(), targetWidth: 120, targetHeight: 120);
+    final carFrame = await carCodec.getNextFrame();
+    final carPng = await carFrame.image.toByteData(format: ui.ImageByteFormat.png);
+    _driverIcon = BitmapDescriptor.fromBytes(
+        carPng!.buffer.asUint8List(), size: const Size(60, 60));
+
+    // Pickup: green circle with white dot
+    _pickupIcon = await _buildPickupIcon();
+
+    if (mounted) setState(() {});
+  }
+
+  Future<BitmapDescriptor> _buildPickupIcon() async {
+    const double dp = 44.0, px = 3.0, size = dp * px;
+    final rec = ui.PictureRecorder();
+    final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
+    final cx = size / 2, cy = size / 2, r = size * 0.38;
+    // Shadow
+    canvas.drawCircle(Offset(cx, cy + 2), r + 4,
+        Paint()..color = Colors.black.withOpacity(0.18)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+    // Outer ring white
+    canvas.drawCircle(Offset(cx, cy), r + 5, Paint()..color = Colors.white);
+    // Green fill
+    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = const Color(0xFF22C55E));
+    // White inner dot
+    canvas.drawCircle(Offset(cx, cy), r * 0.35, Paint()..color = Colors.white);
+    final pic = rec.endRecording();
+    final img = await pic.toImage(size.toInt(), size.toInt());
+    final data = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(), size: const Size(dp, dp));
+  }
+
+  // Clean map style — no POI, no transit, beige roads
+  static const String _mapStyle = '''[
+    {"featureType":"poi","stylers":[{"visibility":"off"}]},
+    {"featureType":"transit","stylers":[{"visibility":"off"}]},
+    {"featureType":"administrative","stylers":[{"visibility":"simplified"}]},
+    {"featureType":"road","elementType":"geometry","stylers":[{"color":"#ffffff"}]},
+    {"featureType":"landscape","stylers":[{"color":"#f5f0e8"}]},
+    {"featureType":"water","stylers":[{"color":"#a8d4f5"}]},
+    {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#f5f1eb"}]},
+    {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#e8e0d0"}]}
+  ]''';
 
   // ── Driver position update ───────────────────────────────────────────────────
   void _onNewDriverPosition(LatLng newPos) {
@@ -159,20 +216,23 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   void _frameBothPoints(LatLng driverPos) {
     final pickup = _pickupLatLng;
     if (pickup == null) {
-      _mapController!.animateCamera(CameraUpdate.newLatLng(driverPos));
+      _mapController!.animateCamera(
+          CameraUpdate.newCameraPosition(CameraPosition(target: driverPos, zoom: 16)));
       return;
     }
+    // Add small padding to avoid markers touching the bounds edge
+    const pad = 0.002;
     final bounds = LatLngBounds(
       southwest: LatLng(
-        math.min(driverPos.latitude,  pickup.latitude),
-        math.min(driverPos.longitude, pickup.longitude),
+        math.min(driverPos.latitude,  pickup.latitude)  - pad,
+        math.min(driverPos.longitude, pickup.longitude) - pad,
       ),
       northeast: LatLng(
-        math.max(driverPos.latitude,  pickup.latitude),
-        math.max(driverPos.longitude, pickup.longitude),
+        math.max(driverPos.latitude,  pickup.latitude)  + pad,
+        math.max(driverPos.longitude, pickup.longitude) + pad,
       ),
     );
-    _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+    _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
   }
 
   Future<void> _fetchRoute(LatLng from, LatLng to) async {
@@ -183,11 +243,22 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
       final points = result?.points ?? [from, to];
       setState(() {
         _polylines = {
+          // Outline (darker blue)
+          Polyline(
+            polylineId: const PolylineId('driver_route_outline'),
+            points: points,
+            color: const Color(0xFF0D47A1),
+            width: 13,
+            jointType: JointType.round,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+          ),
+          // Main route (blue)
           Polyline(
             polylineId: const PolylineId('driver_route'),
             points: points,
-            color: _C.primary,
-            width: 4,
+            color: const Color(0xFF1A73E8),
+            width: 9,
             jointType: JointType.round,
             startCap: Cap.roundCap,
             endCap: Cap.roundCap,
@@ -284,12 +355,14 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
         _onNewDriverPosition(nextPos);
       }
 
-      // Auto-navigate when ride ends
-      if (next.status == RideStatus.completed && mounted) {
+      // Auto-navigate when ride ends (guard against multiple calls)
+      if (next.status == RideStatus.completed && mounted && !_hasNavigated) {
+        _hasNavigated = true;
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) Navigator.pushReplacementNamed(context, '/client_trip_history');
         });
-      } else if (next.status == RideStatus.cancelled && mounted) {
+      } else if (next.status == RideStatus.cancelled && mounted && !_hasNavigated) {
+        _hasNavigated = true;
         Navigator.pushReplacementNamed(context, '/client_dashboard');
       }
     });
@@ -346,33 +419,36 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     final initialTarget = _pickupLatLng!;
     final markers = <Marker>{};
 
-    // Pickup marker (client position — static green)
+    // Pickup marker — custom green circle
     markers.add(Marker(
       markerId: const MarkerId('pickup'),
       position: _pickupLatLng!,
       infoWindow: const InfoWindow(title: 'Votre position'),
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      anchor: const Offset(0.5, 0.5),
+      zIndex: 1,
     ));
 
-    // Driver marker (animated orange)
+    // Driver marker — car icon, flat, rotating
     final driverPos = _smoothDriverPos;
     if (driverPos != null) {
       markers.add(Marker(
         markerId: const MarkerId('driver'),
         position: driverPos,
-        infoWindow: InfoWindow(title: widget.driverName),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+        icon: _driverIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
         rotation: rideState.driverLocation?.heading ?? 0,
         flat: true,
+        anchor: const Offset(0.5, 0.5),
+        zIndex: 2,
       ));
     }
 
     return GoogleMap(
       initialCameraPosition: CameraPosition(target: initialTarget, zoom: 15),
-      onMapCreated: (ctrl) {
+      onMapCreated: (ctrl) async {
         _mapController = ctrl;
+        await ctrl.setMapStyle(_mapStyle);
         setState(() => _isMapReady = true);
-        // If driver position already known, frame it immediately
         final driverLoc = ref.read(activeRideProvider).driverLocation;
         if (driverLoc != null) _frameBothPoints(driverLoc.position);
       },
@@ -381,11 +457,13 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
       myLocationEnabled: false,
       myLocationButtonEnabled: false,
       zoomControlsEnabled: false,
-      compassEnabled: true,
+      compassEnabled: false,
       mapToolbarEnabled: false,
+      buildingsEnabled: false,
+      trafficEnabled: true,
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 80,
-        bottom: 260,
+        bottom: 270,
       ),
     );
   }
