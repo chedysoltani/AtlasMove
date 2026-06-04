@@ -13,6 +13,7 @@ import '../providers/map_provider.dart';
 import '../services/location_service.dart';
 import '../services/trip_service.dart';
 import '../services/route_service.dart';
+import 'driver_main.dart';
 
 enum RidePhase { arriving, started, completed }
 
@@ -89,128 +90,55 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     }
   }
 
-  // Voiture vue 3/4 avant — effet 3D réaliste
+  // Flèche navigation style inDrive/Google Maps — cercle bleu + chevron blanc
   Future<BitmapDescriptor> _createCarIcon() async {
-    // Canvas 3× la taille logique pour haute résolution
-    const double lw = 64.0;  // largeur logique dp
-    const double lh = 90.0;  // hauteur logique dp
-    const double px = 3.0;   // facteur pixel
-    const double w = lw * px;
-    const double h = lh * px;
+    const double dp = 56.0;   // taille logique finale (dp)
+    const double px = 3.0;    // facteur pixel pour haute résolution
+    const double size = dp * px;
+    final double cx = size / 2;
+    final double cy = size / 2;
+    final double r = size * 0.38;
 
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, w, h));
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
 
-    // Ombre au sol
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(w/2, h*0.88), width: w*0.7, height: h*0.07),
+    // Ombre douce
+    canvas.drawCircle(
+      Offset(cx, cy + size * 0.04),
+      r + size * 0.04,
       Paint()
-        ..color = Colors.black.withOpacity(0.25)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+        ..color = Colors.black.withOpacity(0.20)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, size * 0.06),
     );
 
-    // ── Côté gauche (face latérale visible) ──
-    final sideLeft = Path()
-      ..moveTo(w*0.08, h*0.52)
-      ..lineTo(w*0.08, h*0.74)
-      ..lineTo(w*0.42, h*0.80)
-      ..lineTo(w*0.42, h*0.58)
-      ..close();
-    canvas.drawPath(sideLeft, Paint()..color = const Color(0xFFBBDEFB));
+    // Cercle blanc (bordure)
+    canvas.drawCircle(Offset(cx, cy), r + size * 0.04,
+        Paint()..color = Colors.white);
 
-    // ── Toit (vue de dessus légèrement inclinée) ──
-    final roof = Path()
-      ..moveTo(w*0.08, h*0.38)
-      ..lineTo(w*0.42, h*0.30)
-      ..lineTo(w*0.92, h*0.35)
-      ..lineTo(w*0.92, h*0.52)
-      ..lineTo(w*0.42, h*0.58)
-      ..lineTo(w*0.08, h*0.52)
-      ..close();
-    canvas.drawPath(roof, Paint()..color = Colors.white);
+    // Cercle principal bleu Google Maps
+    canvas.drawCircle(Offset(cx, cy), r,
+        Paint()..color = const Color(0xFF1A73E8));
 
-    // ── Face avant (la plus visible) ──
-    final front = Path()
-      ..moveTo(w*0.42, h*0.30)
-      ..lineTo(w*0.92, h*0.35)
-      ..lineTo(w*0.92, h*0.75)
-      ..lineTo(w*0.42, h*0.80)
-      ..close();
-    canvas.drawPath(front, Paint()..color = const Color(0xFFE3F2FD));
-
-    // Contour général
-    final outline = Paint()
-      ..color = const Color(0xFF90CAF9)
+    // Chevron blanc (flèche de navigation pointant vers le haut)
+    final arrowPaint = Paint()
+      ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    canvas.drawPath(front, outline);
-    canvas.drawPath(roof, outline);
-    canvas.drawPath(sideLeft, outline);
+      ..strokeWidth = size * 0.075
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
 
-    // Pare-brise avant
-    final windshield = Path()
-      ..moveTo(w*0.46, h*0.32)
-      ..lineTo(w*0.88, h*0.37)
-      ..lineTo(w*0.88, h*0.51)
-      ..lineTo(w*0.46, h*0.50)
-      ..close();
-    canvas.drawPath(windshield,
-        Paint()..color = const Color(0xFF90CAF9).withOpacity(0.55));
-
-    // Vitres latérales
-    final sideWindows = Path()
-      ..moveTo(w*0.10, h*0.40)
-      ..lineTo(w*0.40, h*0.33)
-      ..lineTo(w*0.40, h*0.50)
-      ..lineTo(w*0.10, h*0.52)
-      ..close();
-    canvas.drawPath(sideWindows,
-        Paint()..color = const Color(0xFF90CAF9).withOpacity(0.40));
-
-    // Phares avant (jaune)
-    final hl = Paint()..color = const Color(0xFFFFF176);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(
-            Rect.fromLTWH(w*0.44, h*0.70, w*0.12, h*0.04), const Radius.circular(3)),
-        hl);
-    canvas.drawRRect(
-        RRect.fromRectAndRadius(
-            Rect.fromLTWH(w*0.74, h*0.70, w*0.14, h*0.04), const Radius.circular(3)),
-        hl);
-
-    // Roues
-    final wheelD = Paint()..color = const Color(0xFF212121);
-    for (final r in [
-      Rect.fromLTWH(w*0.04, h*0.60, w*0.16, h*0.20),
-      Rect.fromLTWH(w*0.36, h*0.64, w*0.14, h*0.18),
-      Rect.fromLTWH(w*0.58, h*0.64, w*0.16, h*0.20),
-      Rect.fromLTWH(w*0.80, h*0.63, w*0.14, h*0.18),
-    ]) {
-      canvas.drawOval(r, wheelD);
-      canvas.drawOval(r.deflate(3), Paint()..color = const Color(0xFF78909C));
-    }
-
-    // Flèche direction (haut = devant du véhicule dans la vue inDrive)
     final arrow = Path()
-      ..moveTo(w*0.50, h*0.02)
-      ..lineTo(w*0.38, h*0.16)
-      ..lineTo(w*0.62, h*0.16)
-      ..close();
-    canvas.drawPath(arrow, Paint()..color = const Color(0xFF1565C0));
-    canvas.drawPath(
-      arrow,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
+      ..moveTo(cx - r * 0.40, cy + r * 0.20)
+      ..lineTo(cx, cy - r * 0.40)
+      ..lineTo(cx + r * 0.40, cy + r * 0.20);
+    canvas.drawPath(arrow, arrowPaint);
 
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(w.toInt(), h.toInt());
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    final pic = recorder.endRecording();
+    final img = await pic.toImage(size.toInt(), size.toInt());
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.fromBytes(
-      data!.buffer.asUint8List(),
-      size: const Size(lw, lh),
+      bytes!.buffer.asUint8List(),
+      size: const Size(dp, dp),
     );
   }
 
@@ -357,31 +285,14 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
           position: currentPos,
           icon: _carIcon!,
           flat: true,
-          rotation: 0,
-          anchor: const Offset(0.5, 0.75),
+          rotation: bearing,
+          anchor: const Offset(0.5, 0.5),
           zIndex: 2,
         ));
       }
 
       mapNotifier.addPolyline(routeOutline);
       mapNotifier.addPolyline(routePolyline);
-
-      // Caméra style navigation GPS :
-      // Zoom 19, tilt 70°, voiture en bas → 250m devant en cible
-      final mapState = ref.read(mapProvider);
-      if (mapStateReady(mapState) && mapState.isFollowingUser) {
-        final aheadTarget = _cameraAheadTarget(currentPos, bearing, 0.25);
-        mapState.mapController?.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: aheadTarget,
-              zoom: 19.0,
-              tilt: 70.0,
-              bearing: bearing,
-            ),
-          ),
-        );
-      }
       
       setState(() {
         _currentDistance = distance;
@@ -395,16 +306,34 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
   bool mapStateReady(MapState state) => state.status == MapStatus.ready;
 
+  // Caméra fluide à chaque update GPS, indépendante du throttle route
+  void _smoothFollowCamera(LatLng pos) {
+    final mapState = ref.read(mapProvider);
+    if (!mapState.isFollowingUser || !mapStateReady(mapState)) return;
+    final ahead = _cameraAheadTarget(pos, _currentBearing, 0.25);
+    mapState.mapController?.animateCamera(
+      CameraUpdate.newCameraPosition(CameraPosition(
+        target: ahead,
+        zoom: 19.0,
+        tilt: 70.0,
+        bearing: _currentBearing,
+      )),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final mapState = ref.watch(mapProvider);
 
-    // Reactively update route if driver moves
+    // Caméra immédiate à chaque position GPS — route throttlée à 10s
     ref.listen<MapState>(mapProvider, (previous, next) {
-      if (next.currentPosition != null && _isMapReady) {
-        if (previous?.currentPosition != next.currentPosition || previous?.status != next.status) {
-          _updateRouteDetails(next.currentPosition!);
-        }
+      if (next.currentPosition == null || !_isMapReady) return;
+      final posChanged = previous?.currentPosition != next.currentPosition;
+      if (posChanged) {
+        _smoothFollowCamera(next.currentPosition!); // immédiat, sans throttle
+      }
+      if (posChanged || previous?.status != next.status) {
+        _updateRouteDetails(next.currentPosition!); // throttlé 10s
       }
     });
 
@@ -1049,8 +978,11 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: () {
-                  // Retour au Dashboard en supprimant tout le stack
-                  Navigator.of(context).popUntil((route) => route.isFirst);
+                  // Retour au Dashboard — recrée DriverMainScreen (index 0 = Dashboard)
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const DriverMainScreen()),
+                    (route) => false,
+                  );
                 },
                 child: const Text('Retour au tableau de bord',
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
