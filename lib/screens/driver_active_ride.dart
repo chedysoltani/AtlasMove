@@ -17,23 +17,18 @@ import 'driver_main.dart';
 
 enum RidePhase { arriving, started, completed }
 
-// Style carte navigation — routes claires, pas de POI ni buildings
+// Style carte navigation — identique au côté client
 const String _navMapStyle = '''[
-  {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
   {"featureType":"poi","stylers":[{"visibility":"off"}]},
   {"featureType":"transit","stylers":[{"visibility":"off"}]},
-  {"featureType":"administrative","elementType":"labels","stylers":[{"visibility":"off"}]},
-  {"featureType":"landscape","elementType":"geometry.fill","stylers":[{"color":"#f2efe9"}]},
-  {"featureType":"landscape.man_made","elementType":"geometry.fill","stylers":[{"color":"#ece8e1"}]},
-  {"featureType":"road","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
-  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#d5d0c8"},{"weight":"1"}]},
-  {"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
-  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#fdd663"}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#e8c84b"},{"weight":"1"}]},
+  {"featureType":"administrative","stylers":[{"visibility":"simplified"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#ffffff"}]},
+  {"featureType":"landscape","stylers":[{"color":"#f5f0e8"}]},
+  {"featureType":"water","stylers":[{"color":"#a8d4f5"}]},
+  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#f5f1eb"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#e8e0d0"}]},
   {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#555555"}]},
-  {"featureType":"road","elementType":"labels.text.stroke","stylers":[{"color":"#ffffff"},{"weight":"3"}]},
-  {"featureType":"water","elementType":"geometry.fill","stylers":[{"color":"#aee0f4"}]},
-  {"featureType":"water","elementType":"labels","stylers":[{"visibility":"off"}]}
+  {"featureType":"road","elementType":"labels.text.stroke","stylers":[{"color":"#ffffff"},{"weight":"3"}]}
 ]''';
 
 class DriverActiveRideScreen extends ConsumerStatefulWidget {
@@ -56,7 +51,9 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   DateTime? _lastRouteFetchTime;
   double _currentBearing = 0.0;
   BitmapDescriptor? _carIcon;
-  
+  BitmapDescriptor? _clientMarkerIcon;
+  BitmapDescriptor? _destMarkerIcon;
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +73,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       ref.read(mapProvider.notifier).initializeMap();
     });
     _initCarIcon();
+    _initTargetIcons();
   }
 
   Future<void> _initCarIcon() async {
@@ -90,55 +88,48 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     }
   }
 
-  // Flèche navigation style inDrive/Google Maps — cercle bleu + chevron blanc
-  Future<BitmapDescriptor> _createCarIcon() async {
-    const double dp = 56.0;   // taille logique finale (dp)
-    const double px = 3.0;    // facteur pixel pour haute résolution
-    const double size = dp * px;
-    final double cx = size / 2;
-    final double cy = size / 2;
-    final double r = size * 0.38;
+  Future<void> _initTargetIcons() async {
+    _clientMarkerIcon = await _buildCircleMarker(const Color(0xFF22C55E));
+    _destMarkerIcon   = await _buildCircleMarker(const Color(0xFFFF6600));
+    if (!mounted) return;
+    setState(() {});
+    // Force refresh des markers et de la caméra après chargement des icônes
+    _lastRouteFetchTime = null;
+    final mapState = ref.read(mapProvider);
+    if (mapState.currentPosition != null) {
+      await _updateRouteDetails(mapState.currentPosition!);
+    }
+  }
 
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
-
-    // Ombre douce
-    canvas.drawCircle(
-      Offset(cx, cy + size * 0.04),
-      r + size * 0.04,
-      Paint()
-        ..color = Colors.black.withOpacity(0.20)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, size * 0.06),
-    );
-
-    // Cercle blanc (bordure)
-    canvas.drawCircle(Offset(cx, cy), r + size * 0.04,
-        Paint()..color = Colors.white);
-
-    // Cercle principal bleu Google Maps
-    canvas.drawCircle(Offset(cx, cy), r,
-        Paint()..color = const Color(0xFF1A73E8));
-
-    // Chevron blanc (flèche de navigation pointant vers le haut)
-    final arrowPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = size * 0.075
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final arrow = Path()
-      ..moveTo(cx - r * 0.40, cy + r * 0.20)
-      ..lineTo(cx, cy - r * 0.40)
-      ..lineTo(cx + r * 0.40, cy + r * 0.20);
-    canvas.drawPath(arrow, arrowPaint);
-
-    final pic = recorder.endRecording();
+  Future<BitmapDescriptor> _buildCircleMarker(Color color) async {
+    const double dp = 44.0, px = 3.0, size = dp * px;
+    final rec = ui.PictureRecorder();
+    final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
+    final cx = size / 2, cy = size / 2, r = size * 0.38;
+    canvas.drawCircle(Offset(cx, cy + 2), r + 4,
+        Paint()..color = Colors.black.withOpacity(0.18)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+    canvas.drawCircle(Offset(cx, cy), r + 5, Paint()..color = Colors.white);
+    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = color);
+    canvas.drawCircle(Offset(cx, cy), r * 0.35, Paint()..color = Colors.white);
+    final pic = rec.endRecording();
     final img = await pic.toImage(size.toInt(), size.toInt());
-    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    final data = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(), size: const Size(dp, dp));
+  }
+
+  Future<BitmapDescriptor> _createCarIcon() async {
+    final data = await rootBundle.load('assets/images/caricon.png');
+    final codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: 120,
+      targetHeight: 120,
+    );
+    final frame = await codec.getNextFrame();
+    final png = await frame.image.toByteData(format: ui.ImageByteFormat.png);
     return BitmapDescriptor.fromBytes(
-      bytes!.buffer.asUint8List(),
-      size: const Size(dp, dp),
+      png!.buffer.asUint8List(),
+      size: const Size(60, 60),
     );
   }
 
@@ -220,13 +211,17 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
       final mapNotifier = ref.read(mapProvider.notifier);
       
+      final isArriving = _currentPhase == RidePhase.arriving;
+      final targetIcon = isArriving
+          ? (_clientMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen))
+          : (_destMarkerIcon   ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange));
+
       final targetMarker = Marker(
         markerId: const MarkerId('target'),
         position: targetLatLng,
-        infoWindow: InfoWindow(title: _currentPhase == RidePhase.arriving ? 'Client' : 'Destination'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-          _currentPhase == RidePhase.arriving ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed
-        ),
+        icon: targetIcon,
+        anchor: const Offset(0.5, 0.5),
+        zIndex: 1,
       );
 
       List<LatLng> points = [currentPos, targetLatLng];
@@ -306,19 +301,42 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
   bool mapStateReady(MapState state) => state.status == MapStatus.ready;
 
-  // Caméra fluide à chaque update GPS, indépendante du throttle route
+  // Caméra : navigation (zoom 19 tilt 70) en in_progress, bounds en arriving
   void _smoothFollowCamera(LatLng pos) {
     final mapState = ref.read(mapProvider);
-    if (!mapState.isFollowingUser || !mapStateReady(mapState)) return;
-    final ahead = _cameraAheadTarget(pos, _currentBearing, 0.25);
-    mapState.mapController?.animateCamera(
-      CameraUpdate.newCameraPosition(CameraPosition(
+    if (!mapStateReady(mapState)) return;
+    final ctrl = mapState.mapController;
+    if (ctrl == null) return;
+
+    if (_currentPhase == RidePhase.arriving) {
+      // Montrer driver + client dans le même cadre
+      final targetPos = LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude);
+      // Padding minimal de 0.008° (~900m) pour forcer un zoom lisible
+      const pad = 0.008;
+      final latDiff = (pos.latitude - targetPos.latitude).abs();
+      final lngDiff = (pos.longitude - targetPos.longitude).abs();
+      final effectivePad = math.max(pad, math.max(latDiff, lngDiff) * 0.4);
+      final bounds = LatLngBounds(
+        southwest: LatLng(
+          math.min(pos.latitude,  targetPos.latitude)  - effectivePad,
+          math.min(pos.longitude, targetPos.longitude) - effectivePad,
+        ),
+        northeast: LatLng(
+          math.max(pos.latitude,  targetPos.latitude)  + effectivePad,
+          math.max(pos.longitude, targetPos.longitude) + effectivePad,
+        ),
+      );
+      ctrl.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
+    } else {
+      // Navigation inDrive : zoom 19, tilt 70°, légèrement en avance
+      final ahead = _cameraAheadTarget(pos, _currentBearing, 0.25);
+      ctrl.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
         target: ahead,
         zoom: 19.0,
         tilt: 70.0,
         bearing: _currentBearing,
-      )),
-    );
+      )));
+    }
   }
 
   @override
@@ -392,17 +410,9 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
         await controller.setMapStyle(_navMapStyle);
         setState(() => _isMapReady = true);
 
-        // Forcer immédiatement la caméra navigation (tilt 70°, zoom 19)
+        // Caméra initiale selon la phase
         final pos = ref.read(mapProvider).currentPosition ?? startTarget;
-        final ahead = _cameraAheadTarget(pos, _currentBearing, 0.25);
-        await controller.animateCamera(
-          CameraUpdate.newCameraPosition(CameraPosition(
-            target: ahead,
-            zoom: 19.0,
-            tilt: 70.0,
-            bearing: _currentBearing,
-          )),
-        );
+        _smoothFollowCamera(pos);
 
         if (ref.read(mapProvider).currentPosition != null) {
           _lastRouteFetchTime = null;
