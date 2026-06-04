@@ -527,16 +527,38 @@ class TripService {
     }
   }
 
+  /// Fetch trip status from the CLIENT side (no driver role required).
+  /// Backend: GET /m/trips/{id}
+  static Future<String?> getClientTripStatus(String tripId) async {
+    try {
+      final response = await HttpClient.get('/m/trips/$tripId');
+      if (response.isSuccess) {
+        final data = response.json['data']?['data'] ?? response.json['data'] ?? response.json;
+        return data['status'] as String?;
+      }
+    } catch (e) {
+      debugPrint('❌ TripService.getClientTripStatus: $e');
+    }
+    return null;
+  }
+
   /// Fetch current driver GPS position for a client's active trip.
   /// Backend: GET /m/trips/{id}/driver-location
   static Future<DriverLocationDto?> getDriverLocation(String tripId) async {
     try {
       final response = await HttpClient.get('/m/trips/$tripId/driver-location');
       if (response.isSuccess) {
-        final raw = response.json['data'] ?? response.json;
+        // API: { data: { message, data: { lat, lng, heading } } }
+        final outer = response.json['data'];
+        final raw = (outer is Map && outer['data'] is Map)
+            ? outer['data'] as Map<String, dynamic>
+            : (outer as Map<String, dynamic>? ?? response.json as Map<String, dynamic>);
+        final lat = (raw['lat'] ?? raw['latitude'] as num?)?.toDouble();
+        final lng = (raw['lng'] ?? raw['longitude'] as num?)?.toDouble();
+        if (lat == null || lng == null) return null;
         return DriverLocationDto(
-          latitude: (raw['latitude'] as num).toDouble(),
-          longitude: (raw['longitude'] as num).toDouble(),
+          latitude: lat,
+          longitude: lng,
           heading: (raw['heading'] as num?)?.toDouble(),
         );
       }

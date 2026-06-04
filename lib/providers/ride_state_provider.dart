@@ -131,10 +131,10 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
         );
       }
 
-      // Fetch trip status
-      final trip = await TripService.getActiveTrip();
-      if (trip != null && mounted) {
-        final newStatus = _parse(trip.status);
+      // Fetch trip status via client endpoint (avoids calling /l/trips/active with client token)
+      final statusStr = await TripService.getClientTripStatus(tripId);
+      if (statusStr != null && mounted) {
+        final newStatus = _parse(statusStr);
         if (newStatus != state.status) {
           state = state.copyWith(status: newStatus);
         }
