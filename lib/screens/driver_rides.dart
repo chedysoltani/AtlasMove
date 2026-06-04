@@ -32,12 +32,20 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
   final Map<String, double> _bidInputs = {};
   final Map<String, bool> _isBiddingExpanded = {};
   final Map<String, Timer> _bidPollingTimers = {};
+  Timer? _autoRefreshTimer;
+  final Set<String> _refusedTripIds = {};
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _fetchAvailableTrips();
+    // Auto-refresh toutes les 6s pour détecter les nouvelles courses
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (mounted && _submittedBids.isEmpty) {
+        _fetchAvailableTrips();
+      }
+    });
   }
 
   void _initializeAnimations() {
@@ -59,6 +67,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
     for (final t in _bidPollingTimers.values) {
       t.cancel();
     }
@@ -139,7 +148,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
 
       if (mounted) {
         setState(() {
-          _trips = trips;
+          // Filtrer les courses refusées localement
+          _trips = trips.where((t) => !_refusedTripIds.contains(t.id)).toList();
           _isLoading = false;
         });
       }
@@ -894,7 +904,9 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
         }
       }
     } else {
+      // Ajouter à la liste noire locale pour éviter la réapparition au refresh
       setState(() {
+        _refusedTripIds.add(trip.id);
         _trips.removeWhere((t) => t.id == trip.id);
       });
     }
