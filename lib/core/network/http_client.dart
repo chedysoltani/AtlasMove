@@ -230,6 +230,8 @@ class HttpClient {
     } on TimeoutException {
       debugPrint('⏰ Timeout Error: Request timed out');
       throw NetworkException('La requête a expiré. Veuillez réessayer.');
+    } on ApiException {
+      rethrow;
     } catch (e) {
       debugPrint('💥 Unexpected Error: $e');
       throw NetworkException('Une erreur inattendue est survenue: $e');

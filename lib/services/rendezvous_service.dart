@@ -58,7 +58,7 @@ class RendezvousService {
     debugPrint('=== RendezvousService.getClientHistory() page=$page ===');
     try {
       final response = await HttpClient.get(
-        '/m/rendezvous/history',
+        '/m/rendezvous/history/client',
         queryParams: {'page': page.toString(), 'limit': limit.toString()},
       );
       if (response.isSuccess) {
@@ -94,6 +94,31 @@ class RendezvousService {
   }
 
   // ─── Driver endpoints ────────────────────────────────────────────────────────
+
+  static Future<RendezvousListResponse> getDriverHistory({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    debugPrint('=== RendezvousService.getDriverHistory() page=$page ===');
+    try {
+      final response = await HttpClient.get(
+        '/m/rendezvous/history/livreur',
+        queryParams: {'page': page.toString(), 'limit': limit.toString()},
+      );
+      if (response.isSuccess) {
+        return RendezvousListResponse.fromJson(response.json);
+      } else {
+        throw RendezvousException(
+          message: response.json['message'] ?? 'Erreur chargement historique',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      debugPrint('ERREUR getDriverHistory: $e');
+      if (e is RendezvousException) rethrow;
+      throw RendezvousException(message: e.toString());
+    }
+  }
 
   static Future<RendezvousListResponse> getAvailableBookings({
     int page = 1,

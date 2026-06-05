@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../models/rendezvous_models.dart';
 import '../services/rendezvous_service.dart';
-import '../utils/app_theme.dart';
 import 'client_rendezvous_booking_screen.dart';
 
 class ClientRendezvousHistoryScreen extends StatefulWidget {
@@ -16,7 +17,18 @@ class ClientRendezvousHistoryScreen extends StatefulWidget {
 class _ClientRendezvousHistoryScreenState
     extends State<ClientRendezvousHistoryScreen>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  // ─── Colors ──────────────────────────────────────────────────────
+  static const _navy = Color(0xFF0F172A);
+  static const _navyLight = Color(0xFF1E293B);
+  static const _orange = Color(0xFFFF6B35);
+  static const _orangeLight = Color(0xFFFF8C5A);
+  static const _bg = Color(0xFFF8F9FB);
+  static const _border = Color(0xFFE8ECF0);
+  static const _textPrimary = Color(0xFF1A1F36);
+  static const _textSecondary = Color(0xFF9BA3B4);
+
+  // ─── State ───────────────────────────────────────────────────────
+  int _selectedTab = 0; // 0 = À venir, 1 = Passés
 
   final List<Rendezvous> _upcoming = [];
   final List<Rendezvous> _past = [];
@@ -31,17 +43,24 @@ class _ClientRendezvousHistoryScreenState
 
   final ScrollController _scrollCtrl = ScrollController();
 
+  late AnimationController _animCtrl;
+  late Animation<double> _fadeAnim;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _loadHistory();
     _scrollCtrl.addListener(_onScroll);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _animCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
@@ -56,7 +75,6 @@ class _ClientRendezvousHistoryScreenState
   }
 
   Future<void> _loadHistory({bool refresh = false}) async {
-    if (_isLoading && !refresh) return;
     setState(() {
       _isLoading = true;
       _error = null;
@@ -80,6 +98,7 @@ class _ClientRendezvousHistoryScreenState
           _hasMore = (_upcoming.length + _past.length) < _total;
           _isLoading = false;
         });
+        _animCtrl.forward(from: 0);
       }
     } catch (e) {
       if (mounted) {
@@ -126,201 +145,627 @@ class _ClientRendezvousHistoryScreenState
   }
 
   Future<void> _cancelRendezvous(Rendezvous rdv) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Annuler le rendez-vous ?'),
-        content: Text(
-          'Voulez-vous annuler le rendez-vous du ${DateFormat('dd MMM yyyy à HH:mm', 'fr').format(rdv.scheduledAt)} ?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Non'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorColor,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Annuler RDV'),
-          ),
-        ],
-      ),
-    );
-
+    final confirmed = await _showCancelDialog(rdv);
     if (confirmed != true) return;
 
     try {
       await RendezvousService.cancelRendezvous(rdv.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Rendez-vous annulé'),
-            backgroundColor: AppTheme.successColor,
-          ),
-        );
+        _showSnack('Rendez-vous annulé', success: true);
         _loadHistory(refresh: true);
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur : $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
+      if (mounted) _showSnack('Erreur : $e', success: false);
     }
   }
+
+  Future<bool?> _showCancelDialog(Rendezvous rdv) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.event_busy_rounded,
+                    color: Color(0xFFEF4444), size: 28),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Annuler ce rendez-vous ?',
+                style: GoogleFonts.poppins(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: _textPrimary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                DateFormat('dd MMM yyyy à HH:mm', 'fr').format(rdv.scheduledAt),
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  color: _textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        side: const BorderSide(color: _border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Retour',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        'Annuler',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSnack(String msg, {required bool success}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: GoogleFonts.poppins()),
+      backgroundColor: success ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ));
+  }
+
+  // ─── Build ───────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Mes Rendez-vous'),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: [
-            Tab(text: 'À venir (${_upcoming.length})'),
-            Tab(text: 'Passés (${_past.length})'),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => _loadHistory(refresh: true),
+      backgroundColor: _navy,
+      floatingActionButton: _buildFAB(),
+      body: Column(
+        children: [
+          _buildHero(),
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: _bg,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                children: [
+                  _buildTabBar(),
+                  Expanded(child: _buildContent()),
+                ],
+              ),
+            ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const ClientRendezvousBookingScreen(),
+    );
+  }
+
+  // ─── Hero ─────────────────────────────────────────────────────────
+
+  Widget _buildHero() {
+    return SafeArea(
+      bottom: false,
+      child: SizedBox(
+        height: 145,
+        child: Stack(
+          children: [
+            Positioned(
+              right: -25,
+              top: -15,
+              child: Container(
+                width: 130,
+                height: 130,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.06),
+                    width: 26,
+                  ),
+                ),
+              ),
             ),
-          );
-          _loadHistory(refresh: true);
-        },
-        backgroundColor: AppTheme.primaryColor,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'Nouveau RDV',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            Positioned(
+              left: -20,
+              bottom: -25,
+              child: Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.04),
+                    width: 18,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => _loadHistory(refresh: true),
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.refresh_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [_orange, _orangeLight],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _orange.withOpacity(0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.calendar_month_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Mes Rendez-vous',
+                            style: GoogleFonts.poppins(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            '${_upcoming.length + _past.length} rendez-vous au total',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.55),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? _buildError()
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildList(_upcoming, isUpcoming: true),
-                    _buildList(_past, isUpcoming: false),
-                  ],
+    );
+  }
+
+  // ─── Tab bar ──────────────────────────────────────────────────────
+
+  Widget _buildTabBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEEF0F4),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            _tabItem(0, Icons.upcoming_rounded, 'À venir', _upcoming.length),
+            _tabItem(1, Icons.history_rounded, 'Passés', _past.length),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tabItem(int index, IconData icon, String label, int count) {
+    final selected = _selectedTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          setState(() => _selectedTab = index);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    )
+                  ]
+                : [],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 15,
+                color: selected ? _orange : _textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? _textPrimary : _textSecondary,
                 ),
+              ),
+              if (count > 0) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: selected ? _orange : _textSecondary.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: selected ? Colors.white : _textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Content ──────────────────────────────────────────────────────
+
+  Widget _buildContent() {
+    if (_isLoading) return _buildLoader();
+    if (_error != null) return _buildError();
+
+    final items = _selectedTab == 0 ? _upcoming : _past;
+    final isUpcoming = _selectedTab == 0;
+
+    if (items.isEmpty) return _buildEmpty(isUpcoming);
+
+    return FadeTransition(
+      opacity: _fadeAnim,
+      child: RefreshIndicator(
+        onRefresh: () => _loadHistory(refresh: true),
+        color: _orange,
+        child: ListView.builder(
+          controller: _selectedTab == 0 ? _scrollCtrl : null,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+          itemCount: items.length + (_isLoadingMore ? 1 : 0),
+          itemBuilder: (ctx, i) {
+            if (i == items.length) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(color: _orange, strokeWidth: 2),
+                ),
+              );
+            }
+            return _RdvCard(
+              rdv: items[i],
+              onCancel: items[i].isCancellable ? () => _cancelRendezvous(items[i]) : null,
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoader() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: _orange.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const CircularProgressIndicator(
+              color: _orange,
+              strokeWidth: 2.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Chargement...',
+            style: GoogleFonts.poppins(fontSize: 13, color: _textSecondary),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildError() {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline,
-              size: 48, color: AppTheme.errorColor),
-          const SizedBox(height: 12),
-          Text(_error!, textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => _loadHistory(refresh: true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white),
-            child: const Text('Réessayer'),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEF4444).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.wifi_off_rounded,
+                  color: Color(0xFFEF4444), size: 30),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Erreur de chargement',
+              style: GoogleFonts.poppins(
+                  fontSize: 16, fontWeight: FontWeight.w700, color: _textPrimary),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _error!,
+              style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            _orangeButton('Réessayer', () => _loadHistory(refresh: true)),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildList(List<Rendezvous> items, {required bool isUpcoming}) {
-    if (items.isEmpty) {
-      return Center(
+  Widget _buildEmpty(bool isUpcoming) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isUpcoming ? Icons.calendar_today : Icons.history,
-              size: 56,
-              color: Colors.grey.shade300,
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: _textSecondary.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isUpcoming ? Icons.event_available_rounded : Icons.history_rounded,
+                color: _textSecondary,
+                size: 32,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
+              isUpcoming ? 'Aucun rendez-vous à venir' : 'Aucun historique',
+              style: GoogleFonts.poppins(
+                  fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary),
+            ),
+            const SizedBox(height: 6),
+            Text(
               isUpcoming
-                  ? 'Aucun rendez-vous à venir'
-                  : 'Aucun historique',
-              style: const TextStyle(color: AppTheme.textSecondary),
+                  ? 'Créez un nouveau rendez-vous en appuyant sur + '
+                  : 'Vos rendez-vous passés apparaîtront ici',
+              style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    return RefreshIndicator(
-      onRefresh: () => _loadHistory(refresh: true),
-      color: AppTheme.primaryColor,
-      child: ListView.builder(
-        controller: isUpcoming ? _scrollCtrl : null,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-        itemCount: items.length + (_isLoadingMore ? 1 : 0),
-        itemBuilder: (ctx, i) {
-          if (i == items.length) {
-            return const Center(
-                child: Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(),
-            ));
-          }
-          return _RendezvousCard(
-            rdv: items[i],
-            onCancel:
-                items[i].isCancellable ? () => _cancelRendezvous(items[i]) : null,
-          );
-        },
+  Widget _orangeButton(String label, VoidCallback onTap) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [_orange, _orangeLight]),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: _orange.withOpacity(0.35),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFAB() {
+    return FloatingActionButton.extended(
+      onPressed: () async {
+        HapticFeedback.lightImpact();
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const ClientRendezvousBookingScreen()),
+        );
+        _loadHistory(refresh: true);
+      },
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      extendedPadding: const EdgeInsets.symmetric(horizontal: 20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      label: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [_orange, _orangeLight]),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: _orange.withOpacity(0.4),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Nouveau RDV',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _RendezvousCard extends StatelessWidget {
+// ─── RDV Card ─────────────────────────────────────────────────────────────────
+
+class _RdvCard extends StatelessWidget {
   final Rendezvous rdv;
   final VoidCallback? onCancel;
 
-  const _RendezvousCard({required this.rdv, this.onCancel});
+  static const _navy = Color(0xFF0F172A);
+  static const _orange = Color(0xFFFF6B35);
+  static const _border = Color(0xFFE8ECF0);
+  static const _textPrimary = Color(0xFF1A1F36);
+  static const _textSecondary = Color(0xFF9BA3B4);
+
+  const _RdvCard({required this.rdv, this.onCancel});
 
   Color _statusColor(String status) {
     switch (status) {
       case 'accepted':
-        return AppTheme.successColor;
+        return const Color(0xFF22C55E);
       case 'completed':
-        return Colors.blue;
+        return const Color(0xFF3B82F6);
       case 'cancelled':
-        return AppTheme.errorColor;
+        return const Color(0xFFEF4444);
       default:
-        return AppTheme.warningColor;
+        return const Color(0xFFF59E0B);
     }
   }
 
@@ -339,144 +784,184 @@ class _RendezvousCard extends StatelessWidget {
     }
   }
 
+  IconData _statusIcon(String status) {
+    switch (status) {
+      case 'accepted':
+        return Icons.check_circle_rounded;
+      case 'completed':
+        return Icons.task_alt_rounded;
+      case 'cancelled':
+        return Icons.cancel_rounded;
+      default:
+        return Icons.schedule_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final color = _statusColor(rdv.status);
+    final statusColor = _statusColor(rdv.status);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
             offset: const Offset(0, 3),
           ),
         ],
       ),
       child: Column(
         children: [
-          // Header with status
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.08),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
+          // ── Top: date + status badge ───────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
             child: Row(
               children: [
-                Icon(Icons.event, color: color, size: 18),
-                const SizedBox(width: 8),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(_statusIcon(rdv.status), color: statusColor, size: 18),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    DateFormat('EEEE dd MMMM yyyy • HH:mm', 'fr')
-                        .format(rdv.scheduledAt),
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        DateFormat('EEEE dd MMMM', 'fr').format(rdv.scheduledAt),
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _textPrimary,
+                        ),
+                      ),
+                      Text(
+                        DateFormat('HH:mm', 'fr').format(rdv.scheduledAt),
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
+                    color: statusColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     _statusLabel(rdv.status),
-                    style: TextStyle(
-                      color: color,
+                    style: GoogleFonts.poppins(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
+                      color: statusColor,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          // Body
+
+          Divider(color: _border, height: 1, thickness: 1),
+
+          // ── Middle: service + address + duration ───────────────
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _infoRow(Icons.local_shipping, rdv.serviceName),
+                _infoRow(Icons.local_taxi_rounded, rdv.serviceName, bold: true),
                 const SizedBox(height: 8),
-                _infoRow(Icons.location_on, rdv.address),
+                _infoRow(Icons.location_on_rounded, rdv.address),
                 const SizedBox(height: 8),
-                _infoRow(Icons.timer, '${rdv.durationMinutes} minutes'),
+                _infoRow(Icons.timer_rounded, '${rdv.durationMinutes} minutes'),
                 if (rdv.livreurName != null) ...[
                   const SizedBox(height: 8),
-                  _infoRow(Icons.person, 'Livreur : ${rdv.livreurName}'),
+                  _infoRow(Icons.person_rounded, rdv.livreurName!),
                 ],
                 if (rdv.details != null && rdv.details!.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  _infoRow(Icons.notes, rdv.details!),
-                ],
-                if (onCancel != null) ...[
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: onCancel,
-                          icon: const Icon(Icons.cancel_outlined,
-                              size: 16, color: AppTheme.errorColor),
-                          label: const Text(
-                            'Annuler',
-                            style: TextStyle(color: AppTheme.errorColor),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppTheme.errorColor),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (rdv.livreurPhone != null) ...[
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(Icons.phone, size: 16),
-                            label: const Text('Contacter'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryColor,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                  _infoRow(Icons.notes_rounded, rdv.details!),
                 ],
               ],
             ),
           ),
+
+          // ── Bottom: cancel button ──────────────────────────────
+          if (onCancel != null) ...[
+            Divider(color: _border, height: 1, thickness: 1),
+            InkWell(
+              onTap: onCancel,
+              borderRadius:
+                  const BorderRadius.vertical(bottom: Radius.circular(18)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withOpacity(0.05),
+                  borderRadius:
+                      const BorderRadius.vertical(bottom: Radius.circular(18)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.event_busy_rounded,
+                        size: 15, color: Color(0xFFEF4444)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Annuler ce rendez-vous',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFFEF4444),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _infoRow(IconData icon, String text) {
+  Widget _infoRow(IconData icon, String text, {bool bold = false}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: AppTheme.primaryColor),
-        const SizedBox(width: 8),
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: _orange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 14, color: _orange),
+        ),
+        const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-                color: AppTheme.textPrimary, fontSize: 13, height: 1.4),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 5),
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
+                color: bold ? _textPrimary : _textSecondary,
+                height: 1.3,
+              ),
+            ),
           ),
         ),
       ],
