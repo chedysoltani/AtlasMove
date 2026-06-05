@@ -6,6 +6,7 @@ import 'driver_rides.dart';
 import 'driver_active_ride.dart';
 import 'driver_earnings.dart';
 import 'driver_profile.dart';
+import 'driver_rendezvous_screen.dart';
 import '../services/trip_service.dart';
 import '../models/trip_models.dart';
 
@@ -35,6 +36,7 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
           });
         },
       ),
+      const DriverRendezvousScreen(),
       const DriverEarningsScreen(),
       const DriverProfileScreen(),
     ];
@@ -142,14 +144,19 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
                 index: 1,
               ),
               _buildNavItem(
+                icon: Icons.calendar_month,
+                label: 'RDV',
+                index: 2,
+              ),
+              _buildNavItem(
                 icon: Icons.attach_money,
                 label: 'Revenus',
-                index: 2,
+                index: 3,
               ),
               _buildNavItem(
                 icon: Icons.person,
                 label: 'Profil',
-                index: 3,
+                index: 4,
               ),
             ],
           ),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart' as provider;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'utils/app_theme.dart';
 import 'screens/landing_screen.dart';
@@ -44,12 +45,18 @@ import 'screens/driver_subscription_screen.dart';
 import 'screens/driver_crypto_select_screen.dart';
 import 'screens/driver_crypto_recharge_screen.dart';
 import 'screens/referral_screen.dart';
+import 'screens/client_rendezvous_booking_screen.dart';
+import 'screens/client_rendezvous_history_screen.dart';
+import 'screens/driver_rendezvous_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Initialiser les données de localisation française pour DateFormat
+  await initializeDateFormatting('fr', null);
+
   // Charger les variables d'environnement
   await dotenv.load(fileName: ".env");
   
@@ -220,6 +227,12 @@ class AtlasMoveApp extends StatelessWidget {
             '/driver_crypto_select': (context) => const DriverCryptoSelectScreen(),
             '/driver_crypto_recharge': (context) => const DriverCryptoRechargeScreen(),
             '/referral': (context) => const ReferralScreen(),
+            '/client_rendezvous_booking': (context) =>
+                const ClientRendezvousBookingScreen(),
+            '/client_rendezvous_history': (context) =>
+                const ClientRendezvousHistoryScreen(),
+            '/driver_rendezvous': (context) =>
+                const DriverRendezvousScreen(),
           },
         ),
       ),
