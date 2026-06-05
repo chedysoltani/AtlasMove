@@ -119,45 +119,31 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(
-                icon: Icons.dashboard,
-                label: 'Dashboard',
-                index: 0,
-              ),
-              _buildNavItem(
-                icon: Icons.local_taxi,
-                label: 'Courses',
-                index: 1,
-              ),
-              _buildNavItem(
-                icon: Icons.calendar_month,
-                label: 'RDV',
-                index: 2,
-              ),
-              _buildNavItem(
-                icon: Icons.attach_money,
-                label: 'Revenus',
-                index: 3,
-              ),
-              _buildNavItem(
-                icon: Icons.person,
-                label: 'Profil',
-                index: 4,
-              ),
+              _buildNavItem(icon: Icons.dashboard_rounded,
+                  label: 'Dashboard', index: 0),
+              _buildNavItem(icon: Icons.local_taxi_rounded,
+                  label: 'Courses', index: 1),
+              _buildNavItem(icon: Icons.calendar_month_rounded,
+                  label: 'RDV', index: 2),
+              _buildNavItem(icon: Icons.account_balance_wallet_rounded,
+                  label: 'Revenus', index: 3),
+              _buildNavItem(icon: Icons.person_rounded,
+                  label: 'Profil', index: 4),
             ],
           ),
         ),
@@ -171,37 +157,33 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
     required int index,
   }) {
     final isSelected = _currentIndex == index;
-    
+    const orange = Color(0xFFFF6B35);
+
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _currentIndex = index;
-        });
+        setState(() => _currentIndex = index);
         HapticFeedback.lightImpact();
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: EdgeInsets.symmetric(
+            horizontal: isSelected ? 14 : 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryColor.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? orange.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? AppTheme.primaryColor : Colors.grey,
-              size: 24,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? AppTheme.primaryColor : Colors.grey,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
+            Icon(icon,
+              color: isSelected ? orange : const Color(0xFF9BA3B4),
+              size: 22),
+            const SizedBox(height: 3),
+            Text(label, style: TextStyle(
+              color: isSelected ? orange : const Color(0xFF9BA3B4),
+              fontSize: 10,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            )),
           ],
         ),
       ),
