@@ -1,357 +1,504 @@
 import 'package:flutter/material.dart';
-import '../utils/app_theme.dart';
-import '../widgets/custom_button.dart';
 import 'package:google_fonts/google_fonts.dart';
-  Shader linearGradient = const LinearGradient(
-  colors: <Color>[
-    Color(0xffFF8C42),
-    Color(0xffFF5E62),
-  ],
-).createShader(const Rect.fromLTWH(0.0, 0.0, 300.0, 70.0));
 
-
-class LandingScreen extends StatelessWidget {
+class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
 
   @override
+  State<LandingScreen> createState() => _LandingScreenState();
+}
+
+class _LandingScreenState extends State<LandingScreen>
+    with TickerProviderStateMixin {
+  static const _orange = Color(0xFFFF6B35);
+  static const _orangeLight = Color(0xFFFF8C42);
+  static const _dark = Color(0xFF0F172A);
+  static const _darkCard = Color(0xFF1A2744);
+
+  late final AnimationController _heroCtrl;
+  late final AnimationController _pulseCtrl;
+  late final List<AnimationController> _itemCtrls;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _heroCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..forward();
+
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat(reverse: true);
+
+    _itemCtrls = List.generate(6, (i) {
+      final c = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 500),
+      );
+      Future.delayed(Duration(milliseconds: 350 + i * 110), () {
+        if (mounted) c.forward();
+      });
+      return c;
+    });
+  }
+
+  @override
+  void dispose() {
+    _heroCtrl.dispose();
+    _pulseCtrl.dispose();
+    for (final c in _itemCtrls) c.dispose();
+    super.dispose();
+  }
+
+  Animation<double> _fade(AnimationController c) =>
+      CurvedAnimation(parent: c, curve: Curves.easeOut);
+
+  Animation<Offset> _slide(AnimationController c) =>
+      Tween(begin: const Offset(0, 0.22), end: Offset.zero)
+          .animate(CurvedAnimation(parent: c, curve: Curves.easeOut));
+
+  @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final heroH = size.height * 0.42;
+
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Header Section
-              
-              
-              const SizedBox(height: 40),
-              
-              // Hero Section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Animated Logo
-                    Container(
-                      width: 200,
-                      height: 200,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor,
-                        borderRadius: BorderRadius.circular(50),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primaryColor.withOpacity(0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Image.asset(
-                        'assets/images/AtlasMove.png',
-                        width: 180,
-                        height: 180,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Title
-                
-Text(
-  'AtlasMove',
-  style: GoogleFonts.poppins(
-    fontSize: 36,
-    fontWeight: FontWeight.w700,
-    letterSpacing: 2,
-    foreground: Paint()..shader = linearGradient,
-    shadows: [
-      Shadow(
-        blurRadius: 10,
-        color: Colors.black26,
-        offset: Offset(2, 4),
-      ),
-    ],
-  ),
-),
-                    
-                    
-                    
-                    const Text(
-                      'Plateforme de Transport & Livraison',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppTheme.textSecondary,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    
-                   
-                    
-                    // Description
-                   
-                  ],
-                ),
+      backgroundColor: _dark,
+      body: Column(
+        children: [
+          // ── Hero ──────────────────────────────────────────────────────
+          SizedBox(height: heroH, child: _buildHero()),
+
+          // ── Content ───────────────────────────────────────────────────
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFFF8F9FB),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
               ),
-              
-              const SizedBox(height: 40),
-              
-              // Features Section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(22, 26, 22, 24),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildFeatureCard(
-                      context,
-                      icon: Icons.person,
+                    _animated(0, _buildSectionHeader()),
+                    const SizedBox(height: 18),
+                    _animated(1, _buildFeatureTile(
+                      icon: Icons.person_rounded,
                       title: 'Pour les Clients',
-                      
-                     
-                      description: 'Demandez des courses et livraisons en quelques clics',
-                      onTap: () => _navigateToAuth(context, 'client'),
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    _buildFeatureCard(
-                      context,
-                      icon: Icons.local_shipping,
+                      description: 'Commandez courses et livraisons en quelques clics',
+                      onTap: () => _nav(context, 'client'),
+                    )),
+                    const SizedBox(height: 10),
+                    _animated(2, _buildFeatureTile(
+                      icon: Icons.local_shipping_rounded,
                       title: 'Pour les Livreurs',
                       description: 'Recevez des missions et gagnez de l\'argent',
-                      onTap: () => _navigateToAuth(context, 'delivery'),
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    _buildFeatureCard(
-                      context,
-                      icon: Icons.location_on,
+                      onTap: () => _nav(context, 'client'),
+                    )),
+                    const SizedBox(height: 10),
+                    _animated(3, _buildFeatureTile(
+                      icon: Icons.gps_fixed_rounded,
                       title: 'GPS Intégré',
                       description: 'Suivi en temps réel sur carte interactive',
-                      onTap: () {},
-                      isDisabled: true,
-                    ),
+                      onTap: null,
+                    )),
+                    const SizedBox(height: 26),
+                    _animated(4, _buildButtons(context)),
+                    const SizedBox(height: 20),
+                    _animated(5, _buildTrustRow()),
                   ],
                 ),
               ),
-              
-              const SizedBox(height: 40),
-              
-              // CTA Section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    CustomButton(
-                      text: 'Commencer maintenant',
-                      onPressed: () => _navigateToAuth(context, 'client'),
-                      type: ButtonType.primary,
-                      height: 56,
-                      width: double.infinity,
-                    ),
-                    
-                    const SizedBox(height: 16),
-                    
-                    CustomButton(
-                      text: 'Devenir Livreur',
-                      onPressed: () => Navigator.of(context).pushNamed('/driver_register'),
-                      type: ButtonType.outline,
-                      height: 56,
-                      width: double.infinity,
-                    ),
-                    
-                    const SizedBox(height: 8),
-                    
-                    // Bouton de test pour débogage
-                  
-                    const SizedBox(height: 24),
-                    
-                    // Trust Indicators
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildTrustItem(Icons.security, 'Sécurisé'),
-                        _buildTrustItem(Icons.speed, 'Rapide'),
-                        _buildTrustItem(Icons.star, 'Fiable'),
-                      ],
-                    ),
-                  ],
-                ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Hero Section ─────────────────────────────────────────────────────────
+
+  Widget _buildHero() {
+    return FadeTransition(
+      opacity: _fade(_heroCtrl),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Gradient background
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [_dark, _darkCard],
               ),
-              
-              const SizedBox(height: 40),
-              
-              // Footer
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    const Divider(color: AppTheme.textSecondary),
-                    const SizedBox(height: 16),
-                    const Text(
-                      '© 2024 AtlasMove. Tous droits réservés.',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
+            ),
+          ),
+
+          // Decorative rings
+          Positioned(top: -50, right: -50,
+            child: _ring(200, _orange.withOpacity(0.07))),
+          Positioned(bottom: 20, left: -70,
+            child: _ring(220, Colors.white.withOpacity(0.03))),
+          Positioned(top: 60, left: 30,
+            child: _dot(7, _orange.withOpacity(0.4))),
+          Positioned(bottom: 60, right: 40,
+            child: _dot(5, Colors.white.withOpacity(0.2))),
+          Positioned(top: 30, right: 80,
+            child: _dot(4, _orange.withOpacity(0.25))),
+
+          // Main hero content
+          SafeArea(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Pulsing icon badge
+                  AnimatedBuilder(
+                    animation: _pulseCtrl,
+                    builder: (_, __) {
+                      final glow = 18.0 + _pulseCtrl.value * 12;
+                      final scale = 1.0 + _pulseCtrl.value * 0.04;
+                      return Transform.scale(
+                        scale: scale,
+                        child: Container(
+                          width: 86,
+                          height: 86,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [_orange, _orangeLight],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _orange.withOpacity(0.45),
+                                blurRadius: glow,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.directions_car_rounded,
+                            color: Colors.white,
+                            size: 42,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  // Brand name
+                  Text(
+                    'AtlasMove',
+                    style: GoogleFonts.poppins(
+                      fontSize: 40,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: -1,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Tagline with accent lines
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _accentLine(),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Transport & Livraison',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.white.withOpacity(0.55),
+                          letterSpacing: 1.4,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildFooterLink('Mentions légales'),
-                        const SizedBox(width: 16),
-                        _buildFooterLink('Politique de confidentialité'),
-                        const SizedBox(width: 16),
-                        _buildFooterLink('Contact'),
-                      ],
-                    ),
-                  ],
+                      const SizedBox(width: 10),
+                      _accentLine(),
+                    ],
+                  ),
+
+                  const SizedBox(height: 22),
+
+                  // Stats row
+                  _buildHeroStats(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroStats() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 32),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _statItem('500+', 'Clients'),
+          _vDivider(),
+          _statItem('200+', 'Livreurs'),
+          _vDivider(),
+          _statItem('24/7', 'Disponible'),
+        ],
+      ),
+    );
+  }
+
+  Widget _statItem(String value, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(value, style: GoogleFonts.poppins(
+          fontSize: 16, fontWeight: FontWeight.w700, color: _orange)),
+        Text(label, style: GoogleFonts.poppins(
+          fontSize: 10, color: Colors.white.withOpacity(0.5))),
+      ],
+    );
+  }
+
+  Widget _vDivider() =>
+      Container(width: 1, height: 28, color: Colors.white.withOpacity(0.1));
+
+  Widget _accentLine() =>
+      Container(width: 22, height: 2,
+          decoration: BoxDecoration(
+              color: _orange,
+              borderRadius: BorderRadius.circular(1)));
+
+  Widget _ring(double size, Color color) => Container(
+    width: size, height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      border: Border.all(color: color, width: 1),
+    ),
+  );
+
+  Widget _dot(double size, Color color) => Container(
+    width: size, height: size,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+  );
+
+  // ── Content Widgets ──────────────────────────────────────────────────────
+
+  Widget _buildSectionHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('COMMENT ÇA MARCHE ?', style: GoogleFonts.poppins(
+          fontSize: 10, fontWeight: FontWeight.w700,
+          color: _orange, letterSpacing: 1.5)),
+        const SizedBox(height: 3),
+        Text('Rejoignez l\'aventure', style: GoogleFonts.poppins(
+          fontSize: 21, fontWeight: FontWeight.w700,
+          color: _dark, height: 1.2)),
+      ],
+    );
+  }
+
+  Widget _buildFeatureTile({
+    required IconData icon,
+    required String title,
+    required String description,
+    required VoidCallback? onTap,
+  }) {
+    final isDisabled = onTap == null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isDisabled
+                ? const Color(0xFFE2E6EF)
+                : _orange.withOpacity(0.12),
+          ),
+          boxShadow: isDisabled ? [] : [
+            BoxShadow(
+              color: _orange.withOpacity(0.07),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Icon container
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: isDisabled
+                    ? const Color(0xFFF1F3F7)
+                    : _orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(icon,
+                color: isDisabled ? const Color(0xFF9BA3B4) : _orange,
+                size: 22),
+            ),
+            const SizedBox(width: 14),
+            // Text
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: GoogleFonts.poppins(
+                    fontSize: 14, fontWeight: FontWeight.w600,
+                    color: isDisabled ? const Color(0xFF9BA3B4) : _dark)),
+                  const SizedBox(height: 2),
+                  Text(description, style: GoogleFonts.poppins(
+                    fontSize: 12, color: const Color(0xFF9BA3B4),
+                    height: 1.4)),
+                ],
+              ),
+            ),
+            if (!isDisabled) ...[
+              const SizedBox(width: 8),
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: _dark,
+                  borderRadius: BorderRadius.circular(9),
                 ),
+                child: const Icon(Icons.arrow_forward_ios_rounded,
+                  color: Colors.white, size: 13),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildFeatureCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String description,
-    required VoidCallback onTap,
-    bool isDisabled = false,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDisabled 
-              ? AppTheme.textSecondary.withOpacity(0.2)
-              : AppTheme.primaryColor.withOpacity(0.2),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+  Widget _buildButtons(BuildContext context) {
+    return Column(
+      children: [
+        // Primary CTA
+        Container(
+          width: double.infinity,
+          height: 54,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [_orange, _orangeLight],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: _orange.withOpacity(0.35),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: isDisabled ? null : onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(20),
+          child: TextButton(
+            onPressed: () => _nav(context, 'client'),
+            style: TextButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
+            child: Text('Commencer maintenant',
+              style: GoogleFonts.poppins(
+                fontSize: 15, fontWeight: FontWeight.w600,
+                color: Colors.white)),
+          ),
+        ),
+
+        const SizedBox(height: 11),
+
+        // Secondary CTA
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: OutlinedButton(
+            onPressed: () =>
+                Navigator.of(context).pushNamed('/driver_register'),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: _dark, width: 1.5),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+            ),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: isDisabled 
-                          ? AppTheme.textSecondary.withOpacity(0.2)
-                          : AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: isDisabled 
-                          ? AppTheme.textSecondary
-                          : AppTheme.primaryColor,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isDisabled 
-                                ? AppTheme.textSecondary
-                                : AppTheme.textWhite,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        description,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (!isDisabled)
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: AppTheme.primaryColor,
-                    size: 20,
-                  ),
+                const Icon(Icons.local_shipping_rounded,
+                    color: _dark, size: 18),
+                const SizedBox(width: 8),
+                Text('Devenir Livreur',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15, fontWeight: FontWeight.w600,
+                    color: _dark)),
               ],
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildTrustItem(IconData icon, String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(
-        children: [
-          Icon(
-            icon,
-            color: AppTheme.primaryColor,
-            size: 20,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
+  Widget _buildTrustRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _trustBadge(Icons.verified_user_rounded, 'Sécurisé'),
+        const SizedBox(width: 24),
+        _trustBadge(Icons.bolt_rounded, 'Rapide'),
+        const SizedBox(width: 24),
+        _trustBadge(Icons.star_rounded, 'Fiable'),
+      ],
     );
   }
 
-  Widget _buildFooterLink(String text) {
-    return GestureDetector(
-      onTap: () {
-        // TODO: Implement footer navigation
-      },
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: AppTheme.primaryColor,
-          fontSize: 12,
-          decoration: TextDecoration.underline,
+  Widget _trustBadge(IconData icon, String label) {
+    return Column(
+      children: [
+        Container(
+          width: 38, height: 38,
+          decoration: BoxDecoration(
+            color: _orange.withOpacity(0.09),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(icon, color: _orange, size: 19),
         ),
-      ),
+        const SizedBox(height: 5),
+        Text(label, style: GoogleFonts.poppins(
+          fontSize: 11, fontWeight: FontWeight.w500,
+          color: const Color(0xFF9BA3B4))),
+      ],
     );
   }
 
-  void _navigateToAuth(BuildContext context, String role) {
+  Widget _animated(int i, Widget child) {
+    if (i >= _itemCtrls.length) return child;
+    return SlideTransition(
+      position: _slide(_itemCtrls[i]),
+      child: FadeTransition(opacity: _fade(_itemCtrls[i]), child: child),
+    );
+  }
+
+  void _nav(BuildContext context, String role) {
     if (role == 'delivery') {
       Navigator.of(context).pushNamed('/signup_step1');
     } else {
