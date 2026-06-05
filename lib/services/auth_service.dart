@@ -62,6 +62,7 @@ class AuthService {
         if (authResponse.isComplete) {
           await TokenStorage.saveAuthTokens(
             accessToken: authResponse.token,
+            refreshToken: authResponse.refreshToken,
             userId: authResponse.user.id,
           );
         }
@@ -173,6 +174,7 @@ class AuthService {
           debugPrint('💾 Sauvegarde du token dans login...');
           await TokenStorage.saveAuthTokens(
             accessToken: authResponse.token,
+            refreshToken: authResponse.refreshToken,
             userId: authResponse.user.id,
           );
           debugPrint('✅ Token sauvegardé avec succès depuis login');
@@ -222,6 +224,7 @@ class AuthService {
         if (authResponse.token.isNotEmpty) {
           await TokenStorage.saveAuthTokens(
             accessToken: authResponse.token,
+            refreshToken: authResponse.refreshToken,
             userId: authResponse.user.id,
           );
         }
@@ -369,6 +372,7 @@ class AuthService {
         if (authResponse.isComplete) {
           await TokenStorage.saveAuthTokens(
             accessToken: authResponse.token,
+            refreshToken: authResponse.refreshToken,
             userId: authResponse.user.id,
           );
         }

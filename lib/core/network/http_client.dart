@@ -8,10 +8,12 @@ import '../storage/token_storage.dart';
 /// HTTP Client pour gérer toutes les requêtes API
 class HttpClient {
   static const String baseUrl = 'https://api.atla.business/api/v1';
-  
-  // Timeout settings
+
   static const Duration _timeout = Duration(seconds: 30);
   static const Duration _receiveTimeout = Duration(seconds: 30);
+
+  // Mutex pour éviter plusieurs refresh simultanés
+  static bool _isRefreshing = false;
   
   /// Headers par défaut pour toutes les requêtes
   static Future<Map<String, String>> _defaultHeaders() async {
@@ -136,6 +138,7 @@ class HttpClient {
     Map<String, dynamic>? body,
     Map<String, dynamic>? queryParams,
     bool isMultipart = false,
+    bool isRetry = false,
   }) async {
     try {
       // Construction de l'URL
@@ -195,11 +198,31 @@ class HttpClient {
         headers: response.headers,
       );
       
-      // Gestion des erreurs HTTP
+      // Auto-refresh sur 401 (token expiré)
+      if (response.statusCode == 401 && !isRetry) {
+        final newToken = await _tryRefresh();
+        if (newToken != null) {
+          // Retry la requête originale avec le nouveau token
+          return _makeRequest(
+            method, endpoint,
+            headers: headers,
+            body: body,
+            queryParams: queryParams,
+            isMultipart: isMultipart,
+            isRetry: true,
+          );
+        } else {
+          // Refresh échoué → session expirée
+          await TokenStorage.clearTokens();
+          throw SessionExpiredException();
+        }
+      }
+
+      // Gestion des autres erreurs HTTP
       if (response.statusCode >= 400) {
         throw _handleHttpError(httpResponse);
       }
-      
+
       return httpResponse;
     } on SocketException {
       debugPrint('❌ Network Error: No Internet Connection');
@@ -210,6 +233,56 @@ class HttpClient {
     } catch (e) {
       debugPrint('💥 Unexpected Error: $e');
       throw NetworkException('Une erreur inattendue est survenue: $e');
+    }
+  }
+
+  /// Tente de rafraîchir le token via le refresh token stocké.
+  /// Retourne le nouveau access token ou null si impossible.
+  static Future<String?> _tryRefresh() async {
+    if (_isRefreshing) return null;
+    _isRefreshing = true;
+    try {
+      final refreshToken = await TokenStorage.getRefreshToken();
+      if (refreshToken == null || refreshToken.isEmpty) {
+        debugPrint('🔄 Refresh: aucun refresh token disponible');
+        return null;
+      }
+      debugPrint('🔄 Tentative de refresh du token...');
+
+      final uri = Uri.parse('$baseUrl/auth/refresh');
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $refreshToken',
+        },
+      ).timeout(_timeout);
+
+      debugPrint('🔄 Refresh status: ${response.statusCode}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final payload = data['data'] ?? data;
+        final newAccess = payload['accessToken'] ?? payload['token'];
+        final newRefresh = payload['refreshToken'];
+
+        if (newAccess != null && (newAccess as String).isNotEmpty) {
+          await TokenStorage.saveAuthTokens(
+            accessToken: newAccess,
+            refreshToken: newRefresh as String?,
+          );
+          debugPrint('✅ Token rafraîchi avec succès');
+          return newAccess;
+        }
+      }
+      debugPrint('❌ Refresh échoué (${response.statusCode})');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Refresh exception: $e');
+      return null;
+    } finally {
+      _isRefreshing = false;
     }
   }
 
@@ -337,4 +410,10 @@ class TooManyRequestsException extends ApiException {
 
 class ServerException extends ApiException {
   ServerException(String message, HttpResponse response) : super(message, response);
+}
+
+/// Lancée quand le refresh token est aussi invalide → forcer la reconnexion
+class SessionExpiredException extends ApiException {
+  SessionExpiredException()
+      : super('Votre session a expiré. Veuillez vous reconnecter.');
 }

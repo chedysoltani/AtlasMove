@@ -4,6 +4,7 @@ import '../user.dart';
 class AuthResponse {
   final User user;
   final String token;
+  final String? refreshToken;
   final String message;
   final bool success;
   final String? authStep;
@@ -13,6 +14,7 @@ class AuthResponse {
   AuthResponse({
     required this.user,
     required this.token,
+    this.refreshToken,
     required this.message,
     required this.success,
     this.authStep,
@@ -22,16 +24,14 @@ class AuthResponse {
 
   /// Crée une instance à partir d'un Map
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
-    // Gérer la structure de réponse réelle de l'API
     if (json.containsKey('data')) {
       final data = json['data'] as Map<String, dynamic>;
-      
-      // Créer l'utilisateur à partir des champs directs de l'API
+
       final email = data['email'] ?? '';
       final nameParts = email.split('@');
       final firstName = data['first_name'] ?? nameParts[0];
       final lastName = data['last_name'] ?? '';
-      
+
       final userMap = {
         'id': data['id'] ?? email,
         'first_name': firstName,
@@ -42,10 +42,11 @@ class AuthResponse {
         'created_at': data['created_at'] ?? DateTime.now().toIso8601String(),
         'updated_at': data['updated_at'] ?? DateTime.now().toIso8601String(),
       };
-      
+
       return AuthResponse(
         user: User.fromMap(userMap),
         token: data['accessToken'] ?? data['token'] ?? data['sessionToken'] ?? '',
+        refreshToken: data['refreshToken'],
         message: data['message'] ?? '',
         success: data['success'] ?? true,
         authStep: data['authStep'],
@@ -53,11 +54,11 @@ class AuthResponse {
         expiresIn: data['expiresIn'],
       );
     }
-    
-    // Gérer la structure attendue (compatibilité)
+
     return AuthResponse(
       user: User.fromMap(json['user'] ?? {}),
       token: json['accessToken'] ?? json['token'] ?? '',
+      refreshToken: json['refreshToken'],
       message: json['message'] ?? '',
       success: json['success'] ?? false,
       authStep: json['authStep'],

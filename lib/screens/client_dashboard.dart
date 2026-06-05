@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import '../utils/app_theme.dart';
 import '../services/trip_service.dart';
 import '../models/trip_models.dart';
 import '../services/notification_service.dart';
@@ -13,700 +14,624 @@ class ClientDashboard extends StatefulWidget {
   State<ClientDashboard> createState() => _ClientDashboardState();
 }
 
-class _ClientDashboardState extends State<ClientDashboard> {
+class _ClientDashboardState extends State<ClientDashboard>
+    with TickerProviderStateMixin {
+  // ── Colors ────────────────────────────────────────────────────────────────
+  static const _orange = Color(0xFFFF6B35);
+  static const _orangeLight = Color(0xFFFF8C42);
+  static const _dark = Color(0xFF0F172A);
+
+  // ── State ─────────────────────────────────────────────────────────────────
   int _currentIndex = 0;
   List<TripHistoryItem> _recentTrips = [];
   bool _isLoadingRecent = false;
   String? _statsTripsCount = '--';
   String? _statsTotalAmount = '--';
 
+  // ── Animation ─────────────────────────────────────────────────────────────
+  late final AnimationController _fadeCtrl;
+
   @override
   void initState() {
     super.initState();
+    _fadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..forward();
     _loadDashboardData();
     NotificationService().initialize();
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _fadeCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDashboardData() async {
-    setState(() {
-      _isLoadingRecent = true;
-    });
-
+    setState(() => _isLoadingRecent = true);
     try {
       final response = await TripService.getClientTripHistory(page: 1, limit: 3);
       if (mounted) {
+        double total = 0;
+        for (var trip in response.trips) {
+          if (trip.status.toLowerCase() == 'completed') {
+            total += trip.estimatedFare;
+          }
+        }
         setState(() {
           _recentTrips = response.trips;
           _statsTripsCount = response.total.toString();
-          
-          // Calculer le montant total approximatif des trajets chargés (ou on pourrait avoir une API dédiée)
-          double total = 0;
-          for (var trip in response.trips) {
-            if (trip.status.toLowerCase() == 'completed') {
-              total += trip.estimatedFare;
-            }
-          }
-          _statsTotalAmount = total > 0 ? '${total.toStringAsFixed(2)} €' : '0.00 €';
-          
+          _statsTotalAmount = '${total.toStringAsFixed(2)} TND';
           _isLoadingRecent = false;
         });
       }
     } catch (e) {
-      debugPrint('Error loading dashboard data: $e');
-      if (mounted) {
-        setState(() {
-          _isLoadingRecent = false;
-        });
-      }
+      debugPrint('Dashboard error: $e');
+      if (mounted) setState(() => _isLoadingRecent = false);
     }
   }
 
   void _navigateToHistory() {
-    Navigator.pushNamed(context, '/client_trip_history').then((_) => _loadDashboardData());
+    Navigator.pushNamed(context, '/client_trip_history')
+        .then((_) => _loadDashboardData());
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          _currentIndex == 0 ? 'Dashboard' : 'Profil',
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-        actions: _currentIndex == 0 ? [
-          AnimatedBuilder(
-            animation: NotificationService(),
-            builder: (context, _) {
-              final unreadCount = NotificationService().unreadCount;
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  IconButton(
-                    onPressed: () => NotificationSheet.show(context),
-                    icon: const Icon(Icons.notifications_outlined, color: Colors.black),
-                    tooltip: 'Notifications',
-                  ),
-                  if (unreadCount > 0)
-                    Positioned(
-                      right: 8,
-                      top: 8,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: AppTheme.primaryColor,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Text(
-                          '$unreadCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
-          IconButton(
-            onPressed: () {
-              NotificationService().disconnect();
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                '/login',
-                (route) => false,
-              );
-            },
-            icon: const Icon(Icons.logout, color: Colors.black),
-            tooltip: 'Déconnexion',
-          ),
-        ] : null,
-      ),
+      backgroundColor: _dark,
       body: _buildBody(),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        backgroundColor: Colors.white,
-        selectedItemColor: AppTheme.primaryColor,
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Accueil',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.directions_car),
-            label: 'Course',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.card_giftcard),
-            label: 'Fidélité',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.credit_card),
-            label: 'Cartes',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profil',
-          ),
-        ],
-      ),
+      bottomNavigationBar: _buildNavBar(),
     );
   }
 
   Widget _buildBody() {
     switch (_currentIndex) {
-      case 0:
-        return _buildDashboardContent();
       case 1:
-        // Navigation vers créer une course
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.pushNamed(context, '/create_ride');
-          setState(() {
-            _currentIndex = 0;
-          });
+          setState(() => _currentIndex = 0);
         });
-        return const Center(child: CircularProgressIndicator());
+        return const SizedBox.shrink();
       case 2:
-        // Navigation vers fidélité
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.pushNamed(context, '/client_rewards');
-          setState(() {
-            _currentIndex = 0;
-          });
+          setState(() => _currentIndex = 0);
         });
-        return const Center(child: CircularProgressIndicator());
+        return const SizedBox.shrink();
       case 3:
-        // Navigation vers cartes
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.pushNamed(context, '/cards');
-          setState(() {
-            _currentIndex = 0;
-          });
+          setState(() => _currentIndex = 0);
         });
-        return const Center(child: CircularProgressIndicator());
+        return const SizedBox.shrink();
       case 4:
-        // Navigation vers profil
         WidgetsBinding.instance.addPostFrameCallback((_) {
           Navigator.pushNamed(context, '/profile');
-          setState(() {
-            _currentIndex = 0;
-          });
+          setState(() => _currentIndex = 0);
         });
-        return const Center(child: CircularProgressIndicator());
+        return const SizedBox.shrink();
       default:
         return _buildDashboardContent();
     }
   }
 
+  // ── Dashboard content ─────────────────────────────────────────────────────
+
   Widget _buildDashboardContent() {
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-              // Welcome Section
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.primaryColor.withOpacity(0.8),
-                      AppTheme.primaryColor,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
+    return Column(
+      children: [
+        // ── Dark hero header ──────────────────────────────────────────
+        _buildHeader(),
+
+        // ── Scrollable white content ──────────────────────────────────
+        Expanded(
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8F9FB),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: FadeTransition(
+              opacity: CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 28),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.person,
-                            color: AppTheme.primaryColor,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Bienvenue, Client!',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Voici votre tableau de bord',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                    // CTA principal
+                    _buildMainCta(),
+                    const SizedBox(height: 22),
+
+                    // Stats
+                    _buildSectionTitle('Résumé', Icons.bar_chart_rounded,
+                        onRefresh: _loadDashboardData),
+                    const SizedBox(height: 12),
+                    _buildStatsRow(),
+                    const SizedBox(height: 22),
+
+                    // Rendez-vous card
+                    _buildRendezvousCard(),
+                    const SizedBox(height: 22),
+
+                    // Activité récente
+                    _buildSectionTitle('Activité récente',
+                        Icons.history_rounded, onSeeAll: _navigateToHistory),
+                    const SizedBox(height: 12),
+                    _buildRecentActivity(),
                   ],
                 ),
               ),
-              
-              const SizedBox(height: 20),
-              
-              // Statistics Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '📊 Statistiques principales',
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _loadDashboardData,
-                    icon: const Icon(Icons.refresh, size: 20, color: AppTheme.primaryColor),
-                    tooltip: 'Rafraîchir',
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Stats Grid
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.3,
-                children: [
-                  _buildStatCard(
-                    context,
-                    'Commandes',
-                    '24',
-                    Icons.shopping_bag_outlined,
-                    Icons.trending_up,
-                    'Ce mois',
-                  ),
-                   _buildStatCard(
-                    context,
-                    'Trajets',
-                    _statsTripsCount ?? '0',
-                    Icons.route,
-                    Icons.trending_up,
-                    'Total',
-                    onTap: _navigateToHistory,
-                  ),
-                  _buildStatCard(
-                    context,
-                    'Montant',
-                    _statsTotalAmount ?? '0 €',
-                    Icons.euro_symbol,
-                    Icons.trending_up,
-                    'Estimé',
-                  ),
-                  _buildStatCard(
-                    context,
-                    'Dernière act.',
-                    '2 jours',
-                    Icons.access_time,
-                    Icons.schedule,
-                    '',
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 20),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-              // ─── Rendez-vous Quick Access ─────────────────────────────────
-              GestureDetector(
-                onTap: () => Navigator.pushNamed(context, '/client_rendezvous_history'),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF6C63FF), Color(0xFF9B88FF)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6C63FF).withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(Icons.calendar_month,
-                            color: Colors.white, size: 28),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
-                              'Rendez-vous',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            SizedBox(height: 3),
-                            Text(
-                              'Réservez un service planifié',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pushNamed(
-                            context, '/client_rendezvous_booking'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF6C63FF),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                          elevation: 0,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text(
-                          'Réserver',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+  // ── Header ────────────────────────────────────────────────────────────────
 
-              const SizedBox(height: 20),
+  Widget _buildHeader() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0F172A), Color(0xFF1A2744)],
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Stack(
+          children: [
+            // Decorative rings
+            Positioned(top: -30, right: -30,
+                child: _ring(160, _orange.withOpacity(0.07))),
+            Positioned(bottom: 0, left: -40,
+                child: _ring(120, Colors.white.withOpacity(0.03))),
 
-              // Recent Activity Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+              child: Row(
                 children: [
-                  Text(
-                    '📍 Activité récente',
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  // Avatar
+                  Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                          colors: [_orange, _orangeLight]),
+                      borderRadius: BorderRadius.circular(13),
                     ),
+                    child: const Icon(Icons.person_rounded,
+                        color: Colors.white, size: 22),
                   ),
-                  TextButton(
-                    onPressed: _navigateToHistory,
-                    child: const Text(
-                      'Voir tout',
-                      style: TextStyle(
-                        color: AppTheme.primaryColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Activity Cards
-              if (_isLoadingRecent)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: CircularProgressIndicator(),
-                  ),
-                )
-              else if (_recentTrips.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.history, size: 48, color: Colors.grey.shade300),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Aucune activité récente',
-                          style: TextStyle(color: Colors.grey),
-                        ),
+                        Text('Bonjour 👋',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12, color: Colors.white54)),
+                        Text('Mon tableau de bord',
+                          style: GoogleFonts.poppins(
+                            fontSize: 15, fontWeight: FontWeight.w700,
+                            color: Colors.white)),
                       ],
                     ),
                   ),
-                )
-              else
-                ..._recentTrips.take(3).map((trip) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _buildRecentTripCard(context, trip),
-                )),
-              
-              const SizedBox(height: 20),
-            ],
-          ),
+                  // Notification bell
+                  AnimatedBuilder(
+                    animation: NotificationService(),
+                    builder: (_, __) {
+                      final count = NotificationService().unreadCount;
+                      return GestureDetector(
+                        onTap: () => NotificationSheet.show(context),
+                        child: Container(
+                          width: 40, height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(11),
+                            border: Border.all(
+                                color: Colors.white.withOpacity(0.15)),
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              const Icon(Icons.notifications_rounded,
+                                  color: Colors.white, size: 20),
+                              if (count > 0)
+                                Positioned(
+                                  right: 8, top: 8,
+                                  child: Container(
+                                    width: 8, height: 8,
+                                    decoration: const BoxDecoration(
+                                        color: _orange,
+                                        shape: BoxShape.circle),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  // Logout
+                  GestureDetector(
+                    onTap: () {
+                      NotificationService().disconnect();
+                      Navigator.of(context)
+                          .pushNamedAndRemoveUntil('/login', (_) => false);
+                    },
+                    child: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(11),
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.15)),
+                      ),
+                      child: const Icon(Icons.logout_rounded,
+                          color: Colors.white, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      );
+      ),
+    );
   }
 
-  Widget _buildStatCard(
-    BuildContext context,
-    String title,
-    String value,
-    IconData icon,
-    IconData trendIcon,
-    String subtitle, {
+  // ── CTA ───────────────────────────────────────────────────────────────────
+
+  Widget _buildMainCta() {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/create_ride'),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [_dark, Color(0xFF1A2744)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(color: _dark.withOpacity(0.25),
+                blurRadius: 16, offset: const Offset(0, 6)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    colors: [_orange, _orangeLight]),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [BoxShadow(color: _orange.withOpacity(0.4),
+                    blurRadius: 12, offset: const Offset(0, 4))],
+              ),
+              child: const Icon(Icons.add_rounded,
+                  color: Colors.white, size: 28),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Créer une course',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15, fontWeight: FontWeight.w700,
+                      color: Colors.white)),
+                  const SizedBox(height: 2),
+                  Text('Trouvez un chauffeur en quelques secondes',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11, color: Colors.white54)),
+                ],
+              ),
+            ),
+            Container(
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: const Icon(Icons.arrow_forward_ios_rounded,
+                  color: Colors.white, size: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+
+  Widget _buildStatsRow() {
+    return Row(
+      children: [
+        _statChip(
+          icon: Icons.route_rounded,
+          value: _statsTripsCount ?? '--',
+          label: 'Trajets',
+          color: const Color(0xFF3B82F6),
+          onTap: _navigateToHistory,
+        ),
+        const SizedBox(width: 10),
+        _statChip(
+          icon: Icons.account_balance_wallet_rounded,
+          value: _statsTotalAmount ?? '--',
+          label: 'Dépensé',
+          color: const Color(0xFF22C55E),
+        ),
+        const SizedBox(width: 10),
+        _statChip(
+          icon: Icons.access_time_rounded,
+          value: _isLoadingRecent ? '...' : (_recentTrips.isNotEmpty ? 'Récent' : '--'),
+          label: 'Activité',
+          color: _orange,
+        ),
+      ],
+    );
+  }
+
+  Widget _statChip({
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color color,
     VoidCallback? onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withOpacity(0.12)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8, offset: const Offset(0, 3))
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: AppTheme.primaryColor,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Row(
-                  children: [
-                    Icon(
-                      trendIcon,
-                      color: Colors.green,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '+12%',
-                      style: const TextStyle(
-                        color: Colors.green,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ),
-    );
-  }
-
-  Widget _buildRecentTripCard(BuildContext context, TripHistoryItem trip) {
-    final dateFormat = DateFormat('dd MMM yyyy - HH:mm');
-    final priceFormat = NumberFormat.currency(symbol: trip.currency, decimalDigits: 2);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+          child: Column(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 32, height: 32,
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(9),
                 ),
-                child: const Icon(
-                  Icons.local_taxi,
-                  color: AppTheme.primaryColor,
-                  size: 20,
-                ),
+                child: Icon(icon, color: color, size: 17),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Vers ${trip.destinationAddress.split(',').first}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      dateFormat.format(trip.createdAt),
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${trip.estimatedDistanceKm.toStringAsFixed(1)} km • ${trip.estimatedDurationMin} min',
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 8),
+              Text(value,
+                style: GoogleFonts.poppins(
+                  fontSize: 13, fontWeight: FontWeight.w800, color: color)),
+              Text(label,
+                style: GoogleFonts.poppins(
+                  fontSize: 10, color: const Color(0xFF9BA3B4),
+                  fontWeight: FontWeight.w500)),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        ),
+      ),
+    );
+  }
+
+  // ── Rendez-vous ───────────────────────────────────────────────────────────
+
+  Widget _buildRendezvousCard() {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/client_rendezvous_history'),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(color: const Color(0xFF4F46E5).withOpacity(0.3),
+                blurRadius: 16, offset: const Offset(0, 6)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48, height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: const Icon(Icons.calendar_month_rounded,
+                  color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Rendez-vous',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14, fontWeight: FontWeight.w700,
+                      color: Colors.white)),
+                  Text('Réservez un service planifié',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11, color: Colors.white60)),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: () => Navigator.pushNamed(
+                  context, '/client_rendezvous_booking'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('Réserver',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12, fontWeight: FontWeight.w700,
+                    color: const Color(0xFF4F46E5))),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Recent trips ──────────────────────────────────────────────────────────
+
+  Widget _buildRecentActivity() {
+    if (_isLoadingRecent) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation(_orange)),
+        ),
+      );
+    }
+    if (_recentTrips.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E6EF)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F3F7),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.history_rounded,
+                  color: Color(0xFF9BA3B4), size: 26),
+            ),
+            const SizedBox(height: 10),
+            Text('Aucun trajet récent',
+              style: GoogleFonts.poppins(
+                fontSize: 13, fontWeight: FontWeight.w600,
+                color: const Color(0xFF475569))),
+            Text('Vos courses apparaîtront ici',
+              style: GoogleFonts.poppins(
+                fontSize: 11, color: const Color(0xFF9BA3B4))),
+          ],
+        ),
+      );
+    }
+    return Column(
+      children: _recentTrips
+          .take(3)
+          .map((trip) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildTripCard(trip),
+              ))
+          .toList(),
+    );
+  }
+
+  Widget _buildTripCard(TripHistoryItem trip) {
+    final dateFormat = DateFormat('dd MMM - HH:mm');
+    final statusData = _statusInfo(trip.status);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E6EF)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03),
+              blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: _orange.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.local_taxi_rounded,
+                color: _orange, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Vers ${trip.destinationAddress.split(',').first}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13, fontWeight: FontWeight.w600,
+                    color: _dark)),
+                const SizedBox(height: 3),
+                Row(children: [
+                  Text(dateFormat.format(trip.createdAt),
+                    style: GoogleFonts.poppins(
+                      fontSize: 11, color: const Color(0xFF9BA3B4))),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 5),
+                    child: Text('·',
+                      style: TextStyle(color: Color(0xFFCDD3E0))),
+                  ),
+                  Text(
+                    '${trip.estimatedDistanceKm.toStringAsFixed(1)} km',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11, color: const Color(0xFF9BA3B4))),
+                ]),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                priceFormat.format(trip.estimatedFare),
-                style: const TextStyle(
-                  color: AppTheme.primaryColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                '${trip.estimatedFare.toStringAsFixed(2)} ${trip.currency}',
+                style: GoogleFonts.poppins(
+                  fontSize: 13, fontWeight: FontWeight.w700,
+                  color: _dark)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusData.$2.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(6),
                 ),
+                child: Text(statusData.$1,
+                  style: GoogleFonts.poppins(
+                    fontSize: 10, fontWeight: FontWeight.w600,
+                    color: statusData.$2)),
               ),
-              _buildStatusBadge(trip.status),
             ],
           ),
         ],
@@ -714,106 +639,115 @@ class _ClientDashboardState extends State<ClientDashboard> {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
-    Color color;
-    String label;
-
+  (String, Color) _statusInfo(String status) {
     switch (status.toLowerCase()) {
-      case 'completed':
-        color = Colors.green;
-        label = 'Terminé';
-        break;
-      case 'cancelled':
-        color = Colors.red;
-        label = 'Annulé';
-        break;
-      case 'accepted':
-        color = Colors.blue;
-        label = 'Accepté';
-        break;
+      case 'completed': return ('Terminé', const Color(0xFF22C55E));
+      case 'cancelled': return ('Annulé', const Color(0xFFEF4444));
+      case 'accepted': return ('Accepté', const Color(0xFF3B82F6));
       case 'in_progress':
-      case 'started':
-        color = Colors.orange;
-        label = 'En cours';
-        break;
-      default:
-        color = Colors.grey;
-        label = status;
+      case 'started': return ('En cours', _orange);
+      default: return (status, const Color(0xFF9BA3B4));
     }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
   }
 
+  // ── Bottom nav ────────────────────────────────────────────────────────────
 
-  Widget _buildActionCard(
-    BuildContext context,
-    String title,
-    String subtitle,
-    IconData icon,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.primaryColor.withOpacity(0.2)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
+  Widget _buildNavBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.07),
+              blurRadius: 20, offset: const Offset(0, -4)),
+        ],
+      ),
+      child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Icon(
-                icon,
-                size: 32,
-                color: AppTheme.primaryColor,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 12,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              _navItem(Icons.home_rounded, 'Accueil', 0),
+              _navItem(Icons.directions_car_rounded, 'Course', 1),
+              _navItem(Icons.card_giftcard_rounded, 'Fidélité', 2),
+              _navItem(Icons.credit_card_rounded, 'Cartes', 3),
+              _navItem(Icons.person_rounded, 'Profil', 4),
             ],
           ),
         ),
       ),
     );
   }
+
+  Widget _navItem(IconData icon, String label, int index) {
+    final isSelected = _currentIndex == index;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _currentIndex = index);
+        HapticFeedback.lightImpact();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: EdgeInsets.symmetric(
+            horizontal: isSelected ? 14 : 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? _orange.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon,
+              color: isSelected ? _orange : const Color(0xFF9BA3B4),
+              size: 22),
+            const SizedBox(height: 3),
+            Text(label, style: GoogleFonts.poppins(
+              fontSize: 10,
+              color: isSelected ? _orange : const Color(0xFF9BA3B4),
+              fontWeight:
+                  isSelected ? FontWeight.w700 : FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  Widget _buildSectionTitle(String title, IconData icon,
+      {VoidCallback? onRefresh, VoidCallback? onSeeAll}) {
+    return Row(
+      children: [
+        Container(
+          width: 28, height: 28,
+          decoration: BoxDecoration(
+            color: _orange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: _orange, size: 15),
+        ),
+        const SizedBox(width: 8),
+        Text(title, style: GoogleFonts.poppins(
+          fontSize: 14, fontWeight: FontWeight.w700, color: _dark)),
+        const Spacer(),
+        if (onRefresh != null)
+          GestureDetector(
+            onTap: onRefresh,
+            child: const Icon(Icons.refresh_rounded,
+                color: _orange, size: 18)),
+        if (onSeeAll != null)
+          GestureDetector(
+            onTap: onSeeAll,
+            child: Text('Voir tout', style: GoogleFonts.poppins(
+              fontSize: 12, fontWeight: FontWeight.w600, color: _orange))),
+      ],
+    );
+  }
+
+  Widget _ring(double s, Color c) => Container(
+    width: s, height: s,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      border: Border.all(color: c, width: 1)));
 }
