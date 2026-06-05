@@ -266,6 +266,20 @@ class TripHistoryResponse {
   }
 }
 
+class ClientDashboardStats {
+  final int totalTrips;
+  final double totalSpent;
+  final String currency;
+  final int upcomingRendezvous;
+
+  const ClientDashboardStats({
+    required this.totalTrips,
+    required this.totalSpent,
+    required this.currency,
+    required this.upcomingRendezvous,
+  });
+}
+
 class BidOffer {
   final String id;
   final String tripId;

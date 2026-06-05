@@ -359,6 +359,34 @@ class TripService {
     }
   }
 
+  static Future<ClientDashboardStats> getClientDashboardStats() async {
+    debugPrint('=== TripService.getClientDashboardStats() START ===');
+    try {
+      final response = await HttpClient.get('/m/trips/dashboard/client');
+      debugPrint('Dashboard stats status: ${response.statusCode}');
+      if (response.isSuccess) {
+        final json = response.json;
+        final outer = json['data'] as Map<String, dynamic>? ?? json;
+        // Réponse imbriquée : { data: { message, data: { totalTrips, ... } } }
+        final data = (outer['data'] as Map<String, dynamic>?) ?? outer;
+        return ClientDashboardStats(
+          totalTrips: int.tryParse(data['totalTrips']?.toString() ?? '0') ?? 0,
+          totalSpent: double.tryParse(data['totalSpent']?.toString() ?? '0') ?? 0.0,
+          currency: data['currency']?.toString() ?? 'TND',
+          upcomingRendezvous:
+              int.tryParse(data['upcomingRendezvous']?.toString() ?? '0') ?? 0,
+        );
+      } else {
+        throw Exception('Erreur chargement stats dashboard');
+      }
+    } catch (e) {
+      debugPrint('ERREUR getClientDashboardStats: $e');
+      rethrow;
+    } finally {
+      debugPrint('=== TripService.getClientDashboardStats() END ===');
+    }
+  }
+
   static Future<TripHistoryResponse> getClientTripHistory({int page = 1, int limit = 10}) async {
     debugPrint('=== TripService.getClientTripHistory() START ===');
     debugPrint('Params: page=$page, limit=$limit');

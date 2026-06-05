@@ -25,8 +25,11 @@ class _ClientDashboardState extends State<ClientDashboard>
   int _currentIndex = 0;
   List<TripHistoryItem> _recentTrips = [];
   bool _isLoadingRecent = false;
-  String? _statsTripsCount = '--';
-  String? _statsTotalAmount = '--';
+  bool _isLoadingStats = true;
+  String _statsTripsCount = '--';
+  String _statsTotalAmount = '--';
+  String _statsCurrency = 'TND';
+  int _statsUpcomingRdv = 0;
 
   // ── Animation ─────────────────────────────────────────────────────────────
   late final AnimationController _fadeCtrl;
@@ -53,25 +56,48 @@ class _ClientDashboardState extends State<ClientDashboard>
   }
 
   Future<void> _loadDashboardData() async {
-    setState(() => _isLoadingRecent = true);
+    setState(() {
+      _isLoadingRecent = true;
+      _isLoadingStats = true;
+    });
+
+    // Charger les stats et les trajets récents en parallèle
+    await Future.wait([
+      _loadStats(),
+      _loadRecentTrips(),
+    ]);
+  }
+
+  Future<void> _loadStats() async {
+    try {
+      final stats = await TripService.getClientDashboardStats();
+      if (mounted) {
+        setState(() {
+          _statsTripsCount = stats.totalTrips.toString();
+          _statsTotalAmount =
+              '${stats.totalSpent.toStringAsFixed(2)} ${stats.currency}';
+          _statsCurrency = stats.currency;
+          _statsUpcomingRdv = stats.upcomingRendezvous;
+          _isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Stats error: $e');
+      if (mounted) setState(() => _isLoadingStats = false);
+    }
+  }
+
+  Future<void> _loadRecentTrips() async {
     try {
       final response = await TripService.getClientTripHistory(page: 1, limit: 3);
       if (mounted) {
-        double total = 0;
-        for (var trip in response.trips) {
-          if (trip.status.toLowerCase() == 'completed') {
-            total += trip.estimatedFare;
-          }
-        }
         setState(() {
           _recentTrips = response.trips;
-          _statsTripsCount = response.total.toString();
-          _statsTotalAmount = '${total.toStringAsFixed(2)} TND';
           _isLoadingRecent = false;
         });
       }
     } catch (e) {
-      debugPrint('Dashboard error: $e');
+      debugPrint('Recent trips error: $e');
       if (mounted) setState(() => _isLoadingRecent = false);
     }
   }
@@ -359,11 +385,12 @@ class _ClientDashboardState extends State<ClientDashboard>
   // ── Stats ─────────────────────────────────────────────────────────────────
 
   Widget _buildStatsRow() {
+    final loading = _isLoadingStats;
     return Row(
       children: [
         _statChip(
           icon: Icons.route_rounded,
-          value: _statsTripsCount ?? '--',
+          value: loading ? '...' : _statsTripsCount,
           label: 'Trajets',
           color: const Color(0xFF3B82F6),
           onTap: _navigateToHistory,
@@ -371,16 +398,17 @@ class _ClientDashboardState extends State<ClientDashboard>
         const SizedBox(width: 10),
         _statChip(
           icon: Icons.account_balance_wallet_rounded,
-          value: _statsTotalAmount ?? '--',
+          value: loading ? '...' : _statsTotalAmount,
           label: 'Dépensé',
           color: const Color(0xFF22C55E),
         ),
         const SizedBox(width: 10),
         _statChip(
-          icon: Icons.access_time_rounded,
-          value: _isLoadingRecent ? '...' : (_recentTrips.isNotEmpty ? 'Récent' : '--'),
-          label: 'Activité',
+          icon: Icons.event_available_rounded,
+          value: loading ? '...' : (_statsUpcomingRdv > 0 ? '$_statsUpcomingRdv RDV' : '0 RDV'),
+          label: 'À venir',
           color: _orange,
+          onTap: () => Navigator.pushNamed(context, '/client_rendezvous_history'),
         ),
       ],
     );
