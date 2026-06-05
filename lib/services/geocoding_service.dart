@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -129,6 +130,28 @@ class GeocodingService {
     }
   }
 
+  /// Supprime les mots de catégorie de la requête pour la recherche par nom pur
+  /// Ex: "ace london café" → "ace london", "restaurant chez pierre" → "chez pierre"
+  static String _stripTypeWords(String query) {
+    const typeWords = [
+      'café', 'cafe', 'coffee', 'restaurant', 'resto', 'restau',
+      'hôtel', 'hotel', 'pharmacie', 'pharmacy', 'supermarché',
+      'supermarket', 'boulangerie', 'pâtisserie', 'patisserie',
+      'pizzeria', 'snack', 'fast food', 'fastfood', 'épicerie',
+      'banque', 'bank', 'clinique', 'clinic', 'hôpital', 'hospital',
+      'école', 'ecole', 'école', 'université', 'universite',
+      'parc', 'park', 'jardin', 'plage', 'beach', 'stade', 'stadium',
+      'mosquée', 'mosquee', 'église', 'eglise', 'marché', 'marche',
+    ];
+    var cleaned = query.trim();
+    for (final word in typeWords) {
+      cleaned = cleaned.replaceAll(
+          RegExp(r'\b' + word + r'\b', caseSensitive: false), '');
+    }
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return cleaned.isEmpty ? query : cleaned;
+  }
+
   /// Convertir un nom de lieu en coordonnées
   static Future<LatLng?> getAddressCoordinates(String address) async {
     try {
@@ -200,6 +223,22 @@ class GeocodingService {
     }
   }
 
+  // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  static double _distanceKm(LatLng a, LatLng b) {
+    const r = 6371.0;
+    final dLat = (b.latitude - a.latitude) * math.pi / 180;
+    final dLon = (b.longitude - a.longitude) * math.pi / 180;
+    final sinDLat = math.sin(dLat / 2);
+    final sinDLon = math.sin(dLon / 2);
+    final h = sinDLat * sinDLat +
+        math.cos(a.latitude * math.pi / 180) *
+            math.cos(b.latitude * math.pi / 180) *
+            sinDLon *
+            sinDLon;
+    return 2 * r * math.asin(math.sqrt(h));
+  }
+
   // ─── Photon (komoot) ────────────────────────────────────────────────────────
 
   /// Recherche POI via Photon — biais de localisation natif, bien meilleur que Nominatim pour les POIs
@@ -207,28 +246,85 @@ class GeocodingService {
       String query, LatLng? userLocation) async {
     try {
       debugPrint('GEO: Photon search pour "$query"');
+      final cleanedQuery = _stripTypeWords(query);
+      final double? bbox = userLocation != null ? 1.5 : null;
 
-      // 1ère tentative : bbox local ±1.5° (~165km) pour exclure les résultats d'autres pays
-      List<String> results = await _photonRequest(query, userLocation,
-          bboxDegrees: userLocation != null ? 1.5 : null);
+      final osmTag = _detectOsmTag(query);
 
-      // 2ème tentative sans bbox si zone locale vide (ex: destination lointaine)
-      if (results.isEmpty && userLocation != null) {
-        debugPrint('GEO: Photon bbox vide, retry sans restriction');
-        results = await _photonRequest(query, userLocation, bboxDegrees: null);
+      // Recherches parallèles : requête originale + requête nettoyée (sans mots de type)
+      // Si type détecté (ex: "café"), chercher aussi par nom pur avec filtre osm_tag
+      final futures = [
+        _photonRequest(query, userLocation, bboxDegrees: bbox),
+        if (cleanedQuery != query)
+          _photonRequest(cleanedQuery, userLocation,
+              bboxDegrees: bbox, osmTag: osmTag),
+      ];
+      final allResults = await Future.wait(futures);
+
+      // Fusionner et dédupliquer par nom (priorité à la requête originale)
+      final seen = <String>{};
+      final merged = <String>[];
+      for (final list in allResults) {
+        for (final name in list) {
+          final key = name.toLowerCase();
+          if (seen.add(key)) merged.add(name);
+        }
       }
 
-      debugPrint('GEO: Photon → ${results.length} résultats');
-      return results;
+      // Si bbox vide → réessayer avec bbox élargi (±3°, ~330km, couvre tout le pays)
+      // puis filtrer par distance pour ne jamais afficher des résultats d'autres continents
+      if (merged.isEmpty && userLocation != null) {
+        debugPrint('GEO: Photon bbox vide, retry bbox élargi ±3°');
+        final r1 = await _photonRequest(query, userLocation, bboxDegrees: 3.0);
+        final r2 = cleanedQuery != query
+            ? await _photonRequest(cleanedQuery, userLocation,
+                bboxDegrees: 3.0, osmTag: osmTag)
+            : <String>[];
+        final seen2 = <String>{};
+        for (final name in [...r1, ...r2]) {
+          if (seen2.add(name.toLowerCase())) merged.add(name);
+        }
+      }
+
+      // Filtre final : exclure résultats à plus de 400km (évite UK/Chine quand bbox échoue)
+      if (userLocation != null) {
+        merged.retainWhere((name) {
+          final coords = _coordsCache[name];
+          if (coords == null) return true;
+          return _distanceKm(userLocation, coords) <= 400;
+        });
+      }
+
+      debugPrint('GEO: Photon → ${merged.length} résultats');
+      return merged;
     } catch (e) {
       debugPrint('GEO EXCEPTION _photonSearch: $e');
       return [];
     }
   }
 
+  /// Détecte un tag OSM depuis la requête pour filtrer par type de POI
+  static String? _detectOsmTag(String query) {
+    final q = query.toLowerCase();
+    if (q.contains('café') || q.contains('cafe') || q.contains('coffee')) return 'amenity:cafe';
+    if (q.contains('restaurant') || q.contains('resto') || q.contains('restau')) return 'amenity:restaurant';
+    if (q.contains('pizzeria')) return 'amenity:restaurant';
+    if (q.contains('hôtel') || q.contains('hotel')) return 'tourism:hotel';
+    if (q.contains('pharmacie') || q.contains('pharmacy')) return 'amenity:pharmacy';
+    if (q.contains('hôpital') || q.contains('hospital') || q.contains('clinique')) return 'amenity:hospital';
+    if (q.contains('supermarché') || q.contains('supermarket') || q.contains('épicerie')) return 'shop:supermarket';
+    if (q.contains('boulangerie') || q.contains('pâtisserie') || q.contains('patisserie')) return 'shop:bakery';
+    if (q.contains('banque') || q.contains('bank')) return 'amenity:bank';
+    if (q.contains('parc') || q.contains('park') || q.contains('jardin')) return 'leisure:park';
+    if (q.contains('mosquée') || q.contains('mosquee')) return 'amenity:place_of_worship';
+    if (q.contains('stade') || q.contains('stadium')) return 'leisure:stadium';
+    if (q.contains('marché') || q.contains('marche')) return 'amenity:marketplace';
+    return null;
+  }
+
   static Future<List<String>> _photonRequest(
       String query, LatLng? userLocation,
-      {double? bboxDegrees}) async {
+      {double? bboxDegrees, String? osmTag}) async {
     String url = 'https://photon.komoot.io/api/'
         '?q=${Uri.encodeComponent(query)}'
         '&limit=10'
@@ -244,6 +340,10 @@ class GeocodingService {
         final maxLat = userLocation.latitude + d;
         url += '&bbox=$minLon,$minLat,$maxLon,$maxLat';
       }
+    }
+
+    if (osmTag != null) {
+      url += '&osm_tag=${Uri.encodeComponent(osmTag)}';
     }
 
     final response = await http.get(

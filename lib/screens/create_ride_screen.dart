@@ -596,10 +596,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         children: [
           _buildGoogleMap(mapState),
           _buildHeader(),
-          if (_showRouteEstimation &&
-              _estimatedDistance != null &&
-              _estimatedDuration != null)
-            _buildRouteEstimationCard(),
+          // Route estimation card removed — info integrated in destination summary
           if (mapState.status == MapStatus.loading) const MapLoadingWidget(),
           if (mapState.status == MapStatus.error ||
               mapState.status == MapStatus.permissionDenied ||
@@ -781,9 +778,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
   // ── FAB Buttons ────────────────────────────────────────────────────────────
   Widget _buildFloatingButtons(MapState mapState) {
-    final topOffset = _showRouteEstimation
-        ? MediaQuery.of(context).padding.top + 220.0
-        : MediaQuery.of(context).padding.top + 100.0;
+    final topOffset = MediaQuery.of(context).padding.top + 100.0;
 
     return Positioned(
       right: 16,
@@ -863,8 +858,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     // Calcul de la hauteur cible en fonction de l'état
     double targetHeight;
     if (_destinationCoordinates == null) {
-      // Augmentation de la hauteur initiale (0.32 au lieu de 0.22)
-      targetHeight = _isDestinationFocused ? screenHeight * 0.65 : screenHeight * 0.32;
+      if (_isDestinationFocused && _addressSuggestions.isNotEmpty) {
+        targetHeight = screenHeight * 0.65; // suggestions visibles → grande hauteur
+      } else if (_isDestinationFocused) {
+        targetHeight = screenHeight * 0.38; // focalisé sans résultats → hauteur réduite
+      } else {
+        targetHeight = screenHeight * 0.32; // état initial
+      }
     } else {
       targetHeight = _serviceSectionExpanded ? screenHeight * 0.75 : screenHeight * 0.48;
     }
@@ -964,11 +964,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Récapitulatif destination compact
+          // Destination + route info intégrés
           _buildDestinationSummary(),
-          
-          if (_showRouteInfo && _estimatedDistance != null)
-            _buildRouteInlineBadge(),
 
           const SizedBox(height: 24),
           
@@ -992,8 +989,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   }
 
   Widget _buildDestinationSummary() {
+    final hasRoute = _estimatedDistance != null && _estimatedDuration != null;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: _AppColors.gray50,
         borderRadius: BorderRadius.circular(16),
@@ -1009,26 +1007,57 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             ),
             child: const Icon(Icons.location_on_rounded, size: 18, color: _AppColors.accent),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Destination',
-                  style: TextStyle(fontSize: 11, color: _AppColors.gray400, fontWeight: FontWeight.w600),
-                ),
                 Text(
                   _destinationController.text,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _AppColors.gray900),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _AppColors.gray900,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (hasRoute) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.straighten_rounded, size: 12, color: _AppColors.gray400),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${_estimatedDistance!.toStringAsFixed(1)} km',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: _AppColors.gray400,
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text('·', style: TextStyle(fontSize: 11, color: _AppColors.gray300)),
+                      ),
+                      const Icon(Icons.access_time_rounded, size: 12, color: _AppColors.gray400),
+                      const SizedBox(width: 3),
+                      Text(
+                        _estimatedDuration!,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: _AppColors.gray400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
-          IconButton(
-            onPressed: () {
+          GestureDetector(
+            onTap: () {
               setState(() {
                 _destinationCoordinates = null;
                 _showRouteInfo = false;
@@ -1043,8 +1072,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               n.removeMarker('pickup');
               n.removeMarker('destination');
             },
-            icon: const Icon(Icons.edit_outlined, size: 18, color: _AppColors.accent),
-            visualDensity: VisualDensity.compact,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: _AppColors.accentLight,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.edit_outlined, size: 15, color: _AppColors.accent),
+            ),
           ),
         ],
       ),
@@ -1868,11 +1903,30 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           ),
         ),
 
+        // État vide focalisé — hint discret
+        if (_isDestinationFocused &&
+            _addressSuggestions.isEmpty &&
+            !_isSearching &&
+            _destinationController.text.isEmpty) ...[
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.search_rounded, size: 15, color: _AppColors.gray300),
+              const SizedBox(width: 6),
+              const Text(
+                'Tapez pour rechercher une adresse ou un lieu',
+                style: TextStyle(fontSize: 12, color: _AppColors.gray300),
+              ),
+            ],
+          ),
+        ],
+
         // Address suggestions
         if (_addressSuggestions.isNotEmpty) ...[
           const SizedBox(height: 12),
           Container(
-            constraints: const BoxConstraints(maxHeight: 350), // Augmenté pour voir encore plus de résultats
+            constraints: const BoxConstraints(maxHeight: 350),
             decoration: BoxDecoration(
               color: _AppColors.white,
               borderRadius: BorderRadius.circular(20),
