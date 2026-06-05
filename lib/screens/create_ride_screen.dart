@@ -183,10 +183,18 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     });
   }
 
+  void _clearMapRoute() {
+    final n = ref.read(mapProvider.notifier);
+    n.clearPolylines();
+    n.removeMarker('pickup');
+    n.removeMarker('destination');
+  }
+
   @override
   void dispose() {
     _offersTimer?.cancel();
     _debounceTimer?.cancel();
+    _clearMapRoute();
     _destinationController.removeListener(_onDestinationChanged);
     _destinationController.dispose();
     _destinationFocusNode.dispose();
@@ -647,7 +655,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               // Back button
               _CircleButton(
                 color: _AppColors.gray100,
-                onTap: () => Navigator.of(context).pop(),
+                onTap: () {
+                  _clearMapRoute();
+                  Navigator.of(context).pop();
+                },
                 child: const Icon(
                   Icons.arrow_back_ios_new_rounded,
                   size: 16,
