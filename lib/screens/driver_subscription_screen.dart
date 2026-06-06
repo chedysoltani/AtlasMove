@@ -535,10 +535,10 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
-            onPressed: () => Navigator.pushNamed(context, '/driver_crypto_select'),
-            icon: const Icon(Icons.currency_exchange_rounded, size: 20),
+            onPressed: () => Navigator.pushNamed(context, '/driver_usdt_payment'),
+            icon: const Text('₮', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
             label: const Text(
-              'Payer en Crypto (90\$)',
+              'Payer via USDT TRC20 (90\$)',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
@@ -546,7 +546,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
               foregroundColor: Colors.white,
               surfaceTintColor: Colors.transparent,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              side: BorderSide(color: AppTheme.primaryColor.withOpacity(0.5), width: 1.5),
+              side: const BorderSide(color: Color(0xFF009387), width: 1.5),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
           ),

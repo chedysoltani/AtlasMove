@@ -44,6 +44,7 @@ import 'models/notification_model.dart';
 import 'screens/driver_subscription_screen.dart';
 import 'screens/driver_crypto_select_screen.dart';
 import 'screens/driver_crypto_recharge_screen.dart';
+import 'screens/driver_usdt_payment_screen.dart';
 import 'screens/referral_screen.dart';
 import 'screens/client_rendezvous_booking_screen.dart';
 import 'screens/client_rendezvous_history_screen.dart';
@@ -226,6 +227,7 @@ class AtlasMoveApp extends StatelessWidget {
             '/driver_subscription': (context) => const DriverSubscriptionScreen(),
             '/driver_crypto_select': (context) => const DriverCryptoSelectScreen(),
             '/driver_crypto_recharge': (context) => const DriverCryptoRechargeScreen(),
+            '/driver_usdt_payment': (context) => const DriverUsdtPaymentScreen(),
             '/referral': (context) => const ReferralScreen(),
             '/client_rendezvous_booking': (context) =>
                 const ClientRendezvousBookingScreen(),

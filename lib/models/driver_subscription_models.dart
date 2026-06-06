@@ -242,6 +242,45 @@ class ClientLoyaltyStatus {
           );
 }
 
+// ─── Crypto Subscription Session (USDT TRC20) ────────────────────────────────
+
+class CryptoSubscriptionSession {
+  final String sessionId;
+  final String address;
+  final double amount;
+  final DateTime expiresAt;
+  final String status; // pending | detected | confirmed | underpaid | expired
+
+  const CryptoSubscriptionSession({
+    required this.sessionId,
+    required this.address,
+    required this.amount,
+    required this.expiresAt,
+    required this.status,
+  });
+
+  factory CryptoSubscriptionSession.fromJson(Map<String, dynamic> json) {
+    // Initiate:  { data: { session_id, address, amount, expires_at } }
+    // Poll:      { data: { id, status, amount_expected, expires_at } }
+    final data = (json['data'] as Map<String, dynamic>?) ?? json;
+    final rawAmount = data['amount'] ?? data['amount_expected'];
+    return CryptoSubscriptionSession(
+      sessionId: data['session_id']?.toString() ?? data['id']?.toString() ?? '',
+      address: data['address']?.toString() ?? '',
+      amount: double.tryParse(rawAmount?.toString() ?? '90') ?? 90.0,
+      expiresAt: DateTime.tryParse(data['expires_at']?.toString() ?? '') ??
+          DateTime.now().add(const Duration(minutes: 30)),
+      status: data['status']?.toString() ?? 'pending',
+    );
+  }
+
+  bool get isPending => status == 'pending';
+  bool get isDetected => status == 'detected';
+  bool get isConfirmed => status == 'confirmed';
+  bool get isUnderpaid => status == 'underpaid';
+  bool get isExpired => status == 'expired';
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 class DriverSubscription {

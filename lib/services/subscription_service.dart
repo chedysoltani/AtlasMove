@@ -91,6 +91,19 @@ class SubscriptionService extends ChangeNotifier {
     return hasActiveSubscription;
   }
 
+  Future<CryptoSubscriptionSession> initiateSession({double amount = 90.0}) async {
+    final response = await HttpClient.post(
+      '/m/livreur/subscription/initiate',
+      body: {'amount': amount},
+    );
+    return CryptoSubscriptionSession.fromJson(response.json);
+  }
+
+  Future<CryptoSubscriptionSession> pollSession(String sessionId) async {
+    final response = await HttpClient.get('/m/livreur/subscription/session/$sessionId');
+    return CryptoSubscriptionSession.fromJson(response.json);
+  }
+
   Future<bool> cancelRenewal() async {
     _isLoading = true;
     _error = null;
