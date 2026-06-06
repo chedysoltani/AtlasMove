@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../models/driver_subscription_models.dart';
+import '../services/subscription_service.dart';
 
 class ClientRewardsScreen extends StatefulWidget {
   const ClientRewardsScreen({super.key});
@@ -11,22 +13,23 @@ class ClientRewardsScreen extends StatefulWidget {
 
 class _ClientRewardsScreenState extends State<ClientRewardsScreen>
     with SingleTickerProviderStateMixin {
-  // ─── Colors ──────────────────────────────────────────────────────
+  // ─── Colors ───────────────────────────────────────────────────────────────
   static const _navy = Color(0xFF0F172A);
   static const _navyLight = Color(0xFF1E293B);
   static const _orange = Color(0xFFFF6B35);
   static const _orangeLight = Color(0xFFFF8C5A);
   static const _bg = Color(0xFFF8F9FB);
   static const _border = Color(0xFFE8ECF0);
-  static const _textPrimary = Color(0xFF1A1F36);
   static const _textSecondary = Color(0xFF9BA3B4);
 
-  // ─── Mock data ────────────────────────────────────────────────────
-  final int _tripsThisMonth = 14;
-  final int _monthlyGoal = 20;
-  final int _consecutiveMonths = 4;
-  final double _progressCashback = 0.66;
-  final double _progressTravel = 0.33;
+  // ─── State ─────────────────────────────────────────────────────────────────
+  ClientLoyaltyStatus? _loyalty;
+  bool _loading = true;
+  String? _error;
+
+  late final AnimationController _animCtrl;
+  late final Animation<double> _fadeAnim;
+  late final Animation<Offset> _slideAnim;
 
   final List<Map<String, String>> _destinations = [
     {'name': 'Santorin, Grèce', 'image': 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?q=80&w=400', 'tag': 'Méditerranée'},
@@ -35,19 +38,17 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
     {'name': 'Barcelone, Espagne', 'image': 'https://images.unsplash.com/photo-1583422409516-2895a77efded?q=80&w=400', 'tag': 'Plage & Ville'},
   ];
 
-  late AnimationController _animCtrl;
-  late Animation<double> _fadeAnim;
-  late Animation<Offset> _slideAnim;
-
   @override
   void initState() {
     super.initState();
     _animCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 600));
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero)
         .animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
-    _animCtrl.forward();
+    _load();
   }
 
   @override
@@ -56,97 +57,91 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
     super.dispose();
   }
 
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final loyalty = await ClientLoyaltyService.getStatus();
+      if (mounted) {
+        setState(() {
+          _loyalty = loyalty;
+          _loading = false;
+        });
+        _animCtrl.forward(from: 0);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  // ─── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _navy,
-      body: Column(
-        children: [
-          _buildHero(),
-          Expanded(
-            child: Container(
-              decoration: const BoxDecoration(
-                color: _bg,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-              ),
-              child: FadeTransition(
-                opacity: _fadeAnim,
-                child: SlideTransition(
-                  position: _slideAnim,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildStatusHeader(),
-                        const SizedBox(height: 20),
-                        _buildGoalCard(),
-                        const SizedBox(height: 20),
-                        _sectionLabel('Récompenses', Icons.card_giftcard_rounded),
-                        const SizedBox(height: 12),
-                        _buildMilestone(
-                          icon: Icons.account_balance_wallet_rounded,
-                          iconColor: const Color(0xFF22C55E),
-                          title: 'Cashback 100 USD',
-                          subtitle: 'Après 6 mois consécutifs',
-                          progress: _progressCashback,
-                          remaining: 'Encore 2 mois',
-                          remainingColor: const Color(0xFF22C55E),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildMilestone(
-                          icon: Icons.flight_takeoff_rounded,
-                          iconColor: _orange,
-                          title: 'Voyage Privilège (5 jours)',
-                          subtitle: 'Après 1 an d\'activité',
-                          progress: _progressTravel,
-                          remaining: 'Encore 8 mois',
-                          remainingColor: _orange,
-                        ),
-                        const SizedBox(height: 24),
-                        _sectionLabel('Destinations suggérées', Icons.explore_rounded),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Basé sur votre localisation (Afrique du Nord)',
-                          style: GoogleFonts.poppins(
-                              fontSize: 12, color: _textSecondary),
-                        ),
-                        const SizedBox(height: 14),
-                        _buildDestinations(),
-                        const SizedBox(height: 24),
-                        _sectionLabel('Niveaux de fidélité', Icons.emoji_events_rounded),
-                        const SizedBox(height: 14),
-                        _buildLevels(),
-                      ],
-                    ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: _navy,
+        body: RefreshIndicator(
+          color: _orange,
+          backgroundColor: Colors.white,
+          onRefresh: _load,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(child: _buildHero()),
+              SliverToBoxAdapter(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: _bg,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                   ),
+                  child: _loading
+                      ? _buildSkeleton()
+                      : _error != null
+                          ? _buildError()
+                          : FadeTransition(
+                              opacity: _fadeAnim,
+                              child: SlideTransition(
+                                position: _slideAnim,
+                                child: _buildContent(),
+                              ),
+                            ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // ─── Hero ─────────────────────────────────────────────────────────
+  // ─── Hero ──────────────────────────────────────────────────────────────────
 
   Widget _buildHero() {
+    final totalTrips = _loyalty?.cashbackProgram?.totalTrips ?? 0;
+
     return SafeArea(
       bottom: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         child: Stack(
           children: [
-            // Rings
+            // Decorative rings
             Positioned(
               right: -20, top: -20,
               child: Container(
                 width: 140, height: 140,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                      color: Colors.white.withOpacity(0.05), width: 28),
+                  border: Border.all(color: Colors.white.withOpacity(0.05), width: 28),
                 ),
               ),
             ),
@@ -156,8 +151,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                 width: 100, height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                      color: _orange.withOpacity(0.08), width: 20),
+                  border: Border.all(color: _orange.withOpacity(0.08), width: 20),
                 ),
               ),
             ),
@@ -175,36 +169,56 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                           color: Colors.white.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(
-                            Icons.arrow_back_ios_new_rounded,
+                        child: const Icon(Icons.arrow_back_ios_new_rounded,
                             color: Colors.white, size: 16),
                       ),
                     ),
-                    // Elite badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF59E0B).withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: const Color(0xFFF59E0B).withOpacity(0.4)),
-                      ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.workspace_premium_rounded,
-                            color: Color(0xFFF59E0B), size: 14),
-                        const SizedBox(width: 5),
-                        Text('Elite',
+                    // Trips count badge (live data)
+                    if (!_loading && _loyalty != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _orange.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _orange.withOpacity(0.4)),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.route_rounded, color: _orange, size: 13),
+                          const SizedBox(width: 5),
+                          Text(
+                            '$totalTrips courses',
                             style: GoogleFonts.poppins(
+                              color: _orange,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ]),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.workspace_premium_rounded,
+                              color: Color(0xFFF59E0B), size: 14),
+                          const SizedBox(width: 5),
+                          Text('Privilège',
+                              style: GoogleFonts.poppins(
                                 color: const Color(0xFFF59E0B),
                                 fontWeight: FontWeight.w700,
-                                fontSize: 12)),
-                      ]),
-                    ),
+                                fontSize: 12,
+                              )),
+                        ]),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 20),
-                // Center icon + title
+                // Center icon
                 Container(
                   width: 60, height: 60,
                   decoration: BoxDecoration(
@@ -218,7 +232,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                       BoxShadow(
                           color: _orange.withOpacity(0.45),
                           blurRadius: 16,
-                          offset: const Offset(0, 6))
+                          offset: const Offset(0, 6)),
                     ],
                   ),
                   child: const Icon(Icons.auto_awesome_rounded,
@@ -235,11 +249,12 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Membre Gold · $_consecutiveMonths mois de régularité',
+                  'Cumulez vos courses et gagnez des récompenses',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: Colors.white.withOpacity(0.55),
                   ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -249,34 +264,91 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
     );
   }
 
-  // ─── Status header ────────────────────────────────────────────────
+  // ─── Content ───────────────────────────────────────────────────────────────
 
-  Widget _buildStatusHeader() {
+  Widget _buildContent() {
+    final cashback = _loyalty?.cashbackProgram;
+    final travel = _loyalty?.travelProgram;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildStatChips(cashback, travel),
+          const SizedBox(height: 20),
+          if (cashback != null) _buildPrimaryCard(cashback),
+          const SizedBox(height: 20),
+          _sectionLabel('Récompenses', Icons.card_giftcard_rounded),
+          const SizedBox(height: 12),
+          if (cashback == null && travel == null)
+            _buildEmptyPrograms()
+          else ...[
+            if (cashback != null) _buildMilestoneCard(
+              program: cashback,
+              icon: Icons.account_balance_wallet_rounded,
+              iconColor: const Color(0xFF22C55E),
+            ),
+            if (cashback != null && travel != null) const SizedBox(height: 12),
+            if (travel != null) _buildMilestoneCard(
+              program: travel,
+              icon: Icons.flight_takeoff_rounded,
+              iconColor: _orange,
+            ),
+          ],
+          const SizedBox(height: 24),
+          _sectionLabel('Destinations suggérées', Icons.explore_rounded),
+          const SizedBox(height: 6),
+          Text(
+            'Basé sur votre localisation (Afrique du Nord)',
+            style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
+          ),
+          const SizedBox(height: 14),
+          _buildDestinations(),
+          const SizedBox(height: 24),
+          _sectionLabel('Niveaux de fidélité', Icons.emoji_events_rounded),
+          const SizedBox(height: 14),
+          _buildLevels(cashback),
+        ],
+      ),
+    );
+  }
+
+  // ─── Stat chips ────────────────────────────────────────────────────────────
+
+  Widget _buildStatChips(
+      ClientLoyaltyProgram? cashback, ClientLoyaltyProgram? travel) {
+    final totalTrips = cashback?.totalTrips ?? 0;
+    final cashbackPct =
+        cashback != null ? '${(cashback.progressPercent * 100).toInt()}%' : '--';
+    final travelPct =
+        travel != null ? '${(travel.progressPercent * 100).toInt()}%' : '--';
+
     return Row(
       children: [
         Expanded(
           child: _statMini(
             icon: Icons.route_rounded,
-            value: '$_tripsThisMonth',
-            label: 'Courses ce mois',
+            value: '$totalTrips',
+            label: 'Courses totales',
             color: const Color(0xFF3B82F6),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _statMini(
-            icon: Icons.calendar_today_rounded,
-            value: '$_consecutiveMonths',
-            label: 'Mois consécutifs',
-            color: const Color(0xFFF59E0B),
+            icon: Icons.account_balance_wallet_rounded,
+            value: cashbackPct,
+            label: 'Cashback',
+            color: const Color(0xFF22C55E),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _statMini(
-            icon: Icons.star_rounded,
-            value: 'Gold',
-            label: 'Niveau actuel',
+            icon: Icons.flight_takeoff_rounded,
+            value: travelPct,
+            label: 'Voyage',
             color: _orange,
           ),
         ),
@@ -301,8 +373,9 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
         Container(
           width: 32, height: 32,
           decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(9)),
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(9),
+          ),
           child: Icon(icon, color: color, size: 16),
         ),
         const SizedBox(height: 6),
@@ -311,19 +384,18 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                 fontSize: 14, fontWeight: FontWeight.w800, color: color)),
         Text(label,
             style: GoogleFonts.poppins(
-                fontSize: 9,
-                color: _textSecondary,
-                fontWeight: FontWeight.w500),
+                fontSize: 9, color: _textSecondary, fontWeight: FontWeight.w500),
             textAlign: TextAlign.center),
       ]),
     );
   }
 
-  // ─── Monthly goal card ────────────────────────────────────────────
+  // ─── Primary card (cashback objective) ────────────────────────────────────
 
-  Widget _buildGoalCard() {
-    final progress = _tripsThisMonth / _monthlyGoal;
-    final remaining = _monthlyGoal - _tripsThisMonth;
+  Widget _buildPrimaryCard(ClientLoyaltyProgram p) {
+    final progress = p.progressPercent;
+    final isCompleted = p.isCompleted;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -344,22 +416,22 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Objectif mensuel',
-                style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white)),
+            Text(
+              p.title,
+              style: GoogleFonts.poppins(
+                  fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+            ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: _orange.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text('$_tripsThisMonth / $_monthlyGoal',
-                  style: GoogleFonts.poppins(
-                      color: _orangeLight,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12)),
+              child: Text(
+                '${p.totalTrips} / ${p.targetTrips}',
+                style: GoogleFonts.poppins(
+                    color: _orangeLight, fontWeight: FontWeight.w700, fontSize: 12),
+              ),
             ),
           ],
         ),
@@ -373,18 +445,17 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
             ),
           ),
           FractionallySizedBox(
-            widthFactor: progress.clamp(0.0, 1.0),
+            widthFactor: progress,
             child: Container(
               height: 10,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [_orange, _orangeLight]),
+                gradient: const LinearGradient(colors: [_orange, _orangeLight]),
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
                       color: _orange.withOpacity(0.5),
                       blurRadius: 6,
-                      offset: const Offset(0, 2))
+                      offset: const Offset(0, 2)),
                 ],
               ),
             ),
@@ -392,9 +463,9 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
         ]),
         const SizedBox(height: 10),
         Text(
-          remaining > 0
-              ? 'Plus que $remaining courses pour valider votre étape !'
-              : 'Objectif atteint ce mois-ci ! 🎉',
+          isCompleted
+              ? 'Cashback débloqué ! En attente de traitement 🎉'
+              : 'Plus que ${p.remainingTrips} courses pour décrocher votre cashback !',
           style: GoogleFonts.poppins(
               fontSize: 12, color: Colors.white.withOpacity(0.6)),
         ),
@@ -402,23 +473,25 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
     );
   }
 
-  // ─── Milestone ────────────────────────────────────────────────────
+  // ─── Milestone card ────────────────────────────────────────────────────────
 
-  Widget _buildMilestone({
+  Widget _buildMilestoneCard({
+    required ClientLoyaltyProgram program,
     required IconData icon,
     required Color iconColor,
-    required String title,
-    required String subtitle,
-    required double progress,
-    required String remaining,
-    required Color remainingColor,
   }) {
+    final isCompleted = program.isCompleted;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _border),
+        border: Border.all(
+          color: isCompleted
+              ? const Color(0xFF22C55E).withOpacity(0.3)
+              : _border,
+        ),
       ),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
@@ -432,15 +505,54 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
         const SizedBox(width: 14),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title,
-                style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: _textPrimary)),
-            const SizedBox(height: 2),
-            Text(subtitle,
-                style: GoogleFonts.poppins(
-                    fontSize: 12, color: _textSecondary)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    program.title,
+                    style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1A1F36)),
+                  ),
+                ),
+                if (isCompleted)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.3)),
+                    ),
+                    child: Text('Obtenu',
+                        style: GoogleFonts.poppins(
+                            color: const Color(0xFF22C55E),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700)),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: iconColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Encore ${program.remainingTrips} courses',
+                      style: GoogleFonts.poppins(
+                          color: iconColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Text(
+              '${program.totalTrips} / ${program.targetTrips} courses réalisées',
+              style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
+            ),
             const SizedBox(height: 10),
             Row(children: [
               Expanded(
@@ -448,29 +560,29 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                   Container(
                     height: 6,
                     decoration: BoxDecoration(
-                        color: _border,
-                        borderRadius: BorderRadius.circular(6)),
+                        color: _border, borderRadius: BorderRadius.circular(6)),
                   ),
                   FractionallySizedBox(
-                    widthFactor: progress.clamp(0.0, 1.0),
+                    widthFactor: program.progressPercent,
                     child: Container(
                       height: 6,
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [iconColor, iconColor.withOpacity(0.6)],
-                        ),
+                            colors: [iconColor, iconColor.withOpacity(0.6)]),
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ),
                   ),
                 ]),
               ),
-              const SizedBox(width: 12),
-              Text(remaining,
-                  style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: remainingColor)),
+              const SizedBox(width: 10),
+              Text(
+                '${(program.progressPercent * 100).toInt()}%',
+                style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: iconColor),
+              ),
             ]),
           ]),
         ),
@@ -478,7 +590,57 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
     );
   }
 
-  // ─── Destinations ─────────────────────────────────────────────────
+  // ─── Empty programs state ──────────────────────────────────────────────────
+
+  Widget _buildEmptyPrograms() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _orange.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.card_giftcard_rounded,
+                color: _orange, size: 32),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Programme en cours d\'activation',
+            style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _navy),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Vos récompenses apparaîtront ici dès votre première course réalisée.',
+            style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Destinations ──────────────────────────────────────────────────────────
+
+  // Fallback colors when network image fails
+  static const _destColors = [
+    Color(0xFF1E40AF),
+    Color(0xFF065F46),
+    Color(0xFF7C2D12),
+    Color(0xFF4C1D95),
+  ];
 
   Widget _buildDestinations() {
     return SizedBox(
@@ -493,53 +655,69 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
             margin: const EdgeInsets.only(right: 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              image: DecorationImage(
-                image: NetworkImage(d['image']!),
-                fit: BoxFit.cover,
-              ),
+              color: _destColors[i % _destColors.length],
               boxShadow: [
                 BoxShadow(
                     color: Colors.black.withOpacity(0.15),
                     blurRadius: 12,
-                    offset: const Offset(0, 6))
+                    offset: const Offset(0, 6)),
               ],
             ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.75),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: _orange.withOpacity(0.85),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(d['tag']!,
-                        style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700)),
+                  // Network image with silent fallback
+                  Image.network(
+                    d['image']!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.expand(),
+                    loadingBuilder: (_, child, progress) =>
+                        progress == null ? child : const SizedBox.expand(),
                   ),
-                  const SizedBox(height: 5),
-                  Text(d['name']!,
-                      style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13)),
+                  // Dark gradient overlay
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.75),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Text content
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _orange.withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(d['tag']!,
+                              style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(d['name']!,
+                            style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -549,22 +727,36 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
     );
   }
 
-  // ─── Loyalty levels ───────────────────────────────────────────────
+  // ─── Loyalty levels ────────────────────────────────────────────────────────
 
-  Widget _buildLevels() {
+  Widget _buildLevels(ClientLoyaltyProgram? cashback) {
+    // Determine active level based on progress
+    final pct =
+        cashback != null ? (cashback.progressPercent * 100).toInt() : 0;
+    final activeIdx = pct >= 75
+        ? 3
+        : pct >= 50
+            ? 2
+            : pct >= 25
+                ? 1
+                : 0;
+
     final levels = [
-      {'icon': Icons.emoji_events_rounded, 'label': 'Bronze', 'color': const Color(0xFFCD7F32), 'active': false},
-      {'icon': Icons.emoji_events_rounded, 'label': 'Silver', 'color': const Color(0xFF9BA3B4), 'active': false},
-      {'icon': Icons.stars_rounded, 'label': 'Gold', 'color': const Color(0xFFF59E0B), 'active': true},
-      {'icon': Icons.diamond_rounded, 'label': 'Platinum', 'color': const Color(0xFF3B82F6), 'active': false},
+      {'icon': Icons.emoji_events_rounded, 'label': 'Bronze', 'color': const Color(0xFFCD7F32)},
+      {'icon': Icons.emoji_events_rounded, 'label': 'Silver', 'color': const Color(0xFF9BA3B4)},
+      {'icon': Icons.stars_rounded, 'label': 'Gold', 'color': const Color(0xFFF59E0B)},
+      {'icon': Icons.diamond_rounded, 'label': 'Platinum', 'color': const Color(0xFF8B5CF6)},
     ];
 
     return Row(
-      children: levels.map((l) {
-        final active = l['active'] as bool;
+      children: levels.asMap().entries.map((entry) {
+        final i = entry.key;
+        final l = entry.value;
+        final active = i == activeIdx;
         final color = l['color'] as Color;
         final icon = l['icon'] as IconData;
         final label = l['label'] as String;
+
         return Expanded(
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 250),
@@ -573,14 +765,13 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
             decoration: BoxDecoration(
               color: active ? _navy : Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: active ? _navy : _border),
+              border: Border.all(color: active ? _navy : _border),
               boxShadow: active
                   ? [
                       BoxShadow(
                           color: _navy.withOpacity(0.25),
                           blurRadius: 10,
-                          offset: const Offset(0, 4))
+                          offset: const Offset(0, 4)),
                     ]
                   : [],
             ),
@@ -594,22 +785,19 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon,
-                    color: active ? color : color.withOpacity(0.5),
-                    size: 18),
+                    color: active ? color : color.withOpacity(0.5), size: 18),
               ),
               const SizedBox(height: 6),
               Text(label,
                   style: GoogleFonts.poppins(
                       fontSize: 11,
-                      fontWeight:
-                          active ? FontWeight.w800 : FontWeight.w500,
+                      fontWeight: active ? FontWeight.w800 : FontWeight.w500,
                       color: active ? Colors.white : _textSecondary)),
               if (active) ...[
                 const SizedBox(height: 4),
                 Container(
                   width: 6, height: 6,
-                  decoration: BoxDecoration(
-                      color: _orange, shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: _orange, shape: BoxShape.circle),
                 ),
               ],
             ]),
@@ -619,7 +807,95 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
     );
   }
 
-  // ─── Section label ────────────────────────────────────────────────
+  // ─── Skeleton ──────────────────────────────────────────────────────────────
+
+  Widget _buildSkeleton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: List.generate(
+              3,
+              (_) => Expanded(
+                child: Container(
+                  height: 88,
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const _ShimmerBox(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _skeletonBlock(height: 110),
+          const SizedBox(height: 20),
+          _skeletonBlock(height: 90),
+          const SizedBox(height: 12),
+          _skeletonBlock(height: 90),
+        ],
+      ),
+    );
+  }
+
+  Widget _skeletonBlock({required double height}) => ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          height: height,
+          color: Colors.white,
+          child: const _ShimmerBox(),
+        ),
+      );
+
+  // ─── Error ─────────────────────────────────────────────────────────────────
+
+  Widget _buildError() {
+    return Padding(
+      padding: const EdgeInsets.all(48),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.error_outline_rounded,
+                  color: Colors.red, size: 40),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Impossible de charger votre programme',
+              style: GoogleFonts.poppins(
+                  fontSize: 15, fontWeight: FontWeight.w700, color: _navy),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Réessayer'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _orange,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────────────────────
 
   Widget _sectionLabel(String text, IconData icon) {
     return Row(children: [
@@ -632,5 +908,56 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
               color: _textSecondary,
               letterSpacing: 0.4)),
     ]);
+  }
+}
+
+// ─── Shimmer ──────────────────────────────────────────────────────────────────
+
+class _ShimmerBox extends StatefulWidget {
+  const _ShimmerBox();
+
+  @override
+  State<_ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.linear);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) => Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment(-1.5 + _anim.value * 3, 0),
+            end: Alignment(-0.5 + _anim.value * 3, 0),
+            colors: const [
+              Color(0xFFF1F5F9),
+              Color(0xFFE2E8F0),
+              Color(0xFFF1F5F9),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

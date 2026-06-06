@@ -2,6 +2,27 @@ import 'package:flutter/foundation.dart';
 import '../core/network/http_client.dart';
 import '../models/driver_subscription_models.dart';
 
+class PrivilegeService {
+  static Future<PrivilegeDashboard> getDashboard() async {
+    final response = await HttpClient.get('/m/livreur/subscription/dashboard');
+    final json = response.json;
+    // Double-nested: { data: { message, data: { vip_level, ... } } }
+    final outer = (json['data'] as Map<String, dynamic>?) ?? json;
+    final data = (outer['data'] as Map<String, dynamic>?) ?? outer;
+    return PrivilegeDashboard.fromJson(data);
+  }
+}
+
+class ClientLoyaltyService {
+  static Future<ClientLoyaltyStatus> getStatus() async {
+    final response = await HttpClient.get('/m/client/loyalty/status');
+    final json = response.json;
+    // Possibly wrapped: { data: { active_programs: [...] } }
+    final data = (json['data'] as Map<String, dynamic>?) ?? json;
+    return ClientLoyaltyStatus.fromJson(data);
+  }
+}
+
 class SubscriptionService extends ChangeNotifier {
   static final SubscriptionService _instance = SubscriptionService._internal();
   factory SubscriptionService() => _instance;

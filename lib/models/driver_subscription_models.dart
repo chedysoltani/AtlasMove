@@ -1,3 +1,249 @@
+// ─── Programme Privilège Dashboard ──────────────────────────────────────────
+
+class PrivilegeStats {
+  final int completedTripsThisMonth;
+  final int monthlyConsecutiveMonths;
+  final String currentLevel;
+
+  const PrivilegeStats({
+    required this.completedTripsThisMonth,
+    required this.monthlyConsecutiveMonths,
+    required this.currentLevel,
+  });
+
+  factory PrivilegeStats.fromJson(Map<String, dynamic> json) {
+    return PrivilegeStats(
+      completedTripsThisMonth: int.tryParse(json['completedTripsThisMonth']?.toString() ?? '0') ?? 0,
+      monthlyConsecutiveMonths: int.tryParse(json['monthlyConsecutiveMonths']?.toString() ?? '0') ?? 0,
+      currentLevel: json['currentLevel']?.toString() ?? 'bronze',
+    );
+  }
+}
+
+class PrivilegeMonthlyObjective {
+  final int targetTrips;
+  final int completedTrips;
+  final int remainingTrips;
+  final int targetHours;
+  final int completedHours;
+  final int remainingHours;
+  final double completionPercentage;
+  final String helperMessage;
+
+  const PrivilegeMonthlyObjective({
+    required this.targetTrips,
+    required this.completedTrips,
+    required this.remainingTrips,
+    required this.targetHours,
+    required this.completedHours,
+    required this.remainingHours,
+    required this.completionPercentage,
+    required this.helperMessage,
+  });
+
+  factory PrivilegeMonthlyObjective.fromJson(Map<String, dynamic> json) {
+    return PrivilegeMonthlyObjective(
+      targetTrips: int.tryParse(json['targetTrips']?.toString() ?? '0') ?? 0,
+      completedTrips: int.tryParse(json['completedTrips']?.toString() ?? '0') ?? 0,
+      remainingTrips: int.tryParse(json['remainingTrips']?.toString() ?? '0') ?? 0,
+      targetHours: int.tryParse(json['targetHours']?.toString() ?? '0') ?? 0,
+      completedHours: int.tryParse(json['completedHours']?.toString() ?? '0') ?? 0,
+      remainingHours: int.tryParse(json['remainingHours']?.toString() ?? '0') ?? 0,
+      completionPercentage: double.tryParse(json['completionPercentage']?.toString() ?? '0') ?? 0.0,
+      helperMessage: json['helperMessage']?.toString() ?? '',
+    );
+  }
+}
+
+class PrivilegeFinancials {
+  final double totalSpentSubscriptions;
+  final String currency;
+  final double commissionRate;
+  final int totalTripsCompleted;
+  final double totalCommissionPaid;
+  final double totalDriverEarnings;
+
+  const PrivilegeFinancials({
+    required this.totalSpentSubscriptions,
+    required this.currency,
+    required this.commissionRate,
+    required this.totalTripsCompleted,
+    required this.totalCommissionPaid,
+    required this.totalDriverEarnings,
+  });
+
+  factory PrivilegeFinancials.fromJson(Map<String, dynamic> json) {
+    return PrivilegeFinancials(
+      totalSpentSubscriptions: double.tryParse(json['totalSpentSubscriptions']?.toString() ?? '0') ?? 0.0,
+      currency: json['currency']?.toString() ?? 'USD',
+      commissionRate: double.tryParse(json['commissionRate']?.toString() ?? '0') ?? 0.0,
+      totalTripsCompleted: int.tryParse(json['totalTripsCompleted']?.toString() ?? '0') ?? 0,
+      totalCommissionPaid: double.tryParse(json['totalCommissionPaid']?.toString() ?? '0') ?? 0.0,
+      totalDriverEarnings: double.tryParse(json['totalDriverEarnings']?.toString() ?? '0') ?? 0.0,
+    );
+  }
+}
+
+class PrivilegeReward {
+  final String id;
+  final String title;
+  final String subtitle;
+  final String type; // cashback | travel
+  final int targetMonths;
+  final int completedMonths;
+  final int remainingMonths;
+  final double completionPercentage;
+  final String status;
+
+  const PrivilegeReward({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.type,
+    required this.targetMonths,
+    required this.completedMonths,
+    required this.remainingMonths,
+    required this.completionPercentage,
+    required this.status,
+  });
+
+  factory PrivilegeReward.fromJson(Map<String, dynamic> json) {
+    return PrivilegeReward(
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      subtitle: json['subtitle']?.toString() ?? '',
+      type: json['type']?.toString() ?? 'cashback',
+      targetMonths: int.tryParse(json['targetMonths']?.toString() ?? '0') ?? 0,
+      completedMonths: int.tryParse(json['completedMonths']?.toString() ?? '0') ?? 0,
+      remainingMonths: int.tryParse(json['remainingMonths']?.toString() ?? '0') ?? 0,
+      completionPercentage: double.tryParse(json['completionPercentage']?.toString() ?? '0') ?? 0.0,
+      status: json['status']?.toString() ?? 'in_progress',
+    );
+  }
+}
+
+class PrivilegeDashboard {
+  final String vipLevel;
+  final int score;
+  final int streakMonths;
+  final PrivilegeStats stats;
+  final PrivilegeMonthlyObjective monthlyObjective;
+  final PrivilegeFinancials financials;
+  final List<PrivilegeReward> rewards;
+
+  const PrivilegeDashboard({
+    required this.vipLevel,
+    required this.score,
+    required this.streakMonths,
+    required this.stats,
+    required this.monthlyObjective,
+    required this.financials,
+    required this.rewards,
+  });
+
+  factory PrivilegeDashboard.fromJson(Map<String, dynamic> json) {
+    final rewardsList = (json['rewards'] as List?)
+            ?.map((r) => PrivilegeReward.fromJson(r as Map<String, dynamic>))
+            .toList() ??
+        [];
+    return PrivilegeDashboard(
+      vipLevel: json['vip_level']?.toString() ?? 'silver',
+      score: int.tryParse(json['score']?.toString() ?? '0') ?? 0,
+      streakMonths: int.tryParse(json['streak_months']?.toString() ?? '0') ?? 0,
+      stats: json['stats'] != null
+          ? PrivilegeStats.fromJson(json['stats'] as Map<String, dynamic>)
+          : const PrivilegeStats(completedTripsThisMonth: 0, monthlyConsecutiveMonths: 0, currentLevel: 'bronze'),
+      monthlyObjective: json['monthlyObjective'] != null
+          ? PrivilegeMonthlyObjective.fromJson(json['monthlyObjective'] as Map<String, dynamic>)
+          : const PrivilegeMonthlyObjective(
+              targetTrips: 0, completedTrips: 0, remainingTrips: 0,
+              targetHours: 0, completedHours: 0, remainingHours: 0,
+              completionPercentage: 0, helperMessage: ''),
+      financials: json['financials'] != null
+          ? PrivilegeFinancials.fromJson(json['financials'] as Map<String, dynamic>)
+          : const PrivilegeFinancials(
+              totalSpentSubscriptions: 0, currency: 'USD', commissionRate: 0,
+              totalTripsCompleted: 0, totalCommissionPaid: 0, totalDriverEarnings: 0),
+      rewards: rewardsList,
+    );
+  }
+}
+
+// ─── Client Loyalty Milestones ────────────────────────────────────────────────
+
+class ClientLoyaltyProgram {
+  final String id;
+  final String type; // client_cashback_6m | client_travel_12m
+  final String title;
+  final String startedAt;
+  final String lastEvaluatedAt;
+  final int totalTrips;
+  final double cashbackAccrued;
+  final String status;
+  final int targetTrips;
+
+  const ClientLoyaltyProgram({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.startedAt,
+    required this.lastEvaluatedAt,
+    required this.totalTrips,
+    required this.cashbackAccrued,
+    required this.status,
+    required this.targetTrips,
+  });
+
+  factory ClientLoyaltyProgram.fromJson(Map<String, dynamic> json) {
+    final progress = json['progress'] as Map<String, dynamic>? ?? {};
+    return ClientLoyaltyProgram(
+      id: json['id']?.toString() ?? '',
+      type: json['type']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      startedAt: json['started_at']?.toString() ?? '',
+      lastEvaluatedAt: json['last_evaluated_at']?.toString() ?? '',
+      totalTrips: int.tryParse(progress['total_trips']?.toString() ?? '0') ?? 0,
+      cashbackAccrued: double.tryParse(json['cashback_accrued']?.toString() ?? '0') ?? 0.0,
+      status: json['status']?.toString() ?? 'active',
+      targetTrips: int.tryParse(json['target_trips']?.toString() ?? '0') ?? 0,
+    );
+  }
+
+  int get remainingTrips => (targetTrips - totalTrips).clamp(0, targetTrips);
+  double get progressPercent =>
+      targetTrips > 0 ? (totalTrips / targetTrips).clamp(0.0, 1.0) : 0.0;
+  bool get isCompleted => status == 'completed' || totalTrips >= targetTrips;
+}
+
+class ClientLoyaltyStatus {
+  final List<ClientLoyaltyProgram> activePrograms;
+
+  const ClientLoyaltyStatus({required this.activePrograms});
+
+  factory ClientLoyaltyStatus.fromJson(Map<String, dynamic> json) {
+    final list = (json['active_programs'] as List?) ?? [];
+    return ClientLoyaltyStatus(
+      activePrograms: list
+          .map((p) => ClientLoyaltyProgram.fromJson(p as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  ClientLoyaltyProgram? get cashbackProgram =>
+      activePrograms.cast<ClientLoyaltyProgram?>().firstWhere(
+            (p) => p?.type == 'client_cashback_6m',
+            orElse: () => null,
+          );
+
+  ClientLoyaltyProgram? get travelProgram =>
+      activePrograms.cast<ClientLoyaltyProgram?>().firstWhere(
+            (p) => p?.type == 'client_travel_12m',
+            orElse: () => null,
+          );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 class DriverSubscription {
   final String id;
   final String status; // trial, active, past_due, canceled
