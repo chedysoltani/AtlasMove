@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import '../models/crypto_asset_model.dart';
 import '../utils/app_theme.dart';
@@ -32,9 +33,9 @@ class _DriverCryptoSelectScreenState extends State<DriverCryptoSelectScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Recharger Sélectionner',
-          style: TextStyle(
+        title: Text(
+          'crypto.title'.tr(), // TODO: add translation key for "Recharger Sélectionner"
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.w900,
@@ -62,7 +63,7 @@ class _DriverCryptoSelectScreenState extends State<DriverCryptoSelectScreen> {
                   });
                 },
                 decoration: InputDecoration(
-                  hintText: 'Rechercher une crypto ou un réseau...',
+                  hintText: 'crypto.search_crypto'.tr(),
                   hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                   prefixIcon: Icon(Icons.search_rounded, color: Colors.grey.shade500, size: 20),
                   border: InputBorder.none,

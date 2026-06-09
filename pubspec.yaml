@@ -27,13 +27,25 @@ dependencies:
   flutter_dotenv: ^6.0.1
   google_fonts: ^6.1.0
   socket_io_client: ^2.0.3
+  agora_rtc_engine: ^6.3.0
   qr_flutter: ^4.1.0
+  easy_localization: ^3.0.7
 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/images/atlasmove_logo.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/atlasmove_logo.png"
+
 
 flutter:
   uses-material-design: true
@@ -41,4 +53,5 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/animations/
+    - assets/translations/
     - .env

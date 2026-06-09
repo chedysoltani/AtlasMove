@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/trip_models.dart';
 import '../services/trip_service.dart';
 import '../utils/app_theme.dart';
@@ -92,7 +93,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
       if (mounted) {
         setState(() => _isLoadingMore = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e')),
+          SnackBar(content: Text('common.unknown_error'.tr())),
         );
       }
     }
@@ -163,7 +164,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Historique',
+                        Text('client.trip_history'.tr(),
                           style: GoogleFonts.poppins(
                             fontSize: 18, fontWeight: FontWeight.w800,
                             color: Colors.white)),
@@ -254,7 +255,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                 color: Color(0xFF9BA3B4), size: 36),
           ),
           const SizedBox(height: 14),
-          Text('Aucun trajet trouvé',
+          Text('client.no_trips'.tr(),
             style: GoogleFonts.poppins(
               fontSize: 15, fontWeight: FontWeight.w700,
               color: _dark)),
@@ -274,7 +275,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                 boxShadow: [BoxShadow(color: _orange.withOpacity(0.3),
                     blurRadius: 12, offset: const Offset(0, 4))],
               ),
-              child: Text('Actualiser',
+              child: Text('common.retry'.tr(),
                 style: GoogleFonts.poppins(
                   fontSize: 13, fontWeight: FontWeight.w600,
                   color: Colors.white)),
@@ -302,7 +303,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                   color: Color(0xFFEF4444), size: 32),
             ),
             const SizedBox(height: 14),
-            Text('Erreur de chargement',
+            Text('common.error'.tr(),
               style: GoogleFonts.poppins(
                 fontSize: 15, fontWeight: FontWeight.w700, color: _dark)),
             const SizedBox(height: 6),
@@ -319,7 +320,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                   color: _orange,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Text('Réessayer',
+                child: Text('common.retry'.tr(),
                   style: GoogleFonts.poppins(
                     fontSize: 13, fontWeight: FontWeight.w600,
                     color: Colors.white)),
@@ -384,7 +385,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                         color: Color(0xFFEF4444), size: 20),
                   ),
                   const SizedBox(width: 12),
-                  Text('Annuler la course',
+                  Text('booking.cancel_ride'.tr(),
                     style: GoogleFonts.poppins(
                       fontSize: 16, fontWeight: FontWeight.w700,
                       color: _dark)),
@@ -454,7 +455,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                     maxLines: 2,
                     style: GoogleFonts.poppins(fontSize: 13, color: _dark),
                     decoration: InputDecoration(
-                      hintText: 'Précisez la raison...',
+                      hintText: 'booking.specify_reason'.tr(),
                       hintStyle: GoogleFonts.poppins(
                           fontSize: 13, color: const Color(0xFFCDD3E0)),
                       filled: true,
@@ -489,7 +490,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                               color: const Color(0xFFE2E6EF))),
-                        child: Center(child: Text('Retour',
+                        child: Center(child: Text('common.back'.tr(),
                           style: GoogleFonts.poppins(
                             fontSize: 14, fontWeight: FontWeight.w600,
                             color: const Color(0xFF475569)))),
@@ -504,8 +505,8 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                             ? customCtrl.text.trim()
                             : selectedReason;
                         if (selectedReason == 'Autre' && reason.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                            content: Text('Veuillez préciser la raison.')));
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('common.error'.tr())));
                           return;
                         }
                         setModal(() => isSubmitting = true);
@@ -514,7 +515,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                           if (mounted) {
                             Navigator.pop(context);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: const Text('Course annulée.'),
+                              SnackBar(content: Text('booking.ride_cancelled_success'.tr()),
                                   backgroundColor: AppTheme.successColor));
                             _loadHistory();
                           }
@@ -522,7 +523,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                           if (mounted) {
                             setModal(() => isSubmitting = false);
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Erreur: $e'),
+                              SnackBar(content: Text('common.unknown_error'.tr()),
                                   backgroundColor: AppTheme.errorColor));
                           }
                         }
@@ -540,7 +541,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                           ? const SizedBox(width: 20, height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2.5,
                                 valueColor: AlwaysStoppedAnimation(Colors.white)))
-                          : Text('Confirmer',
+                          : Text('booking.cancel_ride_confirm'.tr(),
                               style: GoogleFonts.poppins(
                                 fontSize: 14, fontWeight: FontWeight.w600,
                                 color: Colors.white))),
@@ -744,7 +745,7 @@ class TripHistoryCard extends StatelessWidget {
                       const Icon(Icons.cancel_rounded,
                           color: Color(0xFFEF4444), size: 16),
                       const SizedBox(width: 6),
-                      Text('Annuler cette course',
+                      Text('booking.cancel_ride'.tr(),
                         style: GoogleFonts.poppins(
                           fontSize: 12, fontWeight: FontWeight.w600,
                           color: const Color(0xFFEF4444))),
@@ -761,13 +762,13 @@ class TripHistoryCard extends StatelessWidget {
 
   (String, Color) _statusInfo(String s) {
     switch (s) {
-      case 'completed': return ('Terminé', const Color(0xFF22C55E));
-      case 'cancelled': return ('Annulé', const Color(0xFFEF4444));
-      case 'accepted': return ('Accepté', const Color(0xFF3B82F6));
+      case 'completed': return ('common.completed'.tr(), const Color(0xFF22C55E));
+      case 'cancelled': return ('common.cancelled'.tr(), const Color(0xFFEF4444));
+      case 'accepted': return ('common.accepted'.tr(), const Color(0xFF3B82F6));
       case 'started':
-      case 'in_progress': return ('En cours', _orange);
+      case 'in_progress': return ('common.in_progress'.tr(), _orange);
       case 'pending':
-      case 'searching': return ('En attente', const Color(0xFF9BA3B4));
+      case 'searching': return ('common.pending'.tr(), const Color(0xFF9BA3B4));
       default: return (s, const Color(0xFF9BA3B4));
     }
   }

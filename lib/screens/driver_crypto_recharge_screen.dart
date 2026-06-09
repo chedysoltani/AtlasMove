@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -23,10 +24,10 @@ class _DriverCryptoRechargeScreenState extends State<DriverCryptoRechargeScreen>
 
     // Fallback de sécurité si l'argument est manquant
     if (asset == null) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0F1017),
+      return Scaffold(
+        backgroundColor: const Color(0xFF0F1017),
         body: Center(
-          child: Text('Chargement...', style: TextStyle(color: Colors.white)),
+          child: Text('common.loading'.tr(), style: const TextStyle(color: Colors.white)),
         ),
       );
     }
@@ -40,9 +41,9 @@ class _DriverCryptoRechargeScreenState extends State<DriverCryptoRechargeScreen>
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Recharge',
-          style: TextStyle(
+        title: Text(
+          'crypto.title'.tr(),
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.w900,
@@ -107,9 +108,9 @@ class _DriverCryptoRechargeScreenState extends State<DriverCryptoRechargeScreen>
                       child: Container(
                         constraints: const BoxConstraints(minHeight: 52),
                         alignment: Alignment.center,
-                        child: const Text(
-                          'Recharge terminée',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        child: Text(
+                          'sub.pay_crypto_btn'.tr(), // TODO: add translation key for "Recharge terminée"
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -143,9 +144,9 @@ class _DriverCryptoRechargeScreenState extends State<DriverCryptoRechargeScreen>
       ),
       child: Column(
         children: [
-          const Text(
-            'Sélectionnez le réseau principal',
-            style: TextStyle(
+          Text(
+            'crypto.title'.tr(), // TODO: add translation key for "Sélectionnez le réseau principal"
+            style: const TextStyle(
               color: Colors.white70,
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -198,11 +199,11 @@ class _DriverCryptoRechargeScreenState extends State<DriverCryptoRechargeScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            'Adresse de dépôt',
-            style: TextStyle(
+            'payment.method'.tr(), // TODO: add translation key for "Adresse de dépôt"
+            style: const TextStyle(
               color: Colors.white70,
               fontSize: 13,
               fontWeight: FontWeight.w500,
@@ -249,7 +250,7 @@ class _DriverCryptoRechargeScreenState extends State<DriverCryptoRechargeScreen>
                   HapticFeedback.lightImpact();
                 },
                 child: Text(
-                  _copied ? 'Copié !' : 'Copie',
+                  _copied ? 'common.copied'.tr() : 'common.copy'.tr(),
                   style: TextStyle(
                     color: _copied ? AppTheme.successColor : const Color(0xFF009387),
                     fontWeight: FontWeight.bold,
@@ -269,12 +270,12 @@ class _DriverCryptoRechargeScreenState extends State<DriverCryptoRechargeScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          children: const [
-            Icon(Icons.info_outline_rounded, color: Colors.white70, size: 18),
-            SizedBox(width: 8),
+          children: [
+            const Icon(Icons.info_outline_rounded, color: Colors.white70, size: 18),
+            const SizedBox(width: 8),
             Text(
-              'Rappel chaleureux',
-              style: TextStyle(
+              'common.contact_support'.tr(), // TODO: add translation key for "Rappel chaleureux"
+              style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
@@ -316,9 +317,9 @@ class _DriverCryptoRechargeScreenState extends State<DriverCryptoRechargeScreen>
               strokeWidth: 5,
             ),
             const SizedBox(height: 30),
-            const Text(
-              'Vérification Blockchain',
-              style: TextStyle(
+            Text(
+              'common.loading'.tr(), // TODO: add translation key for "Vérification Blockchain"
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
@@ -357,13 +358,13 @@ class _DriverCryptoRechargeScreenState extends State<DriverCryptoRechargeScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
-            children: const [
-              Icon(Icons.verified_rounded, color: Colors.white),
-              SizedBox(width: 10),
+            children: [
+              const Icon(Icons.verified_rounded, color: Colors.white),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Abonnement activé avec succès ! Merci de faire confiance à AtlasMove.',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  'common.active'.tr(), // TODO: add translation key for "Abonnement activé avec succès ! Merci de faire confiance à AtlasMove."
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ],

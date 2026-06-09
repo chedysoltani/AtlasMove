@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:math' as math;
 import 'dart:async';
@@ -13,6 +14,7 @@ import '../widgets/error_widget.dart';
 import '../services/location_service.dart';
 import '../services/geocoding_service.dart';
 import '../services/trip_service.dart';
+import '../services/notification_service.dart';
 import '../providers/cards_provider.dart';
 import '../models/card_models.dart';
 import 'client_active_ride_screen.dart';
@@ -192,6 +194,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
   @override
   void dispose() {
+    NotificationService.onTripCancelledReceived = null;
     _offersTimer?.cancel();
     _debounceTimer?.cancel();
     _clearMapRoute();
@@ -238,9 +241,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         if (suggestions.isEmpty && query.length >= 3) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Aucun résultat trouvé. Essayez une autre recherche.'),
-                duration: Duration(seconds: 2),
+              SnackBar(
+                content: Text('booking.no_results'.tr()),
+                duration: const Duration(seconds: 2),
               ),
             );
           }
@@ -250,9 +253,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       if (mounted) {
         setState(() => _isSearching = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erreur lors de la recherche. Veuillez réessayer.'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text('booking.search_error'.tr()),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -288,14 +291,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       } else if (mounted) {
         setState(() => _isSearching = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Adresse non trouvée')),
+          SnackBar(content: Text('booking.address_not_found'.tr())),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSearching = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur lors de la recherche de l\'adresse')),
+          SnackBar(content: Text('booking.address_search_error'.tr())),
         );
       }
     }
@@ -318,7 +321,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur lors du calcul de l\'itinéraire')),
+          SnackBar(content: Text('booking.route_calc_error'.tr())),
         );
       }
     }
@@ -370,13 +373,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     final pickupMarker = Marker(
       markerId: const MarkerId('pickup'),
       position: start,
-      infoWindow: const InfoWindow(title: 'Point de départ'),
+      infoWindow: InfoWindow(title: 'booking.departure'.tr()),
       icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
     );
     final destinationMarker = Marker(
       markerId: const MarkerId('destination'),
       position: end,
-      infoWindow: const InfoWindow(title: 'Destination'),
+      infoWindow: InfoWindow(title: 'booking.destination'.tr()),
       icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
     );
     final routePolyline = Polyline(
@@ -406,17 +409,17 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       if (_selectedService == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Veuillez sélectionner un service'), backgroundColor: _AppColors.red),
+            SnackBar(content: Text('booking.select_service'.tr()), backgroundColor: _AppColors.red),
           );
         }
         return;
       }
-      
+
       // 2. Validation de la Destination
       if (_destinationCoordinates == null || _estimatedDistance == null || _estimatedDuration == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Veuillez sélectionner une destination'), backgroundColor: _AppColors.red),
+            SnackBar(content: Text('booking.destination'.tr()), backgroundColor: _AppColors.red),
           );
         }
         return;
@@ -427,7 +430,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       if (mapState.currentPosition == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Position actuelle non disponible'), backgroundColor: _AppColors.red),
+            SnackBar(content: Text('booking.departure_hint'.tr()), backgroundColor: _AppColors.red),
           );
         }
         return;
@@ -446,7 +449,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       _pickupCoordinates = mapState.currentPosition;
       final response = await TripService.createTrip(
         serviceId: _selectedService!.id,
-        pickupAddress: 'Position actuelle',
+        pickupAddress: 'booking.current_position'.tr(),
         pickupLatitude: mapState.currentPosition!.latitude,
         pickupLongitude: mapState.currentPosition!.longitude,
         destinationAddress: _destinationController.text,
@@ -474,7 +477,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       if (mounted) {
         setState(() => _tripError = e.toString());
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: ${e.toString()}'), backgroundColor: _AppColors.red),
+          SnackBar(content: Text('common.unknown_error'.tr()), backgroundColor: _AppColors.red),
         );
       }
     } finally {
@@ -486,6 +489,15 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   }
 
   void _startBidsPolling(String tripId) {
+    // Listen for backend trip.cancelled socket event (timeout or all drivers refused)
+    NotificationService.onTripCancelledReceived = (data) {
+      final incomingId = data['tripId']?.toString() ?? '';
+      if (incomingId != tripId) return;
+      NotificationService.onTripCancelledReceived = null;
+      _offersTimer?.cancel();
+      if (mounted) _showTripExpiredDialog();
+    };
+
     _offersTimer?.cancel();
     _offersTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
       if (!mounted || _tripResponse == null) {
@@ -526,8 +538,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       final tripItem = activeTrip ?? TripHistoryItem(
         id: tripId,
         status: 'pending',
-        pickupAddress: 'Position actuelle',
-        destinationAddress: 'Destination',
+        pickupAddress: 'booking.current_position'.tr(),
+        destinationAddress: 'booking.destination'.tr(),
         serviceName: 'Moto standard',
         estimatedFare: offers.isNotEmpty ? offers.first.proposedFare : 4.50,
         currency: 'TND',
@@ -667,15 +679,15 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               ),
               const SizedBox(width: 14),
               // Title
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('Créer une course', style: _AppTextStyles.headerTitle),
-                    SizedBox(height: 2),
+                    Text('client.create_ride'.tr(), style: _AppTextStyles.headerTitle),
+                    const SizedBox(height: 2),
                     Text(
-                      'Sélectionnez votre destination',
+                      'booking.destination_hint'.tr(),
                       style: _AppTextStyles.headerSubtitle,
                     ),
                   ],
@@ -720,9 +732,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
-                    'Estimation du trajet',
-                    style: TextStyle(
+                  Text(
+                    'booking.route_estimate'.tr(),
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: _AppColors.gray900,
@@ -766,7 +778,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                       child: _StatCell(
                         icon: Icons.straighten_rounded,
                         value: '${_estimatedDistance!.toStringAsFixed(1)} km',
-                        label: 'Distance',
+                        label: 'booking.distance'.tr(),
                       ),
                     ),
                     Container(width: 1, height: 40, color: _AppColors.gray200),
@@ -774,7 +786,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                       child: _StatCell(
                         icon: Icons.access_time_rounded,
                         value: _estimatedDuration!,
-                        label: 'Durée estimée',
+                        label: 'booking.estimated_duration'.tr(),
                       ),
                     ),
                   ],
@@ -801,7 +813,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             onTap: () {
               if (mapState.currentPosition != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Position centrée')),
+                  SnackBar(content: Text('booking.position_centered'.tr())),
                 );
               }
             },
@@ -821,8 +833,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(mapState.isFollowingUser
-                      ? 'Suivi GPS désactivé'
-                      : 'Suivi GPS activé'),
+                      ? 'booking.gps_disabled'.tr()
+                      : 'booking.gps_enabled'.tr()),
                 ),
               );
             },
@@ -844,7 +856,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   // ── Error ──────────────────────────────────────────────────────────────────
   Widget _buildErrorWidget(MapState mapState) {
     return LocationErrorWidget(
-      message: mapState.errorMessage ?? 'Une erreur est survenue',
+      message: mapState.errorMessage ?? 'common.unknown_error'.tr(),
       status: mapState.status,
       onRetry: () => ref.read(mapProvider.notifier).retry(),
       onOpenSettings: () {
@@ -951,9 +963,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (!_isDestinationFocused) ...[
-              const Text(
-                'Où allons-nous aujourd\'hui ?',
-                style: TextStyle(
+              Text(
+                'booking.destination_hint'.tr(),
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: _AppColors.gray900,
@@ -1156,19 +1168,19 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
+                      children: [
                         Text(
-                          'Course créée avec succès !',
-                          style: TextStyle(
+                          'booking.ride_completed'.tr(),
+                          style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
-                          'Merci d\'utiliser AtlasMove.',
-                          style: TextStyle(
+                          'booking.thanks_message'.tr(),
+                          style: const TextStyle(
                             fontSize: 12,
                             color: _AppColors.primary,
                             fontWeight: FontWeight.w600,
@@ -1199,9 +1211,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Tarif estimé',
-                          style: TextStyle(
+                        Text(
+                          'booking.confirm_booking'.tr(),
+                          style: const TextStyle(
                             fontSize: 12,
                             color: _AppColors.gray600,
                             fontWeight: FontWeight.w600,
@@ -1241,7 +1253,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                       Expanded(
                         child: _buildTripInfoItem(
                           icon: Icons.route_rounded,
-                          label: 'Distance',
+                          label: 'booking.distance'.tr(),
                           value: '${_estimatedDistance?.toStringAsFixed(1)} km',
                         ),
                       ),
@@ -1249,7 +1261,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                       Expanded(
                         child: _buildTripInfoItem(
                           icon: Icons.access_time_rounded,
-                          label: 'Durée',
+                          label: 'booking.estimated_duration'.tr(),
                           value: _estimatedDuration ?? '-',
                         ),
                       ),
@@ -1257,8 +1269,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                       Expanded(
                         child: _buildTripInfoItem(
                           icon: _paymentType == 'card' ? Icons.credit_card_rounded : Icons.payments_rounded,
-                          label: 'Paiement',
-                          value: _paymentType == 'card' ? 'Carte' : 'Espèces',
+                          label: 'booking.payment'.tr(),
+                          value: _paymentType == 'card' ? 'nav.cards'.tr() : 'booking.cash'.tr(),
                         ),
                       ),
                     ],
@@ -1334,14 +1346,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                         elevation: 3,
                         shadowColor: _AppColors.primary.withOpacity(0.3),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.map_rounded, size: 18),
-                          SizedBox(width: 8),
+                          const Icon(Icons.map_rounded, size: 18),
+                          const SizedBox(width: 8),
                           Text(
-                            'Suivre ma course',
-                            style: TextStyle(
+                            'client.trip_history'.tr(),
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
@@ -1368,12 +1380,12 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
-              children: const [
-                Icon(Icons.gavel_rounded, size: 14, color: _AppColors.primary),
-                SizedBox(width: 6),
+              children: [
+                const Icon(Icons.gavel_rounded, size: 14, color: _AppColors.primary),
+                const SizedBox(width: 6),
                 Text(
-                  'Offres des chauffeurs',
-                  style: TextStyle(
+                  'booking.driver_found'.tr(),
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: _AppColors.gray900,
@@ -1388,7 +1400,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                '${_driverOffers.length} offre(s)',
+                'booking.offers_count'.tr(namedArgs: {'count': '${_driverOffers.length}'}),
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
@@ -1409,8 +1421,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               border: Border.all(color: _AppColors.gray100),
             ),
             child: Column(
-              children: const [
-                SizedBox(
+              children: [
+                const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
@@ -1418,10 +1430,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                     valueColor: AlwaysStoppedAnimation(_AppColors.primary),
                   ),
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 Text(
-                  'Recherche de chauffeurs à proximité...',
-                  style: TextStyle(fontSize: 11, color: _AppColors.gray400),
+                  'booking.searching_driver'.tr(),
+                  style: const TextStyle(fontSize: 11, color: _AppColors.gray400),
                 ),
               ],
             ),
@@ -1534,7 +1546,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                         });
                       } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Erreur: $e'), backgroundColor: _AppColors.red),
+                          SnackBar(content: Text('common.unknown_error'.tr()), backgroundColor: _AppColors.red),
                         );
                       }
                     },
@@ -1558,9 +1570,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                         color: _AppColors.accentLight,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
-                        'Contre',
-                        style: TextStyle(
+                      child: Text(
+                        'rdv.refuse'.tr(),
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: _AppColors.accentMid,
@@ -1597,7 +1609,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                         );
                       } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Erreur: $e'), backgroundColor: _AppColors.red),
+                          SnackBar(content: Text('common.unknown_error'.tr()), backgroundColor: _AppColors.red),
                         );
                       }
                     },
@@ -1607,9 +1619,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                         color: _AppColors.primary,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
-                        'Accepter',
-                        style: TextStyle(
+                      child: Text(
+                        'driver.accept'.tr(),
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -1656,9 +1668,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Contre-proposer un tarif',
-                    style: TextStyle(
+                  Text(
+                    'booking.counter_propose'.tr(),
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: _AppColors.gray900,
@@ -1666,7 +1678,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Chauffeur: ${offer.driverName} (Proposé: ${offer.proposedFare.toStringAsFixed(2)} TND)',
+                    'booking.driver_offer_detail'.tr(namedArgs: {'name': offer.driverName, 'amount': offer.proposedFare.toStringAsFixed(2)}),
                     style: const TextStyle(fontSize: 12, color: _AppColors.gray400),
                   ),
                   const SizedBox(height: 20),
@@ -1734,7 +1746,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                           await TripService.counterOffer(offer.id, counterFare);
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Contre-proposition envoyée !'), backgroundColor: _AppColors.green),
+                            SnackBar(content: Text('rdv.confirmed'.tr()), backgroundColor: _AppColors.green),
                           );
                           final offers = await TripService.getTripOffers(_tripResponse!.data!.id);
                           setState(() {
@@ -1742,13 +1754,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                           });
                         } catch (e) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Erreur: $e'), backgroundColor: _AppColors.red),
+                            SnackBar(content: Text('common.unknown_error'.tr()), backgroundColor: _AppColors.red),
                           );
                         }
                       },
-                      child: const Text(
-                        'Envoyer la contre-proposition',
-                        style: TextStyle(
+                      child: Text(
+                        'common.confirm'.tr(),
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -1831,22 +1843,22 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   String _getStatusText(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return 'En attente';
+        return 'common.pending'.tr();
       case 'searching':
-        return 'Recherche de livreur';
+        return 'booking.searching_driver'.tr();
       case 'accepted':
-        return 'Course acceptée';
+        return 'common.pending'.tr();
       case 'arriving':
       case 'livreur_en_route':
-        return 'Livreur en route';
+        return 'booking.driver_en_route'.tr();
       case 'in_progress':
-        return 'Course en cours';
+        return 'booking.ride_in_progress'.tr();
       case 'completed':
-        return 'Course terminée';
+        return 'booking.ride_completed'.tr();
       case 'cancelled':
-        return 'Course annulée';
+        return 'common.cancelled'.tr();
       default:
-        return 'En attente';
+        return 'common.pending'.tr();
     }
   }
   Widget _buildDestinationInput() {
@@ -1879,7 +1891,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               color: _AppColors.gray900,
             ),
             decoration: InputDecoration(
-              hintText: 'Saisissez votre destination...',
+              hintText: 'booking.destination_hint'.tr(),
               hintStyle: const TextStyle(
                 fontSize: 15,
                 color: _AppColors.gray400,
@@ -1925,9 +1937,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             children: [
               const Icon(Icons.search_rounded, size: 15, color: _AppColors.gray300),
               const SizedBox(width: 6),
-              const Text(
-                'Tapez pour rechercher une adresse ou un lieu',
-                style: TextStyle(fontSize: 12, color: _AppColors.gray300),
+              Text(
+                'booking.search_address_hint'.tr(),
+                style: const TextStyle(fontSize: 12, color: _AppColors.gray300),
               ),
             ],
           ),
@@ -1985,9 +1997,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  subtitle: const Text(
-                    'Appuyer pour sélectionner',
-                    style: TextStyle(fontSize: 11, color: _AppColors.gray400),
+                  subtitle: Text(
+                    'booking.tap_to_select'.tr(),
+                    style: const TextStyle(fontSize: 11, color: _AppColors.gray400),
                   ),
                   onTap: () => _selectDestination(suggestion),
                 );
@@ -2031,9 +2043,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             ),
           ],
           const Spacer(),
-          const Text(
-            'Trajet calculé',
-            style: TextStyle(fontSize: 11, color: _AppColors.accentMid),
+          Text(
+            'booking.route_calculated'.tr(),
+            style: const TextStyle(fontSize: 11, color: _AppColors.accentMid),
           ),
         ],
       ),
@@ -2046,7 +2058,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       children: [
         Row(
           children: [
-            const Text('SERVICES DISPONIBLES', style: _AppTextStyles.sectionLabel),
+            Text('services.title'.tr().toUpperCase(), style: _AppTextStyles.sectionLabel),
             const Spacer(),
             if (_selectedService != null)
               Container(
@@ -2055,9 +2067,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                   color: _AppColors.greenLight,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text(
-                  'Sélectionné',
-                  style: TextStyle(fontSize: 10, color: _AppColors.green, fontWeight: FontWeight.bold),
+                child: Text(
+                  'common.active'.tr(),
+                  style: const TextStyle(fontSize: 10, color: _AppColors.green, fontWeight: FontWeight.bold),
                 ),
               ),
           ],
@@ -2082,15 +2094,15 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                   const Icon(Icons.error_outline_rounded,
                       color: _AppColors.gray300, size: 28),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Erreur de chargement',
-                    style: TextStyle(fontSize: 12, color: _AppColors.gray400),
+                  Text(
+                    'common.error'.tr(),
+                    style: const TextStyle(fontSize: 12, color: _AppColors.gray400),
                   ),
                   TextButton(
                     onPressed: () =>
                         ref.read(catalogueProvider.notifier).fetchCatalogue(),
-                    child: const Text('Réessayer',
-                        style: TextStyle(fontSize: 12, color: _AppColors.accent)),
+                    child: Text('common.retry'.tr(),
+                        style: const TextStyle(fontSize: 12, color: _AppColors.accent)),
                   ),
                 ],
               ),
@@ -2149,18 +2161,18 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                   const SizedBox(width: 10),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
-                        'Négociation de prix',
-                        style: TextStyle(
+                        'booking.price_negotiation'.tr(),
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: _AppColors.gray900,
                         ),
                       ),
                       Text(
-                        'Proposer votre propre tarif',
-                        style: TextStyle(
+                        'booking.propose_your_fare'.tr(),
+                        style: const TextStyle(
                           fontSize: 11,
                           color: _AppColors.gray400,
                         ),
@@ -2189,9 +2201,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             const SizedBox(height: 16),
             const Divider(height: 1, color: _AppColors.gray200),
             const SizedBox(height: 16),
-            const Text(
-              'Votre proposition de départ :',
-              style: TextStyle(
+            Text(
+              'booking.starting_proposal'.tr(),
+              style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: _AppColors.gray600,
@@ -2270,7 +2282,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                 const Icon(Icons.info_outline_rounded, size: 12, color: _AppColors.gray400),
                 const SizedBox(width: 4),
                 Text(
-                  'Tarif estimé standard : ${defaultPrice.toStringAsFixed(2)} $currency',
+                  'booking.standard_estimated_fare'.tr(namedArgs: {'amount': defaultPrice.toStringAsFixed(2), 'currency': currency ?? ''}),
                   style: const TextStyle(fontSize: 11, color: _AppColors.gray400),
                 ),
               ],
@@ -2295,7 +2307,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                   color: _AppColors.gray200, size: 28),
               const SizedBox(height: 6),
               Text(
-                'Aucun service disponible',
+                'services.no_services'.tr(),
                 style: TextStyle(fontSize: 12, color: Colors.grey[500]),
               ),
             ],
@@ -2396,9 +2408,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        const Text(
-          'Services disponibles',
-          style: TextStyle(
+        Text(
+          'booking.available_services'.tr(),
+          style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
             color: _AppColors.gray900,
@@ -2426,20 +2438,20 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('MODE DE PAIEMENT', style: _AppTextStyles.sectionLabel),
+        Text('booking.payment_mode'.tr(), style: _AppTextStyles.sectionLabel),
         const SizedBox(height: 12),
         Row(
           children: [
             _buildCompactPaymentItem(
               id: 'cash',
-              label: 'Espèces',
+              label: 'booking.cash'.tr(),
               icon: Icons.payments_rounded,
               isSelected: _paymentType == 'cash',
             ),
             const SizedBox(width: 12),
             _buildCompactPaymentItem(
               id: 'card',
-              label: defaultCard != null ? 'Carte' : 'Ajouter une carte',
+              label: defaultCard != null ? 'booking.card'.tr() : 'booking.add_card'.tr(),
               subLabel: defaultCard?.maskedLabel,
               icon: Icons.credit_card_rounded,
               isSelected: _paymentType == 'card',
@@ -2577,25 +2589,77 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     );
   }
 
+  void _showTripExpiredDialog() {
+    // Clear any active trip state
+    setState(() {
+      _tripResponse = null;
+      _driverOffers = [];
+    });
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.hourglass_empty_rounded,
+                  color: Color(0xFFF59E0B), size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('Aucun livreur disponible',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Aucun livreur n\'a pu prendre votre course dans le temps imparti.\n\n'
+          'Vous pouvez relancer une nouvelle demande — les livreurs disponibles la recevront immédiatement.',
+          style: TextStyle(fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('common.cancel'.tr(),
+                style: const TextStyle(color: Color(0xFF9BA3B4))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Réessayer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showNoCardDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Aucune carte enregistrée'),
-        content: const Text(
-          'Vous devez enregistrer une carte bancaire pour utiliser ce mode de paiement.',
-        ),
+        title: Text('booking.no_card_title'.tr()),
+        content: Text('booking.no_card_body'.tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
+            child: Text('common.cancel'.tr()),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/cards');
             },
-            child: const Text('Ajouter une carte'),
+            child: Text('nav.cards'.tr()),
           ),
         ],
       ),
@@ -2761,8 +2825,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                     const SizedBox(width: 10),
                     Text(
                       canCreate
-                          ? 'Confirmer la course'
-                          : 'Choisir une option',
+                          ? 'booking.confirm_booking'.tr()
+                          : 'common.loading'.tr(),
                       style: (canCreate && !_isCreatingTrip)
                           ? _AppTextStyles.ctaLabel.copyWith(fontSize: 16)
                           : _AppTextStyles.ctaLabelDisabled.copyWith(fontSize: 16),

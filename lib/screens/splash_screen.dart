@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../utils/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -115,10 +115,14 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.local_shipping,
-                        size: 60,
-                        color: AppTheme.primaryColor,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.asset(
+                          'assets/images/atlasmove_logo.png',
+                          width: 90,
+                          height: 90,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
                   );
@@ -147,7 +151,7 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Transport & Livraison',
+                            'landing.tagline'.tr(),
                             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: AppTheme.textWhite.withOpacity(0.9),
                               letterSpacing: 1,

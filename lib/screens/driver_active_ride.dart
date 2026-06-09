@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:math' as math;
@@ -13,6 +14,8 @@ import '../providers/map_provider.dart';
 import '../services/location_service.dart';
 import '../services/trip_service.dart';
 import '../services/route_service.dart';
+import '../services/call_service.dart';
+import '../screens/active_call_screen.dart';
 import 'driver_main.dart';
 
 enum RidePhase { arriving, started, completed }
@@ -455,7 +458,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
             () {
                ref.read(mapProvider.notifier).toggleFollowingUser();
                ScaffoldMessenger.of(context).showSnackBar(
-                 SnackBar(content: Text(mapState.isFollowingUser ? 'Suivi GPS désactivé' : 'Suivi GPS activé'))
+                 SnackBar(content: Text(mapState.isFollowingUser ? 'Suivi GPS désactivé' : 'Suivi GPS activé')),
                );
             },
             color: mapState.isFollowingUser ? AppTheme.primaryColor : Colors.black,
@@ -492,7 +495,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     final navColor = isArriving
         ? const Color(0xFF1B5E20)   // vert foncé → vers client
         : const Color(0xFF0D47A1);  // bleu foncé → vers destination
-    final directionLabel = isArriving ? 'Vers le client' : 'Vers la destination';
+    final directionLabel = isArriving ? 'driver.active_ride'.tr() : 'driver.rides_title'.tr();
 
     return Column(
       children: [
@@ -544,7 +547,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
               ),
               // Boutons action
               if (widget.trip.clientPhone != null)
-                _navIconBtn(Icons.phone_rounded, Colors.white, () {}),
+                _navIconBtn(Icons.phone_rounded, Colors.white, _startCallToClient),
               const SizedBox(width: 6),
               _navIconBtn(Icons.close_rounded, Colors.red.shade300,
                   () => _showCancelDialog()),
@@ -553,6 +556,31 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
         ),
       ],
     );
+  }
+
+  Future<void> _startCallToClient() async {
+    final session = await CallService().initiateCall(widget.trip.id);
+    if (session == null) {
+      if (mounted) {
+        final err = CallService().lastError ?? 'Erreur inconnue';
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Impossible de démarrer l\'appel'),
+            content: SelectableText(err),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+          ),
+        );
+      }
+      return;
+    }
+    if (mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ActiveCallScreen(session: session, isOutgoing: true),
+        ),
+      );
+    }
   }
 
   Widget _navIconBtn(IconData icon, Color color, VoidCallback onTap) {
@@ -577,41 +605,41 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Annuler la course'),
+          title: Text('common.cancelled'.tr()),
           content: TextField(
             controller: reasonController,
-            decoration: const InputDecoration(
-              hintText: 'Raison de l\'annulation',
+            decoration: InputDecoration(
+              hintText: 'driver.cancellation_reason'.tr(),
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Retour', style: TextStyle(color: Colors.grey)),
+              child: Text('common.back'.tr(), style: const TextStyle(color: Colors.grey)),
             ),
             TextButton(
               onPressed: () async {
                 if (reasonController.text.trim().isEmpty) return;
-                
+
                 Navigator.pop(context); // Close dialog
-                
+
                 try {
                   await TripService.cancelTrip(widget.trip.id, reasonController.text);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Course annulée.'), backgroundColor: Colors.orange),
+                      SnackBar(content: Text('common.cancelled'.tr()), backgroundColor: Colors.orange),
                     );
                     Navigator.pop(context); // Go back to dashboard
                   }
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+                      SnackBar(content: Text('common.server_error'.tr()), backgroundColor: Colors.red),
                     );
                   }
                 }
               },
-              child: const Text('Confirmer', style: TextStyle(color: Colors.red)),
+              child: Text('common.confirm'.tr(), style: const TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -725,7 +753,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
         Row(
           children: [
             Text(
-              _currentPhase == RidePhase.arriving ? 'Vers le client' : 'Vers la destination',
+              _currentPhase == RidePhase.arriving ? 'driver.active_ride'.tr() : 'driver.rides_title'.tr(),
             // arriving→pickup  |  started/completed→destination
               style: const TextStyle(
                 color: Colors.black87,
@@ -849,19 +877,19 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
     switch (_currentPhase) {
       case RidePhase.arriving:
-        buttonText = 'Arrivé chez le client';
+        buttonText = 'driver.active_ride'.tr();
         onPressed = () {
           _updatePhase(RidePhase.started, 'livreur_en_route');
         };
         break;
       case RidePhase.started:
-        buttonText = 'Démarrer la course';
+        buttonText = 'driver.rides_title'.tr();
         onPressed = () {
           _updatePhase(RidePhase.completed, 'in_progress');
         };
         break;
       case RidePhase.completed:
-        buttonText = 'Terminer la course';
+        buttonText = 'driver.ride_completed'.tr();
         onPressed = () => _completeRide();
         break;
     }
@@ -918,8 +946,8 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
         }
         
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erreur réseau. Action annulée.'),
+          SnackBar(
+            content: Text('common.network_error'.tr()),
             backgroundColor: Colors.red,
           ),
         );
@@ -935,7 +963,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(content: Text('Erreur: impossible de terminer.'), backgroundColor: Colors.red)
+           SnackBar(content: Text('common.server_error'.tr()), backgroundColor: Colors.red)
         );
       }
     }
@@ -963,8 +991,8 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
               child: const Icon(Icons.check_rounded, color: Colors.green, size: 32),
             ),
             const SizedBox(height: 16),
-            const Text('Course terminée !',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('driver.ride_completed'.tr(),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Text(widget.trip.destinationAddress,
               textAlign: TextAlign.center,
@@ -975,7 +1003,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
               children: [
                 _summaryTile('Distance', '${widget.trip.estimatedDistanceKm.toStringAsFixed(1)} km'),
                 _summaryTile('Durée', _estimatedTime),
-                _summaryTile('Gain', '${widget.trip.estimatedFare.toStringAsFixed(2)} ${widget.trip.currency}'),
+                _summaryTile('nav.earnings'.tr(), '${widget.trip.estimatedFare.toStringAsFixed(2)} ${widget.trip.currency}'),
               ],
             ),
             const SizedBox(height: 24),
@@ -994,8 +1022,8 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
                     (route) => false,
                   );
                 },
-                child: const Text('Retour au tableau de bord',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text('driver.dashboard_title'.tr(),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -1017,11 +1045,11 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   String _getPhaseMessage(RidePhase phase) {
     switch (phase) {
       case RidePhase.arriving:
-        return 'En route vers le client...';
+        return 'driver.active_ride'.tr();
       case RidePhase.started:
-        return 'Arrivé chez le client. Démarrez la course !';
+        return 'driver.active_ride'.tr();
       case RidePhase.completed:
-        return 'Course en cours — en route vers la destination !';
+        return 'driver.ride_completed'.tr();
     }
   }
 

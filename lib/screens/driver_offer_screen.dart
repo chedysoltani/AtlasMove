@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/driver_subscription_models.dart';
@@ -87,13 +88,13 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
   String _vipLabel(String level) {
     switch (level.toLowerCase()) {
       case 'gold':
-        return 'Elite Gold';
+        return 'privilege.vip_gold'.tr();
       case 'platinum':
-        return 'Elite Platinum';
+        return 'privilege.vip_platinum'.tr();
       case 'silver':
-        return 'Elite Silver';
+        return 'privilege.vip_silver'.tr();
       default:
-        return 'Bronze';
+        return 'privilege.vip_bronze'.tr();
     }
   }
 
@@ -271,7 +272,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                                 border: Border.all(color: _orange.withOpacity(0.4)),
                               ),
                               child: Text(
-                                '${_data!.score} pts',
+                                'privilege.score'.tr(namedArgs: {'score': _data!.score.toString()}),
                                 style: const TextStyle(
                                   color: _orange,
                                   fontSize: 11,
@@ -283,9 +284,9 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                         ],
                       ),
                       const SizedBox(height: 10),
-                      const Text(
-                        'Programme Privilège',
-                        style: TextStyle(
+                      Text(
+                        'privilege.title'.tr(),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 22,
                           fontWeight: FontWeight.w900,
@@ -294,7 +295,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Membre $currentLevel · $streakMonths mois de régularité',
+                        'privilege.subtitle'.tr(namedArgs: {'level': currentLevel, 'months': streakMonths.toString()}),
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.65),
                           fontSize: 13,
@@ -355,7 +356,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
         Expanded(
           child: _statChip(
             icon: Icons.directions_car_rounded,
-            label: 'Ce mois',
+            label: 'privilege.this_month'.tr(),
             value: '${data.stats.completedTripsThisMonth}',
             color: const Color(0xFF3B82F6),
           ),
@@ -364,8 +365,8 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
         Expanded(
           child: _statChip(
             icon: Icons.local_fire_department_rounded,
-            label: 'Régularité',
-            value: '${data.stats.monthlyConsecutiveMonths} mois',
+            label: 'privilege.regularity'.tr(),
+            value: 'privilege.months_streak'.tr(namedArgs: {'count': data.stats.monthlyConsecutiveMonths.toString()}),
             color: const Color(0xFFF59E0B),
           ),
         ),
@@ -373,7 +374,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
         Expanded(
           child: _statChip(
             icon: Icons.workspace_premium_rounded,
-            label: 'Niveau',
+            label: 'privilege.level'.tr(),
             value: data.stats.currentLevel.toUpperCase(),
             color: _vipColor(data.vipLevel),
           ),
@@ -441,7 +442,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionLabel('Objectif mensuel'),
+        _sectionLabel('privilege.monthly_obj'.tr()),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(20),
@@ -469,7 +470,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'courses réalisées',
+                        'privilege.trips_done'.tr(),
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.55),
                           fontSize: 12,
@@ -555,7 +556,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Heures actives',
+                              'privilege.hours_active'.tr(),
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.5),
                                 fontSize: 10,
@@ -573,7 +574,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                         ),
                       ),
                       Text(
-                        'Encore ${obj.remainingHours}h',
+                        'privilege.hours_remaining'.tr(namedArgs: {'h': obj.remainingHours.toString()}),
                         style: const TextStyle(
                           color: _orange,
                           fontSize: 11,
@@ -598,7 +599,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionLabel('Récompenses'),
+        _sectionLabel('privilege.rewards'.tr()),
         const SizedBox(height: 12),
         ...rewards.map(_buildRewardCard),
       ],
@@ -665,9 +666,9 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                           border: Border.all(
                               color: const Color(0xFF10B981).withOpacity(0.3)),
                         ),
-                        child: const Text(
-                          'Obtenu',
-                          style: TextStyle(
+                        child: Text(
+                          'privilege.reward_obtained'.tr(),
+                          style: const TextStyle(
                             color: Color(0xFF10B981),
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
@@ -683,7 +684,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          'Encore ${r.remainingMonths} mois',
+                          'privilege.reward_months_left'.tr(namedArgs: {'months': r.remainingMonths.toString()}),
                           style: TextStyle(
                             color: color,
                             fontSize: 10,
@@ -734,7 +735,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionLabel('Résumé financier'),
+        _sectionLabel('privilege.financial_summary'.tr()),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(18),
@@ -754,14 +755,14 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
             children: [
               _finRow(
                 icon: Icons.trending_up_rounded,
-                label: 'Gains totaux',
+                label: 'privilege.total_earnings'.tr(),
                 value: '${f.totalDriverEarnings.toStringAsFixed(2)} ${f.currency}',
                 color: const Color(0xFF10B981),
               ),
               const Divider(height: 20, indent: 44),
               _finRow(
                 icon: Icons.pie_chart_rounded,
-                label: 'Commission payée (${_commissionRateLabel(f.commissionRate)})',
+                label: 'privilege.commission_paid'.tr(namedArgs: {'rate': _commissionRateLabel(f.commissionRate)}),
                 value: '${f.totalCommissionPaid.toStringAsFixed(2)} ${f.currency}',
                 color: _orange,
               ),
@@ -769,7 +770,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                 const Divider(height: 20, indent: 44),
                 _finRow(
                   icon: Icons.receipt_long_rounded,
-                  label: 'Abonnements payés',
+                  label: 'privilege.subscriptions_paid'.tr(),
                   value: '${f.totalSpentSubscriptions.toStringAsFixed(2)} ${f.currency}',
                   color: const Color(0xFF3B82F6),
                 ),
@@ -777,7 +778,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
               const Divider(height: 20, indent: 44),
               _finRow(
                 icon: Icons.local_taxi_rounded,
-                label: 'Courses totales',
+                label: 'privilege.total_trips'.tr(),
                 value: '${f.totalTripsCompleted}',
                 color: const Color(0xFF8B5CF6),
               ),
@@ -896,9 +897,9 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                   color: Colors.red, size: 40),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Impossible de charger le tableau de bord',
-              style: TextStyle(
+            Text(
+              'privilege.load_error'.tr(),
+              style: const TextStyle(
                 color: _navy,
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -915,7 +916,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
             ElevatedButton.icon(
               onPressed: _load,
               icon: const Icon(Icons.refresh_rounded, size: 16),
-              label: const Text('Réessayer'),
+              label: Text('common.retry'.tr()),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _orange,
                 foregroundColor: Colors.white,

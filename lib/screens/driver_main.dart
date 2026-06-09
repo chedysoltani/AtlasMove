@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../utils/app_theme.dart';
 import 'driver_dashboard.dart';
 import 'driver_rides.dart';
 import 'driver_active_ride.dart';
-import 'driver_earnings.dart';
 import 'driver_profile.dart';
 import 'driver_rendezvous_screen.dart';
 import '../services/trip_service.dart';
@@ -37,7 +37,6 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
         },
       ),
       const DriverRendezvousScreen(),
-      const DriverEarningsScreen(),
       const DriverProfileScreen(),
     ];
     WidgetsBinding.instance.addObserver(this);
@@ -135,15 +134,13 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(icon: Icons.dashboard_rounded,
-                  label: 'Dashboard', index: 0),
+                  label: 'nav.dashboard'.tr(), index: 0),
               _buildNavItem(icon: Icons.local_taxi_rounded,
-                  label: 'Courses', index: 1),
+                  label: 'nav.rides'.tr(), index: 1),
               _buildNavItem(icon: Icons.calendar_month_rounded,
-                  label: 'RDV', index: 2),
-              _buildNavItem(icon: Icons.account_balance_wallet_rounded,
-                  label: 'Revenus', index: 3),
+                  label: 'nav.rdv'.tr(), index: 2),
               _buildNavItem(icon: Icons.person_rounded,
-                  label: 'Profil', index: 4),
+                  label: 'nav.profile'.tr(), index: 3),
             ],
           ),
         ),

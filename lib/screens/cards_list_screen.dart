@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -130,7 +131,7 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen>
                         onTap: () => Navigator.pop(context),
                         child: _iconBtn(Icons.arrow_back_ios_new_rounded),
                       ),
-                      Text('Mes Cartes',
+                      Text('payment.cards_title'.tr(),
                           style: GoogleFonts.poppins(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -187,12 +188,12 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen>
                     ),
                     const SizedBox(width: 14),
                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Mes Cartes',
+                      Text('payment.cards_title'.tr(),
                           style: GoogleFonts.poppins(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
                               color: Colors.white)),
-                      Text('Gérez vos moyens de paiement',
+                      Text('payment.cards_subtitle'.tr(),
                           style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.white.withOpacity(0.5))),
@@ -277,7 +278,7 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen>
                   ctx: ctx,
                   icon: Icons.star_rounded,
                   iconColor: const Color(0xFFF59E0B),
-                  label: 'Définir par défaut',
+                  label: 'payment.set_default'.tr(),
                   onTap: () {
                     Navigator.pop(ctx);
                     ref.read(cardsProvider.notifier).setDefault(card.id);
@@ -289,7 +290,7 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen>
                 ctx: ctx,
                 icon: Icons.delete_rounded,
                 iconColor: const Color(0xFFEF4444),
-                label: 'Supprimer la carte',
+                label: 'payment.remove_card'.tr(),
                 destructive: true,
                 onTap: () {
                   Navigator.pop(ctx);
@@ -368,7 +369,7 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen>
                   color: Color(0xFFEF4444), size: 28),
             ),
             const SizedBox(height: 16),
-            Text('Supprimer la carte ?',
+            Text('payment.remove_card'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -390,7 +391,7 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen>
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text('Annuler',
+                  child: Text('common.cancel'.tr(),
                       style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           color: _textSecondary)),
@@ -410,7 +411,7 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen>
                         borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
-                  child: Text('Supprimer',
+                  child: Text('common.delete'.tr(),
                       style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w700, color: Colors.white)),
                 ),
@@ -434,7 +435,7 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen>
                 color: _orange, strokeWidth: 2.5),
           ),
           const SizedBox(height: 14),
-          Text('Chargement des cartes...',
+          Text('common.loading'.tr(),
               style: GoogleFonts.poppins(fontSize: 13, color: _textSecondary)),
         ]),
       );
@@ -452,13 +453,13 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen>
                   color: _textSecondary, size: 36),
             ),
             const SizedBox(height: 16),
-            Text('Aucune carte enregistrée',
+            Text('payment.no_cards'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: _textPrimary)),
             const SizedBox(height: 6),
-            Text('Ajoutez une carte pour payer vos courses',
+            Text('payment.cards_subtitle'.tr(), // TODO: add translation key for "Ajoutez une carte pour payer vos courses"
                 style: GoogleFonts.poppins(
                     fontSize: 13, color: _textSecondary),
                 textAlign: TextAlign.center),
@@ -479,7 +480,7 @@ class _CardsListScreenState extends ConsumerState<CardsListScreen>
                 onPressed: _handleAddCard,
                 icon: const Icon(Icons.add_rounded,
                     color: Colors.white, size: 20),
-                label: Text('Ajouter une carte',
+                label: Text('payment.add_card'.tr(),
                     style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700, color: Colors.white)),
                 style: ElevatedButton.styleFrom(

@@ -54,6 +54,10 @@
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Cette application a besoin d'accéder à votre position en arrière-plan pour suivre vos courses</string>
 	
+	<!-- Microphone pour les appels audio (Agora RTC) -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Atlas a besoin d'accéder au microphone pour connecter les appels audio entre le livreur et le client.</string>
+
 	<!-- Configuration Google Maps -->
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>

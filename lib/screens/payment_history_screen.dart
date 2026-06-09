@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import '../services/payment_service.dart';
 import '../models/payment_models.dart';
@@ -41,14 +42,14 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Historique des Paiements'),
+        title: Text('payment.history_title'.tr()),
       ),
       body: _isLoading 
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadHistory,
               child: _payments.isEmpty 
-                  ? const Center(child: Text('Aucun paiement trouvé'))
+                  ? Center(child: Text('common.no_data'.tr()))
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: _payments.length,
@@ -97,9 +98,9 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildInfoRow('ID Transaction', payment.id),
-                _buildInfoRow('ID Course', payment.tripId),
-                _buildInfoRow('Mode de paiement', isCard ? 'Carte' : 'Espèces'),
+                _buildInfoRow('ID Transaction', payment.id), // TODO: add translation key for "ID Transaction"
+                _buildInfoRow('ID Course', payment.tripId), // TODO: add translation key for "ID Course"
+                _buildInfoRow('payment.method'.tr(), isCard ? 'payment.cards_title'.tr() : 'common.no_data'.tr()), // TODO: add translation key for "Carte" / "Espèces"
                 if (payment.failureMessage != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8.0),
@@ -119,7 +120,7 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
                           backgroundColor: AppTheme.primaryColor,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text('Réessayer le paiement'),
+                        child: Text('common.retry'.tr()),
                       ),
                     ),
                   ),
@@ -177,19 +178,19 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
     switch (status) {
       case 'succeeded':
         color = Colors.green;
-        label = 'Payé';
+        label = 'common.completed'.tr();
         break;
       case 'failed':
         color = Colors.red;
-        label = 'Échoué';
+        label = 'common.cancelled'.tr(); // TODO: add translation key for "Échoué"
         break;
       case 'processing':
         color = Colors.blue;
-        label = 'Traitement';
+        label = 'common.loading'.tr(); // TODO: add translation key for "Traitement"
         break;
       case 'pending':
         color = Colors.orange;
-        label = 'Attente';
+        label = 'common.pending'.tr();
         break;
       default:
         color = Colors.grey;
@@ -214,12 +215,12 @@ class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
     final result = await PaymentService.retryPayment(payment.id);
     if (mounted && result != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tentative de paiement en cours...'), backgroundColor: Colors.blue),
+        SnackBar(content: Text('common.loading'.tr()), backgroundColor: Colors.blue), // TODO: add translation key for "Tentative de paiement en cours..."
       );
       _loadHistory();
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Erreur lors de la tentative de paiement'), backgroundColor: Colors.red),
+        SnackBar(content: Text('common.unknown_error'.tr()), backgroundColor: Colors.red), // TODO: add translation key for "Erreur lors de la tentative de paiement"
       );
     }
   }

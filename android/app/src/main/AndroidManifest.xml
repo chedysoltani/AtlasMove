@@ -6,6 +6,12 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
     
+    <!-- Pour les appels audio (Agora RTC) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+
     <!-- Pour Google Maps -->
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
@@ -15,6 +21,10 @@
         android:label="atlasmove"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+
+        <!-- Disable Impeller on emulators (x86_64 OpenGLES instability) -->
+        <meta-data android:name="io.flutter.embedding.android.EnableImpeller"
+                   android:value="false"/>
         
         <!-- Google Maps API Key -->
         <meta-data android:name="com.google.android.geo.API_KEY"

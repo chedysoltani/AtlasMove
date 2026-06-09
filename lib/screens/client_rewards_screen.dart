@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/driver_subscription_models.dart';
 import '../services/subscription_service.dart';
 
@@ -186,7 +187,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                           const Icon(Icons.route_rounded, color: _orange, size: 13),
                           const SizedBox(width: 5),
                           Text(
-                            '$totalTrips courses',
+                            'loyalty_client.trips_count'.tr(namedArgs: {'count': '$totalTrips'}),
                             style: GoogleFonts.poppins(
                               color: _orange,
                               fontWeight: FontWeight.w700,
@@ -207,7 +208,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                           const Icon(Icons.workspace_premium_rounded,
                               color: Color(0xFFF59E0B), size: 14),
                           const SizedBox(width: 5),
-                          Text('Privilège',
+                          Text('loyalty_client.privilege_badge'.tr(),
                               style: GoogleFonts.poppins(
                                 color: const Color(0xFFF59E0B),
                                 fontWeight: FontWeight.w700,
@@ -240,7 +241,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Programme Privilège',
+                  'loyalty_client.title'.tr(),
                   style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
@@ -249,7 +250,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Cumulez vos courses et gagnez des récompenses',
+                  'loyalty_client.earn_rewards'.tr(),
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: Colors.white.withOpacity(0.55),
@@ -279,7 +280,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
           const SizedBox(height: 20),
           if (cashback != null) _buildPrimaryCard(cashback),
           const SizedBox(height: 20),
-          _sectionLabel('Récompenses', Icons.card_giftcard_rounded),
+          _sectionLabel('client.rewards_title'.tr(), Icons.card_giftcard_rounded),
           const SizedBox(height: 12),
           if (cashback == null && travel == null)
             _buildEmptyPrograms()
@@ -297,16 +298,16 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
             ),
           ],
           const SizedBox(height: 24),
-          _sectionLabel('Destinations suggérées', Icons.explore_rounded),
+          _sectionLabel('loyalty_client.destinations'.tr(), Icons.explore_rounded),
           const SizedBox(height: 6),
           Text(
-            'Basé sur votre localisation (Afrique du Nord)',
+            'loyalty_client.location_based'.tr(),
             style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
           ),
           const SizedBox(height: 14),
           _buildDestinations(),
           const SizedBox(height: 24),
-          _sectionLabel('Niveaux de fidélité', Icons.emoji_events_rounded),
+          _sectionLabel('loyalty_client.loyalty_levels'.tr(), Icons.emoji_events_rounded),
           const SizedBox(height: 14),
           _buildLevels(cashback),
         ],
@@ -330,7 +331,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
           child: _statMini(
             icon: Icons.route_rounded,
             value: '$totalTrips',
-            label: 'Courses totales',
+            label: 'loyalty_client.cashback_program'.tr(),
             color: const Color(0xFF3B82F6),
           ),
         ),
@@ -339,7 +340,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
           child: _statMini(
             icon: Icons.account_balance_wallet_rounded,
             value: cashbackPct,
-            label: 'Cashback',
+            label: 'loyalty_client.cashback_accrued'.tr(),
             color: const Color(0xFF22C55E),
           ),
         ),
@@ -348,7 +349,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
           child: _statMini(
             icon: Icons.flight_takeoff_rounded,
             value: travelPct,
-            label: 'Voyage',
+            label: 'loyalty_client.travel_program'.tr(),
             color: _orange,
           ),
         ),
@@ -464,8 +465,8 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
         const SizedBox(height: 10),
         Text(
           isCompleted
-              ? 'Cashback débloqué ! En attente de traitement 🎉'
-              : 'Plus que ${p.remainingTrips} courses pour décrocher votre cashback !',
+              ? 'loyalty_client.cashback_unlocked'.tr()
+              : 'loyalty_client.cashback_remaining'.tr(namedArgs: {'count': '${p.remainingTrips}'}),
           style: GoogleFonts.poppins(
               fontSize: 12, color: Colors.white.withOpacity(0.6)),
         ),
@@ -525,7 +526,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: const Color(0xFF22C55E).withOpacity(0.3)),
                     ),
-                    child: Text('Obtenu',
+                    child: Text('loyalty_client.completed'.tr(),
                         style: GoogleFonts.poppins(
                             color: const Color(0xFF22C55E),
                             fontSize: 10,
@@ -539,7 +540,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      'Encore ${program.remainingTrips} courses',
+                      'loyalty_client.trips_remaining'.tr(namedArgs: {'count': '${program.remainingTrips}'}),
                       style: GoogleFonts.poppins(
                           color: iconColor,
                           fontSize: 10,
@@ -550,7 +551,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
             ),
             const SizedBox(height: 3),
             Text(
-              '${program.totalTrips} / ${program.targetTrips} courses réalisées',
+              'loyalty_client.trips_progress'.tr(namedArgs: {'done': '${program.totalTrips}', 'total': '${program.targetTrips}'}),
               style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
             ),
             const SizedBox(height: 10),
@@ -614,7 +615,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
           ),
           const SizedBox(height: 14),
           Text(
-            'Programme en cours d\'activation',
+            'loyalty_client.no_program'.tr(),
             style: GoogleFonts.poppins(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
@@ -871,7 +872,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              'Impossible de charger votre programme',
+              'common.error'.tr(),
               style: GoogleFonts.poppins(
                   fontSize: 15, fontWeight: FontWeight.w700, color: _navy),
               textAlign: TextAlign.center,
@@ -880,7 +881,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
             ElevatedButton.icon(
               onPressed: _load,
               icon: const Icon(Icons.refresh_rounded, size: 16),
-              label: const Text('Réessayer'),
+              label: Text('common.retry'.tr()),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _orange,
                 foregroundColor: Colors.white,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../core/network/http_client.dart';
 import '../models/rendezvous_models.dart';
 import '../services/rendezvous_service.dart';
@@ -163,15 +164,15 @@ class _ClientRendezvousBookingScreenState
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDate == null) {
-      _showSnack('Veuillez sélectionner une date');
+      _showSnack('rdv.date'.tr());
       return;
     }
     if (_selectedTime == null) {
-      _showSnack('Veuillez sélectionner une heure');
+      _showSnack('rdv.time'.tr());
       return;
     }
     if (_selectedService == null) {
-      _showSnack('Veuillez sélectionner un service');
+      _showSnack('services.title'.tr());
       return;
     }
 
@@ -241,7 +242,7 @@ class _ClientRendezvousBookingScreenState
               ),
               const SizedBox(height: 16),
               Text(
-                'Réservation confirmée !',
+                'rdv.confirmed'.tr(),
                 style: GoogleFonts.poppins(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -250,17 +251,17 @@ class _ClientRendezvousBookingScreenState
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              _confirmRow(Icons.local_taxi_rounded, 'Service', rdv.serviceName),
+              _confirmRow(Icons.local_taxi_rounded, 'services.title'.tr(), rdv.serviceName),
               const SizedBox(height: 10),
               _confirmRow(
                 Icons.calendar_today_rounded,
-                'Date',
+                'rdv.date'.tr(),
                 DateFormat('dd MMM yyyy à HH:mm', 'fr').format(rdv.scheduledAt),
               ),
               const SizedBox(height: 10),
-              _confirmRow(Icons.timer_rounded, 'Durée', '${rdv.durationMinutes} min'),
+              _confirmRow(Icons.timer_rounded, 'rdv.details'.tr(), '${rdv.durationMinutes} min'), // TODO: add translation key for duration
               const SizedBox(height: 10),
-              _confirmRow(Icons.location_on_rounded, 'Adresse', rdv.address),
+              _confirmRow(Icons.location_on_rounded, 'rdv.address'.tr(), rdv.address),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -292,7 +293,7 @@ class _ClientRendezvousBookingScreenState
                       ),
                     ),
                     child: Text(
-                      'Parfait !',
+                      'common.confirm'.tr(),
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -366,11 +367,11 @@ class _ClientRendezvousBookingScreenState
                           child: ListView(
                             padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
                             children: [
-                              _sectionLabel('Service', Icons.local_taxi_rounded),
+                              _sectionLabel('services.title'.tr(), Icons.local_taxi_rounded),
                               const SizedBox(height: 10),
                               _serviceDropdown(),
                               const SizedBox(height: 22),
-                              _sectionLabel('Date & Heure', Icons.event_rounded),
+                              _sectionLabel('rdv.date'.tr(), Icons.event_rounded), // TODO: add translation key for "Date & Heure"
                               const SizedBox(height: 10),
                               Row(children: [
                                 Expanded(child: _dateTile()),
@@ -378,11 +379,11 @@ class _ClientRendezvousBookingScreenState
                                 Expanded(child: _timeTile()),
                               ]),
                               const SizedBox(height: 22),
-                              _sectionLabel('Durée', Icons.timer_rounded),
+                              _sectionLabel('rdv.details'.tr(), Icons.timer_rounded), // TODO: add translation key for duration
                               const SizedBox(height: 10),
                               _durationSelector(),
                               const SizedBox(height: 22),
-                              _sectionLabel('Adresse du rendez-vous', Icons.location_on_rounded),
+                              _sectionLabel('rdv.address'.tr(), Icons.location_on_rounded),
                               const SizedBox(height: 10),
                               _addressField(),
                               const SizedBox(height: 12),
@@ -396,7 +397,7 @@ class _ClientRendezvousBookingScreenState
                                 ),
                               ]),
                               const SizedBox(height: 22),
-                              _sectionLabel('Instructions (optionnel)', Icons.notes_rounded),
+                              _sectionLabel('rdv.details'.tr(), Icons.notes_rounded),
                               const SizedBox(height: 10),
                               _detailsField(),
                               if (_error != null) ...[
@@ -539,7 +540,7 @@ class _ClientRendezvousBookingScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Nouveau Rendez-vous',
+                            'rdv.book'.tr(),
                             style: GoogleFonts.poppins(
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
@@ -547,7 +548,7 @@ class _ClientRendezvousBookingScreenState
                             ),
                           ),
                           Text(
-                            'Réservez votre course à l\'avance',
+                            'rdv.title'.tr(), // TODO: add translation key for "Réservez votre course à l'avance"
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.white.withOpacity(0.55),
@@ -585,7 +586,7 @@ class _ClientRendezvousBookingScreenState
           ),
           const SizedBox(height: 16),
           Text(
-            'Chargement des services...',
+            'common.loading'.tr(),
             style: GoogleFonts.poppins(
               fontSize: 13,
               color: _textSecondary,
@@ -634,7 +635,7 @@ class _ClientRendezvousBookingScreenState
             ),
             const SizedBox(width: 12),
             Text(
-              'Aucun service disponible',
+              'services.no_services'.tr(),
               style: GoogleFonts.poppins(fontSize: 14, color: _textSecondary),
             ),
           ],
@@ -708,7 +709,7 @@ class _ClientRendezvousBookingScreenState
               child: Text(
                 hasDate
                     ? DateFormat('dd/MM/yyyy').format(_selectedDate!)
-                    : 'Date',
+                    : 'rdv.date'.tr(),
                 style: GoogleFonts.poppins(
                   fontSize: 13,
                   fontWeight: hasDate ? FontWeight.w600 : FontWeight.normal,
@@ -745,7 +746,7 @@ class _ClientRendezvousBookingScreenState
             ),
             const SizedBox(width: 10),
             Text(
-              hasTime ? _selectedTime!.format(context) : 'Heure',
+              hasTime ? _selectedTime!.format(context) : 'rdv.time'.tr(),
               style: GoogleFonts.poppins(
                 fontSize: 13,
                 fontWeight: hasTime ? FontWeight.w600 : FontWeight.normal,
@@ -828,9 +829,9 @@ class _ClientRendezvousBookingScreenState
       controller: _addressCtrl,
       style: GoogleFonts.poppins(fontSize: 14, color: _textPrimary),
       validator: (v) =>
-          (v == null || v.trim().isEmpty) ? 'Adresse requise' : null,
+          (v == null || v.trim().isEmpty) ? 'rdv.address'.tr() : null,
       maxLines: 2,
-      decoration: _inputDeco('Adresse complète', Icons.location_on_rounded),
+      decoration: _inputDeco('rdv.address'.tr(), Icons.location_on_rounded),
     );
   }
 
@@ -851,7 +852,7 @@ class _ClientRendezvousBookingScreenState
       style: GoogleFonts.poppins(fontSize: 14, color: _textPrimary),
       maxLines: 3,
       decoration: _inputDeco(
-        'Ex: Articles fragiles, appelez à l\'arrivée…',
+        'rdv.details'.tr(),
         Icons.notes_rounded,
       ),
     );
@@ -950,7 +951,7 @@ class _ClientRendezvousBookingScreenState
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    'Envoi en cours...',
+                    'common.loading'.tr(),
                     style: GoogleFonts.poppins(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -965,7 +966,7 @@ class _ClientRendezvousBookingScreenState
                   const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
                   const SizedBox(width: 10),
                   Text(
-                    'Confirmer la réservation',
+                    'common.confirm'.tr(),
                     style: GoogleFonts.poppins(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,

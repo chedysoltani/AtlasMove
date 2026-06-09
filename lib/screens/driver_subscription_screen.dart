@@ -1,5 +1,5 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../models/driver_subscription_models.dart';
 import '../services/subscription_service.dart';
 import '../utils/app_theme.dart';
@@ -31,9 +31,9 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Mon Abonnement',
-          style: TextStyle(
+        title: Text(
+          'sub.title'.tr(),
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.w900,
@@ -120,9 +120,9 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Paiement en retard',
-                  style: TextStyle(
+                Text(
+                  'sub.past_due'.tr(),
+                  style: const TextStyle(
                     color: Colors.redAccent,
                     fontWeight: FontWeight.w900,
                     fontSize: 14,
@@ -130,7 +130,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Votre abonnement est impayé. Régularisez pour reprendre l\'accès aux courses.',
+                  'sub.past_due_desc'.tr(),
                   style: TextStyle(color: Colors.red.shade300, fontSize: 12, height: 1.4),
                 ),
               ],
@@ -148,25 +148,25 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
     IconData icon;
 
     if (sub == null || sub.isCanceled) {
-      title = 'Aucun abonnement actif';
-      subtitle = 'Abonnez-vous pour recevoir les demandes de courses';
+      title = 'sub.inactive'.tr();
+      subtitle = 'sub.inactive_desc'.tr();
       accentColor = AppTheme.errorColor;
       icon = Icons.warning_amber_rounded;
     } else if (sub.isPastDue) {
-      title = 'Abonnement impayé';
-      subtitle = 'Expired le : ${DateFormat('dd MMM yyyy').format(sub.expiresAt)}';
+      title = 'sub.past_due'.tr();
+      subtitle = 'sub.expires_on'.tr(namedArgs: {'date': DateFormat('dd MMM yyyy').format(sub.expiresAt)});
       accentColor = Colors.redAccent;
       icon = Icons.credit_card_off_rounded;
     } else if (sub.isTrial) {
-      title = "Période d'essai active";
-      subtitle = 'Expire le : ${DateFormat('dd MMMM yyyy').format(sub.expiresAt)}';
+      title = 'sub.trial'.tr();
+      subtitle = 'sub.expires_on'.tr(namedArgs: {'date': DateFormat('dd MMMM yyyy').format(sub.expiresAt)});
       accentColor = const Color(0xFF4FC3F7);
       icon = Icons.hourglass_top_rounded;
     } else {
-      title = 'Abonnement Premium Actif';
+      title = 'sub.active'.tr();
       subtitle = sub.cancelAtPeriodEnd
-          ? 'Actif jusqu\'au ${DateFormat('dd MMM yyyy').format(sub.expiresAt)} (annulation demandée)'
-          : 'Prochain renouvellement : ${DateFormat('dd MMM yyyy').format(sub.expiresAt)}';
+          ? 'sub.until_date'.tr(namedArgs: {'date': DateFormat('dd MMM yyyy').format(sub.expiresAt)})
+          : 'sub.next_renewal'.tr(namedArgs: {'date': DateFormat('dd MMM yyyy').format(sub.expiresAt)});
       accentColor = AppTheme.successColor;
       icon = Icons.verified_rounded;
     }
@@ -234,7 +234,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Période d\'essai — encore ${sub.daysRemaining} jour${sub.daysRemaining > 1 ? 's' : ''} restant${sub.daysRemaining > 1 ? 's' : ''}',
+              'sub.trial_days'.tr(namedArgs: {'days': sub.daysRemaining.toString()}),
               style: const TextStyle(
                 color: Color(0xFF4FC3F7),
                 fontWeight: FontWeight.w700,
@@ -272,9 +272,9 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
                 child: const Icon(Icons.star_rounded, color: Colors.amber, size: 22),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Programme de Fidélité',
-                style: TextStyle(
+              Text(
+                'sub.loyalty_title'.tr(),
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w900,
                   fontSize: 15,
@@ -288,9 +288,9 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
                     color: AppTheme.successColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    'COMPLÉTÉ',
-                    style: TextStyle(
+                  child: Text(
+                    'sub.loyalty_completed'.tr(),
+                    style: const TextStyle(
                       color: AppTheme.successColor,
                       fontSize: 9,
                       fontWeight: FontWeight.w900,
@@ -307,7 +307,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Cashback accumulé',
+                'sub.loyalty_cashback'.tr(),
                 style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
               ),
               Text(
@@ -339,7 +339,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${loyalty.completedTripsCount} course${loyalty.completedTripsCount > 1 ? 's' : ''} complétée${loyalty.completedTripsCount > 1 ? 's' : ''}',
+                'sub.loyalty_trips'.tr(namedArgs: {'count': loyalty.completedTripsCount.toString()}),
                 style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
               ),
               Text(
@@ -404,9 +404,9 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
                         borderRadius: BorderRadius.circular(30),
                         border: Border.all(color: AppTheme.primaryColor.withOpacity(0.4)),
                       ),
-                      child: const Text(
-                        'PREMIUM LIVREUR',
-                        style: TextStyle(
+                      child: Text(
+                        'sub.badge'.tr(),
+                        style: const TextStyle(
                           color: AppTheme.primaryColor,
                           fontSize: 10,
                           fontWeight: FontWeight.w900,
@@ -421,9 +421,9 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
                           color: AppTheme.successColor.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Text(
-                          '15 JOURS OFFERTS',
-                          style: TextStyle(
+                        child: Text(
+                          'sub.trial_offer'.tr(),
+                          style: const TextStyle(
                             color: AppTheme.successColor,
                             fontSize: 9,
                             fontWeight: FontWeight.w900,
@@ -448,7 +448,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '/ mois',
+                      'sub.per_month'.tr(),
                       style: TextStyle(
                         color: Colors.grey.shade400,
                         fontSize: 16,
@@ -459,17 +459,17 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Optimisez vos revenus sans aucune commission.',
+                  'sub.tagline'.tr(),
                   style: TextStyle(color: Colors.grey.shade500, fontSize: 13, height: 1.4),
                 ),
                 const SizedBox(height: 20),
                 const Divider(color: Colors.white12, height: 1),
                 const SizedBox(height: 20),
-                _buildCheckRow('0% Commission sur les courses'),
-                _buildCheckRow('Priorité absolue sur les courses à proximité'),
-                _buildCheckRow('Accès aux zones rouges (forte demande)'),
-                _buildCheckRow('Historique de statistiques avancé'),
-                _buildCheckRow('Support premium dédié WhatsApp & Clavardage'),
+                _buildCheckRow('sub.feature_commission'.tr()),
+                _buildCheckRow('sub.feature_priority'.tr()),
+                _buildCheckRow('sub.feature_zones'.tr()),
+                _buildCheckRow('sub.feature_stats'.tr()),
+                _buildCheckRow('sub.feature_support'.tr()),
               ],
             ),
           ),
@@ -529,7 +529,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
             child: Text(
-              isPastDue ? 'Régulariser mon abonnement' : 'S\'abonner — 90\$ / mois',
+              isPastDue ? 'sub.regularize_btn'.tr() : 'sub.subscribe_btn'.tr(),
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
           ),
@@ -537,9 +537,9 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
           ElevatedButton.icon(
             onPressed: () => Navigator.pushNamed(context, '/driver_usdt_payment'),
             icon: const Text('₮', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-            label: const Text(
-              'Payer via USDT TRC20 (90\$)',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            label: Text(
+              'sub.pay_crypto_btn'.tr(),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
@@ -561,9 +561,9 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
               foregroundColor: Colors.red.shade400,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            child: const Text(
-              'Annuler le renouvellement automatique',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            child: Text(
+              'sub.cancel_renewal'.tr(),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -584,7 +584,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Renouvellement annulé. Votre abonnement reste actif jusqu\'à expiration.',
+                    'sub.cancel_notice'.tr(),
                     style: TextStyle(color: Colors.orange.shade300, fontSize: 12, height: 1.4),
                   ),
                 ),
@@ -595,7 +595,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
 
         const SizedBox(height: 12),
         Text(
-          'Paiements sécurisés via Stripe ou cryptomonnaies.',
+          'sub.payment_secured'.tr(),
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.4),
         ),
@@ -609,11 +609,11 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.verified_rounded, color: Colors.white),
-              SizedBox(width: 10),
-              Expanded(child: Text('Abonnement activé avec succès !')),
+              const Icon(Icons.verified_rounded, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(child: Text('sub.activated_success'.tr())),
             ],
           ),
           backgroundColor: AppTheme.successColor,
@@ -624,7 +624,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_subService.error ?? 'Erreur lors de la souscription.'),
+          content: Text(_subService.error ?? 'common.unknown_error'.tr()),
           backgroundColor: AppTheme.errorColor,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -639,19 +639,19 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1A1C2A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Annuler le renouvellement ?', style: TextStyle(color: Colors.white)),
+        title: Text('sub.cancel_renewal_title'.tr(), style: const TextStyle(color: Colors.white)),
         content: Text(
-          'Votre abonnement restera actif jusqu\'à la date d\'expiration, mais ne sera pas renouvelé automatiquement.',
+          'sub.cancel_renewal_body'.tr(),
           style: TextStyle(color: Colors.grey.shade400, fontSize: 13, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Annuler', style: TextStyle(color: Colors.grey)),
+            child: Text('common.cancel'.tr(), style: const TextStyle(color: Colors.grey)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Confirmer', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: Text('common.confirm'.tr(), style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -663,7 +663,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(success ? 'Renouvellement annulé.' : (_subService.error ?? 'Erreur.')),
+        content: Text(success ? 'sub.cancel_notice'.tr() : (_subService.error ?? 'common.unknown_error'.tr())),
         backgroundColor: success ? Colors.orange : AppTheme.errorColor,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

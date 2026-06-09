@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 
@@ -67,9 +68,9 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Revenus',
-          style: TextStyle(
+        title: Text(
+          'driver.earnings_title'.tr(),
+          style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w600,
           ),
@@ -127,13 +128,13 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen>
       child: Row(
         children: [
           Expanded(
-            child: _buildPeriodButton('Journalier', EarningsPeriod.daily),
+            child: _buildPeriodButton('driver.earnings_today'.tr(), EarningsPeriod.daily),
           ),
           Expanded(
-            child: _buildPeriodButton('Hebdomadaire', EarningsPeriod.weekly),
+            child: _buildPeriodButton('driver.earnings_week'.tr(), EarningsPeriod.weekly),
           ),
           Expanded(
-            child: _buildPeriodButton('Mensuel', EarningsPeriod.monthly),
+            child: _buildPeriodButton('driver.earnings_month'.tr(), EarningsPeriod.monthly),
           ),
         ],
       ),
@@ -273,7 +274,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Évolution des revenus',
+            'driver.earnings_title'.tr(),
             style: const TextStyle(
               color: Colors.black,
               fontSize: 18,
@@ -416,9 +417,9 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Gains récents',
-          style: TextStyle(
+        Text(
+          'nav.earnings'.tr(),
+          style: const TextStyle(
             color: Colors.black,
             fontSize: 18,
             fontWeight: FontWeight.bold,

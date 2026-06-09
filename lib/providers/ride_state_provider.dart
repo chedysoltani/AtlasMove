@@ -71,6 +71,7 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
     // Wire WebSocket push callbacks
     NotificationService.onDriverLocationReceived = _onWsDriverLocation;
     NotificationService.onTripStatusReceived = _onWsTripStatus;
+    NotificationService.onTripCancelledReceived = _onWsTripStatus;
 
     // Fallback REST poll — fires when WebSocket is silent or disconnected
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _poll(tripId));
@@ -80,6 +81,7 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
     _cancelTimers();
     NotificationService.onDriverLocationReceived = null;
     NotificationService.onTripStatusReceived = null;
+    NotificationService.onTripCancelledReceived = null;
     state = const ActiveRideState();
   }
 
@@ -191,6 +193,7 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
     _cancelTimers();
     NotificationService.onDriverLocationReceived = null;
     NotificationService.onTripStatusReceived = null;
+    NotificationService.onTripCancelledReceived = null;
     super.dispose();
   }
 }

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'providers/locale_provider.dart';
 
 import 'utils/app_theme.dart';
 import 'screens/landing_screen.dart';
@@ -45,25 +47,44 @@ import 'screens/driver_subscription_screen.dart';
 import 'screens/driver_crypto_select_screen.dart';
 import 'screens/driver_crypto_recharge_screen.dart';
 import 'screens/driver_usdt_payment_screen.dart';
+import 'screens/language_selection_screen.dart';
 import 'screens/referral_screen.dart';
 import 'screens/client_rendezvous_booking_screen.dart';
 import 'screens/client_rendezvous_history_screen.dart';
 import 'screens/driver_rendezvous_screen.dart';
+import 'screens/incoming_call_screen.dart';
+import 'screens/active_call_screen.dart';
+import 'services/call_service.dart';
+import 'core/network/http_client.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await EasyLocalization.ensureInitialized();
 
   // Initialiser les données de localisation française pour DateFormat
   await initializeDateFormatting('fr', null);
 
   // Charger les variables d'environnement
   await dotenv.load(fileName: ".env");
-  
+
   // Initialiser Stripe
   Stripe.publishableKey = dotenv.env['STRIPE_PUBLISHABLE_KEY'] ?? '';
   await Stripe.instance.applySettings();
+
+  // Session expirée → naviguer vers /login et déconnecter les sockets
+  HttpClient.onSessionExpired = () {
+    NotificationService().disconnect();
+    CallService().disconnect();
+    navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+  };
+
+  // Token rafraîchi → reconnecter les sockets avec le nouveau token
+  HttpClient.onTokenRefreshed = () {
+    NotificationService().reconnect();
+    CallService().reconnect();
+  };
 
   // Configurer la réception globale des notifications in-app
   NotificationService.onNewNotificationReceived = (item) {
@@ -73,6 +94,22 @@ void main() async {
     }
   };
 
+  // Appel entrant — affiche l'écran d'appel par-dessus tout autre écran
+  CallService.onIncomingCall = (session) {
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => IncomingCallScreen(session: session),
+        ),
+      );
+    }
+  };
+
+  // Connecter le socket d'appel dès le démarrage (réessaie si pas encore authentifié)
+  CallService().connectSocket();
+
   // Bonus de parrainage reçu en temps réel
   NotificationService.onReferralBonusReceived = (pointsGained, message) {
     final context = navigatorKey.currentContext;
@@ -81,7 +118,15 @@ void main() async {
     }
   };
   
-  runApp(const AtlasMoveApp());
+  runApp(
+    EasyLocalization(
+      supportedLocales: LocaleProvider.supportedLocales,
+      path: 'assets/translations',
+      fallbackLocale: const Locale('fr'),
+      startLocale: const Locale('fr'),
+      child: const AtlasMoveApp(),
+    ),
+  );
 }
 
 /// Shows a celebratory dialog when the driver earns a referral bonus in real time.
@@ -187,6 +232,9 @@ class AtlasMoveApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.system,
+          localizationsDelegates: context.localizationDelegates,
+          supportedLocales: context.supportedLocales,
+          locale: context.locale,
           initialRoute: '/',
           routes: {
             '/': (context) => const SplashScreen(),
@@ -228,6 +276,7 @@ class AtlasMoveApp extends StatelessWidget {
             '/driver_crypto_select': (context) => const DriverCryptoSelectScreen(),
             '/driver_crypto_recharge': (context) => const DriverCryptoRechargeScreen(),
             '/driver_usdt_payment': (context) => const DriverUsdtPaymentScreen(),
+            '/language': (context) => const LanguageSelectionScreen(),
             '/referral': (context) => const ReferralScreen(),
             '/client_rendezvous_booking': (context) =>
                 const ClientRendezvousBookingScreen(),
@@ -235,6 +284,14 @@ class AtlasMoveApp extends StatelessWidget {
                 const ClientRendezvousHistoryScreen(),
             '/driver_rendezvous': (context) =>
                 const DriverRendezvousScreen(),
+            '/active_call': (context) {
+              final args = ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
+              return ActiveCallScreen(
+                session: args!['session'],
+                isOutgoing: args['isOutgoing'] as bool? ?? true,
+              );
+            },
           },
         ),
       ),

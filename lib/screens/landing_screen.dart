@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -88,22 +89,22 @@ class _LandingScreenState extends State<LandingScreen>
                     const SizedBox(height: 18),
                     _animated(1, _buildFeatureTile(
                       icon: Icons.person_rounded,
-                      title: 'Pour les Clients',
-                      description: 'Commandez courses et livraisons en quelques clics',
+                      title: 'landing.for_clients'.tr(),
+                      description: 'landing.for_clients_desc'.tr(),
                       onTap: () => _nav(context, 'client'),
                     )),
                     const SizedBox(height: 10),
                     _animated(2, _buildFeatureTile(
                       icon: Icons.local_shipping_rounded,
-                      title: 'Pour les Livreurs',
-                      description: 'Recevez des missions et gagnez de l\'argent',
+                      title: 'landing.for_drivers'.tr(),
+                      description: 'landing.for_drivers_desc'.tr(),
                       onTap: () => _nav(context, 'client'),
                     )),
                     const SizedBox(height: 10),
                     _animated(3, _buildFeatureTile(
                       icon: Icons.gps_fixed_rounded,
-                      title: 'GPS Intégré',
-                      description: 'Suivi en temps réel sur carte interactive',
+                      title: 'landing.gps'.tr(),
+                      description: 'landing.gps_desc'.tr(),
                       onTap: null,
                     )),
                     const SizedBox(height: 26),
@@ -215,7 +216,7 @@ class _LandingScreenState extends State<LandingScreen>
                       _accentLine(),
                       const SizedBox(width: 10),
                       Text(
-                        'Transport & Livraison',
+                        'landing.tagline'.tr(),
                         style: GoogleFonts.poppins(
                           fontSize: 13,
                           fontWeight: FontWeight.w400,
@@ -253,11 +254,11 @@ class _LandingScreenState extends State<LandingScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _statItem('500+', 'Clients'),
+          _statItem('500+', 'landing.clients_stat'.tr()),
           _vDivider(),
-          _statItem('200+', 'Livreurs'),
+          _statItem('200+', 'landing.drivers_stat'.tr()),
           _vDivider(),
-          _statItem('24/7', 'Disponible'),
+          _statItem('24/7', 'landing.available_stat'.tr()),
         ],
       ),
     );
@@ -303,11 +304,11 @@ class _LandingScreenState extends State<LandingScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('COMMENT ÇA MARCHE ?', style: GoogleFonts.poppins(
+        Text('landing.how_it_works'.tr(), style: GoogleFonts.poppins(
           fontSize: 10, fontWeight: FontWeight.w700,
           color: _orange, letterSpacing: 1.5)),
         const SizedBox(height: 3),
-        Text('Rejoignez l\'aventure', style: GoogleFonts.poppins(
+        Text('landing.join_adventure'.tr(), style: GoogleFonts.poppins(
           fontSize: 21, fontWeight: FontWeight.w700,
           color: _dark, height: 1.2)),
       ],
@@ -419,7 +420,7 @@ class _LandingScreenState extends State<LandingScreen>
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16)),
             ),
-            child: Text('Commencer maintenant',
+            child: Text('landing.start_now'.tr(),
               style: GoogleFonts.poppins(
                 fontSize: 15, fontWeight: FontWeight.w600,
                 color: Colors.white)),
@@ -446,7 +447,7 @@ class _LandingScreenState extends State<LandingScreen>
                 const Icon(Icons.local_shipping_rounded,
                     color: _dark, size: 18),
                 const SizedBox(width: 8),
-                Text('Devenir Livreur',
+                Text('landing.become_driver'.tr(),
                   style: GoogleFonts.poppins(
                     fontSize: 15, fontWeight: FontWeight.w600,
                     color: _dark)),
@@ -462,11 +463,11 @@ class _LandingScreenState extends State<LandingScreen>
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _trustBadge(Icons.verified_user_rounded, 'Sécurisé'),
+        _trustBadge(Icons.verified_user_rounded, 'landing.secured'.tr()),
         const SizedBox(width: 24),
-        _trustBadge(Icons.bolt_rounded, 'Rapide'),
+        _trustBadge(Icons.bolt_rounded, 'landing.fast'.tr()),
         const SizedBox(width: 24),
-        _trustBadge(Icons.star_rounded, 'Fiable'),
+        _trustBadge(Icons.star_rounded, 'landing.reliable'.tr()),
       ],
     );
   }

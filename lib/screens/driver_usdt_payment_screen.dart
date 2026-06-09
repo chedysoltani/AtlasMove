@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -186,8 +187,8 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Payer via USDT (TRC20)',
+        title: Text(
+          'crypto.title'.tr(),
           style: TextStyle(
             color: Colors.white,
             fontSize: 17,
@@ -212,15 +213,15 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
   // ── Loading ───────────────────────────────────────────────────────────────
 
   Widget _buildLoading() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(color: _teal, strokeWidth: 3),
-          SizedBox(height: 20),
+          const CircularProgressIndicator(color: _teal, strokeWidth: 3),
+          const SizedBox(height: 20),
           Text(
-            'Création de la session de paiement...',
-            style: TextStyle(color: Colors.white54, fontSize: 13),
+            'crypto.creating_session'.tr(),
+            style: const TextStyle(color: Colors.white54, fontSize: 13),
           ),
         ],
       ),
@@ -245,9 +246,9 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
               child: const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 44),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Impossible de créer la session',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+            Text(
+              'crypto.session_error'.tr(),
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -258,7 +259,7 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
             ),
             const SizedBox(height: 28),
             _primaryButton(
-              label: 'Réessayer',
+              label: 'common.retry'.tr(),
               icon: Icons.refresh_rounded,
               color: _teal,
               onTap: _initiate,
@@ -301,9 +302,9 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
                       decoration: const BoxDecoration(color: _teal, shape: BoxShape.circle),
                     ),
                     const SizedBox(width: 6),
-                    const Text(
-                      'En attente de transfert...',
-                      style: TextStyle(color: _teal, fontSize: 11, fontWeight: FontWeight.w700),
+                    Text(
+                      'crypto.waiting'.tr(),
+                      style: const TextStyle(color: _teal, fontSize: 11, fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
@@ -366,10 +367,10 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
                     ),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      const Text(
                         '₮',
                         style: TextStyle(
                           color: Colors.white,
@@ -377,10 +378,10 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       Text(
-                        'USDT · Réseau TRON (TRC20)',
-                        style: TextStyle(
+                        'crypto.network_badge'.tr(),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -416,7 +417,7 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Scannez avec votre wallet TRON',
+                  'crypto.scan_hint'.tr(),
                   style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
                 ),
               ],
@@ -426,7 +427,7 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
 
           // Address row
           _infoRow(
-            label: 'Adresse de dépôt',
+            label: 'crypto.deposit_address'.tr(),
             value: session.address,
             copied: _addressCopied,
             onCopy: _copyAddress,
@@ -436,7 +437,7 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
 
           // Amount row
           _infoRow(
-            label: 'Montant exact à envoyer',
+            label: 'crypto.exact_amount'.tr(),
             value: '${session.amount.toStringAsFixed(2)} USDT',
             copied: _amountCopied,
             onCopy: _copyAmount,
@@ -617,7 +618,7 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        copied ? 'Copié !' : 'Copier',
+                        copied ? 'common.copied'.tr() : 'common.copy'.tr(),
                         style: TextStyle(
                           color: copied ? const Color(0xFF10B981) : _teal,
                           fontSize: 11,
@@ -648,12 +649,10 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
         children: [
           const Icon(Icons.warning_amber_rounded, color: _orange, size: 22),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              'ATTENTION : Envoyez uniquement de l\'USDT sur le réseau TRON (TRC20). '
-              'Tout envoi sur un autre réseau (ERC20, BEP20) ou d\'un autre token '
-              'entraînera la perte définitive de vos fonds.',
-              style: TextStyle(
+              'crypto.warning'.tr(),
+              style: const TextStyle(
                 color: Color(0xFFFFAB40),
                 fontSize: 12,
                 height: 1.5,
@@ -688,9 +687,9 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
               ),
             ),
             const SizedBox(height: 28),
-            const Text(
-              'Paiement détecté',
-              style: TextStyle(
+            Text(
+              'crypto.detected_title'.tr(),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
@@ -698,10 +697,10 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Validation blockchain en cours...\nCela peut prendre quelques minutes.',
+            Text(
+              'crypto.validating'.tr(),
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
+              style: const TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 20),
             Container(
@@ -711,9 +710,9 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: _teal.withOpacity(0.25)),
               ),
-              child: const Text(
-                'Ne fermez pas cette page',
-                style: TextStyle(color: _teal, fontSize: 12, fontWeight: FontWeight.w600),
+              child: Text(
+                'crypto.dont_close'.tr(),
+                style: const TextStyle(color: _teal, fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -744,9 +743,9 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Abonnement activé !',
-              style: TextStyle(
+            Text(
+              'crypto.confirmed_title'.tr(),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
@@ -754,10 +753,10 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Votre abonnement Premium est maintenant actif.\nBonne route !',
+            Text(
+              'crypto.confirmed_subtitle'.tr(),
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.6),
+              style: const TextStyle(color: Colors.white54, fontSize: 13, height: 1.6),
             ),
             const SizedBox(height: 28),
             const CircularProgressIndicator(
@@ -765,9 +764,9 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
               strokeWidth: 2.5,
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Redirection en cours...',
-              style: TextStyle(color: Colors.white30, fontSize: 11),
+            Text(
+              'crypto.redirecting'.tr(),
+              style: const TextStyle(color: Colors.white30, fontSize: 11),
             ),
           ],
         ),
@@ -794,9 +793,9 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
                   color: Colors.orange, size: 44),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Montant insuffisant reçu',
-              style: TextStyle(
+            Text(
+              'crypto.underpaid_title'.tr(),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
@@ -804,15 +803,13 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Le montant envoyé est inférieur au prix de l\'abonnement '
-              '(${_session?.amount.toStringAsFixed(2)} USDT requis).\n'
-              'Contactez le support.',
+              'crypto.underpaid_desc'.tr(namedArgs: {'amount': _session?.amount.toStringAsFixed(2) ?? '90'}),
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 28),
             _primaryButton(
-              label: 'Contacter le support',
+              label: 'common.contact_support'.tr(),
               icon: Icons.support_agent_rounded,
               color: Colors.orange,
               onTap: () => Navigator.pop(context),
@@ -841,23 +838,23 @@ class _DriverUsdtPaymentScreenState extends State<DriverUsdtPaymentScreen> {
               child: const Icon(Icons.timer_off_rounded, color: Colors.redAccent, size: 44),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Session expirée',
-              style: TextStyle(
+            Text(
+              'crypto.expired_title'.tr(),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'La session de paiement a expiré.\nCréez une nouvelle session pour continuer.',
+            Text(
+              'crypto.expired_desc'.tr(),
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
+              style: const TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 28),
             _primaryButton(
-              label: 'Réessayer',
+              label: 'common.retry'.tr(),
               icon: Icons.refresh_rounded,
               color: _teal,
               onTap: _initiate,

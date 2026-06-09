@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart' as provider_pkg;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/user.dart';
 import '../providers/auth_provider.dart';
 import '../services/auth_service.dart';
@@ -278,14 +279,14 @@ class _LoginScreenState extends State<LoginScreen>
 
                   const SizedBox(height: 12),
 
-                  Text('Bienvenue !', style: GoogleFonts.poppins(
+                  Text('auth.welcome'.tr(), style: GoogleFonts.poppins(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     height: 1.1,
                   )),
                   const SizedBox(height: 5),
-                  Text('Connectez-vous à votre compte',
+                  Text('auth.login_subtitle'.tr(),
                     style: GoogleFonts.poppins(
                       fontSize: 13,
                       color: Colors.white.withOpacity(0.5),
@@ -318,15 +319,15 @@ class _LoginScreenState extends State<LoginScreen>
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Text('Je suis un...', style: GoogleFonts.poppins(
+            child: Text('auth.i_am_a'.tr(), style: GoogleFonts.poppins(
               fontSize: 13, fontWeight: FontWeight.w600, color: _dark)),
           ),
           const Divider(height: 1, color: Color(0xFFF1F3F7)),
           _roleTile(
             role: UserRole.client,
             icon: Icons.person_rounded,
-            title: 'Client',
-            subtitle: 'Demander des courses et livraisons',
+            title: 'auth.client'.tr(),
+            subtitle: 'auth.client_desc'.tr(),
             isFirst: true,
           ),
           const Divider(height: 1, indent: 16, endIndent: 16,
@@ -334,8 +335,8 @@ class _LoginScreenState extends State<LoginScreen>
           _roleTile(
             role: UserRole.delivery,
             icon: Icons.local_shipping_rounded,
-            title: 'Livreur',
-            subtitle: 'Livrer des courses et gagner de l\'argent',
+            title: 'auth.driver'.tr(),
+            subtitle: 'auth.driver_desc'.tr(),
             isFirst: false,
           ),
         ],
@@ -419,14 +420,14 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildEmailField() {
     return _formField(
       controller: _emailCtrl,
-      hint: 'Adresse email',
+      hint: 'auth.email_hint'.tr(),
       icon: Icons.mail_outline_rounded,
       keyboardType: TextInputType.emailAddress,
       action: TextInputAction.next,
       validator: (v) {
-        if (v == null || v.isEmpty) return 'Veuillez entrer votre email';
+        if (v == null || v.isEmpty) return 'auth.email_required'.tr();
         if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v)) {
-          return 'Email invalide';
+          return 'auth.email_invalid'.tr();
         }
         return null;
       },
@@ -436,7 +437,7 @@ class _LoginScreenState extends State<LoginScreen>
   Widget _buildPasswordField() {
     return _formField(
       controller: _passwordCtrl,
-      hint: 'Mot de passe',
+      hint: 'auth.password_hint'.tr(),
       icon: Icons.lock_outline_rounded,
       obscureText: _obscurePassword,
       action: TextInputAction.done,
@@ -450,8 +451,8 @@ class _LoginScreenState extends State<LoginScreen>
           color: const Color(0xFF9BA3B4), size: 20),
       ),
       validator: (v) {
-        if (v == null || v.isEmpty) return 'Veuillez entrer votre mot de passe';
-        if (v.length < 6) return 'Minimum 6 caractères';
+        if (v == null || v.isEmpty) return 'auth.password_required'.tr();
+        if (v.length < 6) return 'auth.password_min6'.tr();
         return null;
       },
     );
@@ -560,7 +561,7 @@ class _LoginScreenState extends State<LoginScreen>
                   valueColor: AlwaysStoppedAnimation(Colors.white),
                 ),
               )
-            : Text('Se connecter', style: GoogleFonts.poppins(
+            : Text('auth.login_btn'.tr(), style: GoogleFonts.poppins(
                 fontSize: 15, fontWeight: FontWeight.w600,
                 color: Colors.white)),
       ),
@@ -571,12 +572,12 @@ class _LoginScreenState extends State<LoginScreen>
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text('Pas encore de compte ?', style: GoogleFonts.poppins(
+        Text('auth.no_account'.tr(), style: GoogleFonts.poppins(
           fontSize: 13, color: const Color(0xFF9BA3B4))),
         const SizedBox(width: 4),
         GestureDetector(
           onTap: () => Navigator.pushNamed(context, '/signup'),
-          child: Text('S\'inscrire', style: GoogleFonts.poppins(
+          child: Text('auth.register_btn'.tr(), style: GoogleFonts.poppins(
             fontSize: 13, fontWeight: FontWeight.w600, color: _orange)),
         ),
       ],

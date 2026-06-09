@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import '../../utils/app_theme.dart';
@@ -41,8 +42,8 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
       );
     } else if (_selectedVehicle == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner un type de véhicule'),
+        SnackBar(
+          content: Text('booking.select_vehicle_type'.tr()),
           backgroundColor: AppTheme.errorColor,
         ),
       );

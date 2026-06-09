@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,8 @@ import '../models/trip_models.dart';
 import '../providers/ride_state_provider.dart';
 import '../services/trip_service.dart';
 import '../services/route_service.dart';
+import '../services/call_service.dart';
+import '../screens/active_call_screen.dart';
 import '../utils/app_theme.dart';
 
 // ─── Local palette ────────────────────────────────────────────────────────────
@@ -285,12 +288,12 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
 
   static String _statusLabel(RideStatus s) {
     switch (s) {
-      case RideStatus.accepted:   return 'Course confirmée';
-      case RideStatus.arriving:   return 'Chauffeur en route vers vous';
-      case RideStatus.inProgress: return 'Course en cours';
-      case RideStatus.completed:  return 'Course terminée';
-      case RideStatus.cancelled:  return 'Course annulée';
-      default:                    return 'En attente…';
+      case RideStatus.accepted:   return 'booking.ride_confirmed'.tr();
+      case RideStatus.arriving:   return 'booking.driver_en_route'.tr();
+      case RideStatus.inProgress: return 'booking.ride_in_progress'.tr();
+      case RideStatus.completed:  return 'booking.ride_completed'.tr();
+      case RideStatus.cancelled:  return 'booking.ride_cancelled'.tr();
+      default:                    return 'common.pending'.tr();
     }
   }
 
@@ -311,18 +314,17 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Annuler la course ?',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text(
-            'Êtes-vous sûr de vouloir annuler ? Des frais peuvent s\'appliquer.'),
+        title: Text('booking.cancel_ride'.tr(),
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('booking.cancel_confirm_body'.tr()),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Non')),
+              child: Text('common.no'.tr())),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: _C.red),
-            child: const Text('Oui, annuler'),
+            child: Text('booking.cancel_ride_confirm'.tr()),
           ),
         ],
       ),
@@ -336,7 +338,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Erreur: $e'), backgroundColor: _C.red));
+            .showSnackBar(SnackBar(content: Text('common.unknown_error'.tr()), backgroundColor: _C.red));
         setState(() => _isCancelling = false);
       }
     }
@@ -363,7 +365,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
         });
       } else if (next.status == RideStatus.cancelled && mounted && !_hasNavigated) {
         _hasNavigated = true;
-        Navigator.pushReplacementNamed(context, '/client_dashboard');
+        _showCancelledByDriverDialog();
       }
     });
 
@@ -692,14 +694,14 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
             child: const Icon(Icons.receipt_long_rounded, color: _C.primary, size: 20),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Course Active',
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                Text('Suivi en temps réel',
-                    style: TextStyle(color: _C.primary, fontSize: 12)),
+                Text('booking.active_ride_title'.tr(),
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('booking.real_time_tracking'.tr(),
+                    style: const TextStyle(color: _C.primary, fontSize: 12)),
               ],
             ),
           ),
@@ -782,17 +784,45 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
             ],
           ),
         ),
-        // Call button placeholder
-        Container(
-          width: 38, height: 38,
-          decoration: BoxDecoration(
-            color: _C.green.withAlpha(20), shape: BoxShape.circle,
-            border: Border.all(color: _C.green.withAlpha(80)),
+        // Call button
+        GestureDetector(
+          onTap: _startCallToDriver,
+          child: Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(
+              color: _C.green.withAlpha(20), shape: BoxShape.circle,
+              border: Border.all(color: _C.green.withAlpha(80)),
+            ),
+            child: const Icon(Icons.phone_rounded, color: _C.green, size: 18),
           ),
-          child: const Icon(Icons.phone_rounded, color: _C.green, size: 18),
         ),
       ],
     );
+  }
+
+  Future<void> _startCallToDriver() async {
+    final session = await CallService().initiateCall(widget.tripId);
+    if (session == null) {
+      if (mounted) {
+        final err = CallService().lastError ?? 'Erreur inconnue';
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Impossible de démarrer l\'appel'),
+            content: SelectableText(err),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+          ),
+        );
+      }
+      return;
+    }
+    if (mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ActiveCallScreen(session: session, isOutgoing: true),
+        ),
+      );
+    }
   }
 
   Widget _avatarInitial() {
@@ -812,8 +842,8 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
         children: [
           const Icon(Icons.handshake_rounded, color: _C.primary, size: 20),
           const SizedBox(width: 10),
-          const Text('Tarif verrouillé',
-              style: TextStyle(fontSize: 13, color: _C.gray600, fontWeight: FontWeight.w600)),
+          Text('booking.fare_locked'.tr(),
+              style: const TextStyle(fontSize: 13, color: _C.gray600, fontWeight: FontWeight.w600)),
           const Spacer(),
           Text(
             '${widget.lockedFare.toStringAsFixed(2)} ${widget.currency}',
@@ -921,8 +951,8 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Votre chauffeur',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _C.gray400, letterSpacing: 0.8)),
+          Text('booking.your_driver'.tr(),
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _C.gray400, letterSpacing: 0.8)),
           const SizedBox(height: 12),
           _buildDriverRow(),
         ],
@@ -931,11 +961,11 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   }
 
   Widget _buildStepperCard(ActiveRideState rideState) {
-    const steps = [
-      ('Course confirmée',       RideStatus.accepted),
-      ('Chauffeur en route',     RideStatus.arriving),
-      ('Course en cours',        RideStatus.inProgress),
-      ('Course terminée',        RideStatus.completed),
+    final steps = [
+      ('booking.ride_confirmed'.tr(),        RideStatus.accepted),
+      ('booking.driver_en_route_short'.tr(), RideStatus.arriving),
+      ('booking.ride_in_progress'.tr(),      RideStatus.inProgress),
+      ('booking.ride_completed'.tr(),        RideStatus.completed),
     ];
     final currentIdx = steps.indexWhere((s) => s.$2 == rideState.status);
 
@@ -949,8 +979,8 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Étapes du trajet',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _C.gray400, letterSpacing: 0.8)),
+          Text('booking.ride_steps'.tr(),
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _C.gray400, letterSpacing: 0.8)),
           const SizedBox(height: 14),
           ...List.generate(steps.length, (i) {
             final isDone    = i < currentIdx;
@@ -995,6 +1025,60 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     );
   }
 
+  void _showCancelledByDriverDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _C.amber.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person_off_rounded, color: _C.amber, size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('Course annulée',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Le livreur n\'a pas pu prendre en charge votre course.\n\n'
+          'Vous pouvez créer une nouvelle demande — d\'autres livreurs sont disponibles.',
+          style: TextStyle(fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushReplacementNamed(context, '/client_dashboard');
+            },
+            child: Text('common.cancel'.tr(),
+                style: const TextStyle(color: _C.gray400)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushReplacementNamed(context, '/create_ride');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _C.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Nouvelle course'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCancelButton() {
     return SizedBox(
       width: double.infinity,
@@ -1004,7 +1088,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
             ? const SizedBox(width: 16, height: 16,
                 child: CircularProgressIndicator(strokeWidth: 2, color: _C.red))
             : const Icon(Icons.close_rounded, size: 18),
-        label: Text(_isCancelling ? 'Annulation…' : 'Annuler la course'),
+        label: Text(_isCancelling ? 'booking.cancelling'.tr() : 'booking.cancel_ride'.tr()),
         style: OutlinedButton.styleFrom(
           foregroundColor: _C.red,
           side: const BorderSide(color: _C.red, width: 1.5),
@@ -1032,13 +1116,13 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
               Icon(isCompleted ? Icons.check_circle_rounded : Icons.cancel_rounded,
                   color: isCompleted ? _C.green : _C.red, size: 48),
               const SizedBox(height: 10),
-              Text(isCompleted ? 'Course terminée ! 🎉' : 'Course annulée',
+              Text(isCompleted ? 'booking.ride_completed_success'.tr() : 'booking.ride_cancelled'.tr(),
                   style: TextStyle(
                       fontSize: 18, fontWeight: FontWeight.bold,
                       color: isCompleted ? _C.green : _C.red)),
               if (isCompleted) ...[
                 const SizedBox(height: 6),
-                Text('Montant payé : ${widget.lockedFare.toStringAsFixed(2)} ${widget.currency}',
+                Text('booking.amount_paid'.tr(namedArgs: {'amount': widget.lockedFare.toStringAsFixed(2), 'currency': widget.currency}),
                     style: const TextStyle(fontSize: 14, color: _C.gray600)),
               ],
             ],
@@ -1050,7 +1134,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
           child: ElevatedButton.icon(
             onPressed: () => Navigator.pushReplacementNamed(context, '/client_trip_history'),
             icon: const Icon(Icons.history_rounded, size: 18),
-            label: const Text('Voir l\'historique'),
+            label: Text('nav.history'.tr()),
             style: ElevatedButton.styleFrom(
               backgroundColor: _C.primary, foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),

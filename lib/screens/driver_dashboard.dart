@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
@@ -10,8 +11,10 @@ import '../utils/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../services/location_tracking_service.dart';
 import '../services/notification_service.dart';
+import '../services/call_service.dart';
 import '../services/trip_service.dart';
 import '../services/subscription_service.dart';
+import '../services/driver_service.dart';
 import '../widgets/notification_sheet.dart';
 import 'driver_active_ride.dart';
 
@@ -56,7 +59,9 @@ class _DriverDashboardState extends State<DriverDashboard>
   final Set<Marker> _markers = {};
 
   // State
-  bool _isOnline = false;
+  bool _isTogglingOnline = false;
+
+  bool get _isOnline => DriverService.isOnline;
 
   // Services
   final LocationTrackingService _locationTrackingService =
@@ -79,13 +84,17 @@ class _DriverDashboardState extends State<DriverDashboard>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
+    DriverService.isOnlineNotifier.addListener(_onAvailabilityChanged);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initLocation();
       _initializeLocationTracking();
       _resumeActiveRideIfAny();
       _subService.fetchStatus();
+      DriverService.loadAvailability();
     });
     NotificationService().initialize();
+    CallService().connectSocket();
 
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -95,11 +104,16 @@ class _DriverDashboardState extends State<DriverDashboard>
 
   @override
   void dispose() {
+    DriverService.isOnlineNotifier.removeListener(_onAvailabilityChanged);
     _mapController?.dispose();
     _positionSub?.cancel();
     _locationTrackingService.dispose();
     _onlineAnimController.dispose();
     super.dispose();
+  }
+
+  void _onAvailabilityChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _initLocation() async {
@@ -181,27 +195,47 @@ class _DriverDashboardState extends State<DriverDashboard>
     } catch (_) {}
   }
 
-  void _toggleOnline() {
-    setState(() {
-      _isOnline = !_isOnline;
-      // Rebuild marker with new color
-      if (_currentPosition != null) {
-        _markers.removeWhere((m) => m.markerId.value == 'driver');
-        _markers.add(_buildDriverMarker(_currentPosition!));
+  Future<void> _toggleOnline() async {
+    if (_isTogglingOnline) return;
+    HapticFeedback.mediumImpact();
+    setState(() => _isTogglingOnline = true);
+    final newStatus = !_isOnline;
+    try {
+      await DriverService.setAvailability(newStatus);
+      // Rebuild map marker with new color
+      if (_currentPosition != null && mounted) {
+        setState(() {
+          _markers.removeWhere((m) => m.markerId.value == 'driver');
+          _markers.add(_buildDriverMarker(_currentPosition!));
+        });
       }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isOnline ? 'Vous êtes maintenant en ligne' : 'Vous êtes hors ligne',
-        ),
-        backgroundColor: _isOnline ? Colors.green : Colors.orange,
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-      ),
-    );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newStatus ? 'driver.status_online'.tr() : 'driver.status_offline'.tr()),
+            backgroundColor: newStatus ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: impossible de changer le statut'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTogglingOnline = false);
+    }
   }
 
   void _centerOnMe() {
@@ -337,7 +371,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    _isOnline ? 'En ligne' : 'Hors ligne',
+                    _isOnline ? 'driver.status_online'.tr() : 'driver.status_offline'.tr(),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -485,9 +519,9 @@ class _DriverDashboardState extends State<DriverDashboard>
                 // ── Section label ─────────────────────────────────────
                 Row(
                   children: [
-                    const Text(
-                      'Résumé du jour',
-                      style: TextStyle(
+                    Text(
+                      'driver.dashboard_title'.tr(),
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF9BA3B4),
@@ -496,7 +530,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                     ),
                     const Spacer(),
                     Text(
-                      _isOnline ? '● En ligne' : '● Hors ligne',
+                      _isOnline ? '● ${'driver.status_online'.tr()}' : '● ${'driver.status_offline'.tr()}',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -516,21 +550,21 @@ class _DriverDashboardState extends State<DriverDashboard>
                     _buildStatChip(
                       icon: Icons.account_balance_wallet_rounded,
                       value: '${_todayEarnings.toStringAsFixed(0)} TND',
-                      label: "Gains",
+                      label: 'nav.earnings'.tr(),
                       color: const Color(0xFF22C55E),
                     ),
                     const SizedBox(width: 10),
                     _buildStatChip(
                       icon: Icons.directions_car_rounded,
                       value: '$_todayRides',
-                      label: 'Courses',
+                      label: 'nav.rides'.tr(),
                       color: const Color(0xFF3B82F6),
                     ),
                     const SizedBox(width: 10),
                     _buildStatChip(
                       icon: Icons.star_rounded,
                       value: '$_rating',
-                      label: 'Note',
+                      label: 'driver.rating'.tr(),
                       color: const Color(0xFFF59E0B),
                     ),
                   ],
@@ -540,7 +574,7 @@ class _DriverDashboardState extends State<DriverDashboard>
 
                 // ── Online / Offline button ───────────────────────────
                 GestureDetector(
-                  onTap: _toggleOnline,
+                  onTap: _isTogglingOnline ? null : _toggleOnline,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 350),
                     curve: Curves.easeInOut,
@@ -566,38 +600,46 @@ class _DriverDashboardState extends State<DriverDashboard>
                         ),
                       ],
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 250),
-                          child: Icon(
-                            _isOnline
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            key: ValueKey(_isOnline),
-                            color: Colors.white,
-                            size: 26,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 250),
-                          child: Text(
-                            _isOnline
-                                ? 'Passer hors ligne'
-                                : 'Aller en ligne',
-                            key: ValueKey(_isOnline),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.2,
+                    child: _isTogglingOnline
+                        ? const Center(
+                            child: SizedBox(
+                              width: 22, height: 22,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2.5),
                             ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 250),
+                                child: Icon(
+                                  _isOnline
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  key: ValueKey(_isOnline),
+                                  color: Colors.white,
+                                  size: 26,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 250),
+                                child: Text(
+                                  _isOnline
+                                      ? 'driver.status_offline'.tr()
+                                      : 'driver.status_online'.tr(),
+                                  key: ValueKey(_isOnline),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ],
@@ -733,21 +775,21 @@ class _DriverDashboardState extends State<DriverDashboard>
             ),
           ],
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.warning_rounded, color: Colors.white, size: 20),
-            SizedBox(width: 10),
+            const Icon(Icons.warning_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 'Abonnement impayé — Régularisez pour accéder aux courses',
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                 ),
               ),
             ),
-            Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 12),
+            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 12),
           ],
         ),
       ),
@@ -798,29 +840,29 @@ class _DriverDashboardState extends State<DriverDashboard>
                 child: const Icon(Icons.menu_rounded, color: Colors.white, size: 18),
               ),
               const SizedBox(width: 10),
-              const Text('Menu', style: TextStyle(
+              Text('Menu', style: const TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w700,
                 color: Color(0xFF0F172A))),
             ]),
             const SizedBox(height: 16),
 
-            _buildMenuTile(Icons.person_rounded, 'Mon Profil',
-                'Gérer vos informations', () {
+            _buildMenuTile(Icons.person_rounded, 'driver.profile_title'.tr(),
+                'driver.profile_subtitle'.tr(), () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/driver_profile');
             }),
-            _buildMenuTile(Icons.card_membership_rounded, 'Abonnement',
-                'Statut et renouvellement', () {
+            _buildMenuTile(Icons.card_membership_rounded, 'driver.subscription_menu'.tr(),
+                'driver.subscription_subtitle'.tr(), () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/driver_subscription');
             }),
-            _buildMenuTile(Icons.star_rounded, 'Offre Partenariat',
-                'Avantages exclusifs', () {
+            _buildMenuTile(Icons.star_rounded, 'driver.offers_menu'.tr(),
+                'driver.offers_subtitle'.tr(), () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/driver_offer');
             }),
-            _buildMenuTile(Icons.my_location_rounded, 'Actualiser localisation',
-                'Resynchroniser le GPS', () {
+            _buildMenuTile(Icons.my_location_rounded, 'driver.refresh_location'.tr(),
+                'driver.refresh_location_subtitle'.tr(), () {
               Navigator.pop(context);
               _refreshLocation();
             }),
@@ -830,8 +872,8 @@ class _DriverDashboardState extends State<DriverDashboard>
               child: Divider(color: Color(0xFFF1F3F7), height: 1),
             ),
 
-            _buildMenuTile(Icons.logout_rounded, 'Déconnexion',
-                'Quitter votre session', () async {
+            _buildMenuTile(Icons.logout_rounded, 'auth.logout'.tr(),
+                'driver.logout_subtitle'.tr(), () async {
               Navigator.pop(context);
               NotificationService().disconnect();
               await Provider.of<AuthProvider>(context, listen: false).logout();
@@ -901,7 +943,7 @@ class _DriverDashboardState extends State<DriverDashboard>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Localisation actualisée'),
+            content: Text('driver.location_refreshed'.tr()),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/user.dart';
 import '../services/profile_service.dart';
 import '../models/requests/update_profile_request.dart';
@@ -102,13 +103,33 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _pickImage() async {
     try {
-      final XFile? image =
-          await ImagePicker().pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        setState(() => _profilePictureUrl = image.path);
+      final XFile? image = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 1024,
+      );
+      if (image == null) return;
+      // Show local preview immediately
+      setState(() => _profilePictureUrl = image.path);
+      // Upload to server
+      setState(() => _isLoading = true);
+      try {
+        final result = await ProfileService.uploadProfilePicture(image.path);
+        final url = result['data']?['profilePicture'] ??
+            result['profilePicture'] ??
+            result['data']?['profile_picture'] ??
+            result['profile_picture'];
+        if (mounted && url is String) {
+          setState(() => _profilePictureUrl = url);
+          _showSnack('Photo mise à jour', success: true);
+        }
+      } catch (e) {
+        if (mounted) _showSnack('Échec upload photo: $e', success: false);
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
-      _showSnack('Erreur sélection image', success: false);
+      _showSnack('common.unknown_error'.tr(), success: false);
     }
   }
 
@@ -144,7 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (e is ValidationException) return e.toString();
     if (e is AuthErrorResponse) return e.message;
     if (e is NetworkException) return e.message;
-    return 'Erreur inattendue : $e';
+    return 'common.unknown_error'.tr();
   }
 
   void _showSnack(String msg, {required bool success}) {
@@ -183,25 +204,27 @@ class _ProfileScreenState extends State<ProfileScreen>
                             padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
                             children: [
                               if (_errorMessage != null) _buildError(),
-                              _section('Informations personnelles', Icons.person_rounded, [
-                                _field(_firstNameCtrl, 'Prénom', Icons.badge_rounded),
+                              _section('profile.personal_info'.tr(), Icons.person_rounded, [
+                                _field(_firstNameCtrl, 'profile.first_name'.tr(), Icons.badge_rounded),
                                 _divider(),
-                                _field(_lastNameCtrl, 'Nom', Icons.badge_outlined),
+                                _field(_lastNameCtrl, 'profile.last_name'.tr(), Icons.badge_outlined),
                                 _divider(),
                                 _genderField(),
                                 _divider(),
                                 _dobField(),
                               ]),
                               const SizedBox(height: 20),
-                              _section('Coordonnées', Icons.contact_mail_rounded, [
-                                _field(_emailCtrl, 'Email', Icons.email_rounded,
+                              _section('profile.contact'.tr(), Icons.contact_mail_rounded, [
+                                _field(_emailCtrl, 'profile.email'.tr(), Icons.email_rounded,
                                     type: TextInputType.emailAddress),
                                 _divider(),
-                                _field(_phoneCtrl, 'Téléphone', Icons.phone_rounded,
+                                _field(_phoneCtrl, 'profile.phone'.tr(), Icons.phone_rounded,
                                     type: TextInputType.phone),
                                 _divider(),
-                                _field(_countryCtrl, 'Pays', Icons.public_rounded),
+                                _field(_countryCtrl, 'profile.country'.tr(), Icons.public_rounded),
                               ]),
+                              const SizedBox(height: 16),
+                              _languageButton(),
                               const SizedBox(height: 28),
                               _saveButton(),
                             ],
@@ -249,7 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       child: _iconBtn(Icons.arrow_back_ios_new_rounded),
                     ),
                     Text(
-                      'Mon Profil',
+                      'profile.title'.tr(),
                       style: GoogleFonts.poppins(
                         fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
                     ),
@@ -312,7 +335,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  name.isEmpty ? 'Mon Profil' : name,
+                  name.isEmpty ? 'profile.title'.tr() : name,
                   style: GoogleFonts.poppins(
                     fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
                 ),
@@ -431,7 +454,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             child: DropdownButtonFormField<String>(
               initialValue: _genderCtrl.text.isEmpty ? null : _genderCtrl.text,
               decoration: InputDecoration(
-                labelText: 'Genre',
+                labelText: 'profile.gender'.tr(),
                 labelStyle:
                     GoogleFonts.poppins(color: _textSecondary, fontSize: 13),
                 border: InputBorder.none,
@@ -442,10 +465,10 @@ class _ProfileScreenState extends State<ProfileScreen>
               style: GoogleFonts.poppins(fontSize: 14, color: _textPrimary),
               icon: const Icon(Icons.keyboard_arrow_down_rounded,
                   color: _textSecondary),
-              items: const [
-                DropdownMenuItem(value: 'male', child: Text('Homme')),
-                DropdownMenuItem(value: 'female', child: Text('Femme')),
-                DropdownMenuItem(value: 'other', child: Text('Autre')),
+              items: [
+                DropdownMenuItem(value: 'male', child: Text('profile.male'.tr())),
+                DropdownMenuItem(value: 'female', child: Text('profile.female'.tr())),
+                DropdownMenuItem(value: 'other', child: Text('profile.other_gender'.tr())),
               ],
               onChanged: (v) => setState(() => _genderCtrl.text = v ?? ''),
             ),
@@ -491,7 +514,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             child: const Icon(Icons.cake_rounded, color: _orange, size: 15),
           ),
-          labelText: 'Date de naissance',
+          labelText: 'profile.birth_date'.tr(),
           labelStyle:
               GoogleFonts.poppins(color: _textSecondary, fontSize: 13),
           border: InputBorder.none,
@@ -502,6 +525,22 @@ class _ProfileScreenState extends State<ProfileScreen>
               ? null
               : const Icon(Icons.edit_rounded, color: _textSecondary, size: 16),
         ),
+      ),
+    );
+  }
+
+  // ─── Language button ──────────────────────────────────────────────
+
+  Widget _languageButton() {
+    return OutlinedButton.icon(
+      onPressed: () => Navigator.pushNamed(context, '/language'),
+      icon: const Icon(Icons.language_rounded),
+      label: Text('profile.language'.tr()),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 50),
+        side: const BorderSide(color: _border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        foregroundColor: _orange,
       ),
     );
   }
@@ -546,14 +585,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: _textSecondary)),
                 const SizedBox(width: 12),
-                Text('Enregistrement...',
+                Text('common.loading'.tr(),
                     style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w600, color: _textSecondary)),
               ])
             : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 const Icon(Icons.check_rounded, color: Colors.white, size: 20),
                 const SizedBox(width: 10),
-                Text('Enregistrer les modifications',
+                Text('profile.edit'.tr(),
                     style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -575,7 +614,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 color: _orange, strokeWidth: 2.5),
           ),
           const SizedBox(height: 14),
-          Text('Chargement du profil...',
+          Text('common.loading'.tr(),
               style: GoogleFonts.poppins(fontSize: 13, color: _textSecondary)),
         ]),
       );
@@ -620,13 +659,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                   color: Color(0xFFEF4444), size: 28),
             ),
             const SizedBox(height: 16),
-            Text('Déconnexion',
+            Text('auth.logout'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
                     color: _textPrimary)),
             const SizedBox(height: 8),
-            Text('Êtes-vous sûr de vouloir vous déconnecter ?',
+            Text('auth.logout_confirm'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 13, color: _textSecondary),
                 textAlign: TextAlign.center),
@@ -641,7 +680,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text('Annuler',
+                  child: Text('common.cancel'.tr(),
                       style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           color: _textSecondary)),
@@ -658,7 +697,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
-                  child: Text('Déconnexion',
+                  child: Text('profile.logout'.tr(),
                       style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w700, color: Colors.white)),
                 ),
@@ -678,7 +717,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             .pushNamedAndRemoveUntil('/login', (route) => false);
       }
     } catch (e) {
-      if (mounted) _showSnack('Erreur déconnexion : $e', success: false);
+      if (mounted) _showSnack('common.unknown_error'.tr(), success: false);
     }
   }
 }

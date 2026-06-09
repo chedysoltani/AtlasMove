@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 import '../services/location_service.dart';
 import '../services/trip_service.dart';
+import '../services/driver_service.dart';
 import '../models/trip_models.dart';
 import 'driver_active_ride.dart';
 
@@ -39,13 +41,34 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
-    _fetchAvailableTrips();
-    // Auto-refresh toutes les 6s pour détecter les nouvelles courses
+    DriverService.isOnlineNotifier.addListener(_onOnlineStatusChanged);
+    if (DriverService.isOnline) {
+      _fetchAvailableTrips();
+      _startAutoRefresh();
+    } else {
+      _isLoading = false;
+    }
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (mounted && _submittedBids.isEmpty) {
+      if (mounted && _submittedBids.isEmpty && DriverService.isOnline) {
         _fetchAvailableTrips();
       }
     });
+  }
+
+  void _onOnlineStatusChanged() {
+    if (!mounted) return;
+    if (DriverService.isOnline) {
+      setState(() { _isLoading = true; _error = null; _trips = []; });
+      _fetchAvailableTrips();
+      _startAutoRefresh();
+    } else {
+      _autoRefreshTimer?.cancel();
+      setState(() { _isLoading = false; _trips = []; _error = null; });
+    }
   }
 
   void _initializeAnimations() {
@@ -67,6 +90,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
 
   @override
   void dispose() {
+    DriverService.isOnlineNotifier.removeListener(_onOnlineStatusChanged);
     _autoRefreshTimer?.cancel();
     for (final t in _bidPollingTimers.values) {
       t.cancel();
@@ -181,9 +205,9 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                 onPressed: widget.onBackToDashboard,
               )
             : null,
-        title: const Text(
-          'Courses disponibles',
-          style: TextStyle(
+        title: Text(
+          'driver.available_rides'.tr(),
+          style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w600,
           ),
@@ -196,66 +220,99 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Header with status
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              border: Border(
-                bottom: BorderSide(color: Colors.grey.shade200),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: _isLoading ? Colors.orange : (_error != null ? Colors.red : Colors.green),
-                    shape: BoxShape.circle,
-                  ),
+      body: ValueListenableBuilder<bool>(
+        valueListenable: DriverService.isOnlineNotifier,
+        builder: (_, isOnline, __) {
+          if (!isOnline) return _buildOfflineScreen();
+          return Column(
+            children: [
+              // Header with status
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _isLoading ? 'Recherche en cours...' : (_error != null ? 'Erreur de recherche' : 'En ligne - Prêt'),
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (!_isLoading && _error == null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${_trips.length} disponibles',
-                      style: const TextStyle(
-                        color: AppTheme.primaryColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 12, height: 12,
+                      decoration: BoxDecoration(
+                        color: _isLoading ? Colors.orange : (_error != null ? Colors.red : Colors.green),
+                        shape: BoxShape.circle,
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-
-          // Rides List or States
-          Expanded(
-            child: _buildBodyContent(),
-          ),
-        ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _isLoading ? 'common.loading'.tr() : (_error != null ? 'common.error'.tr() : 'driver.status_online'.tr()),
+                        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    if (!_isLoading && _error == null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${_trips.length} disponibles',
+                          style: const TextStyle(
+                            color: AppTheme.primaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Expanded(child: _buildBodyContent()),
+            ],
+          );
+        },
       ),
     );
   }
   
+  Widget _buildOfflineScreen() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80, height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A).withOpacity(0.07),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.wifi_off_rounded,
+                  color: Color(0xFF0F172A), size: 38),
+            ),
+            const SizedBox(height: 20),
+            const Text('Vous êtes hors ligne',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A))),
+            const SizedBox(height: 10),
+            const Text(
+              'Passez en ligne depuis le tableau de bord pour voir et accepter des courses.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF9BA3B4),
+                  height: 1.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBodyContent() {
     if (_isLoading) {
       return const Center(
@@ -274,9 +331,9 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
             children: [
               const Icon(Icons.error_outline, color: Colors.red, size: 60),
               const SizedBox(height: 16),
-              const Text(
-                'Une erreur est survenue',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                'common.unknown_error'.tr(),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
@@ -286,7 +343,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
               ),
               const SizedBox(height: 24),
               CustomButton(
-                text: 'Réessayer',
+                text: 'common.retry'.tr(),
                 onPressed: _fetchAvailableTrips,
               ),
             ],
@@ -302,9 +359,9 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
           children: [
             Icon(Icons.location_off, color: Colors.grey.shade300, size: 80),
             const SizedBox(height: 16),
-            const Text(
-              'Aucune course disponible à proximité',
-              style: TextStyle(
+            Text(
+              'driver.no_rides'.tr(),
+              style: const TextStyle(
                 color: Colors.black54,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -561,7 +618,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  'Offre de ${_submittedBids[trip.id]!.toStringAsFixed(2)} ${trip.currency} soumise au client ! En attente...',
+                                  'driver_rides.offer_submitted'.tr(namedArgs: {'amount': _submittedBids[trip.id]!.toStringAsFixed(2), 'currency': trip.currency}),
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.green,
@@ -596,9 +653,9 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                                   ),
                                   side: BorderSide(color: Colors.grey.shade300),
                                 ),
-                                child: const Text(
-                                  'Refuser',
-                                  style: TextStyle(
+                                child: Text(
+                                  'driver.refuse'.tr(),
+                                  style: const TextStyle(
                                     color: Colors.black,
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -645,7 +702,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                               child: _acceptingTripId == trip.id 
                                 ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator()))
                                 : CustomButton(
-                                    text: _submittedBids[trip.id] != null ? 'Accepter Client' : 'Accepter',
+                                    text: _submittedBids[trip.id] != null ? 'driver.accept'.tr() : 'driver.accept'.tr(),
                                     onPressed: () => _handleRideAction(trip, true),
                                     height: 48,
                                   ),
@@ -659,9 +716,9 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                               _isBiddingExpanded[trip.id] = false;
                             });
                           },
-                          child: const Text(
-                            'Retour aux options',
-                            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+                          child: Text(
+                            'common.back'.tr(),
+                            style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
                           ),
                         ),
                     ],
@@ -775,7 +832,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                   });
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Offre de ${currentBid.toStringAsFixed(2)} ${trip.currency} soumise !'),
+                      content: Text('driver.offer_submitted_short'.tr(namedArgs: {'amount': currentBid.toStringAsFixed(2), 'currency': trip.currency})),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -784,7 +841,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Erreur: $e'),
+                      content: Text('common.unknown_error'.tr()),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -876,8 +933,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
           });
           
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Course acceptée avec succès !'),
+            SnackBar(
+              content: Text('driver.active_ride'.tr()),
               backgroundColor: Colors.green,
             ),
           );
@@ -896,19 +953,23 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
             _acceptingTripId = null;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Erreur: Impossible d\'accepter la course'),
+            SnackBar(
+              content: Text('common.server_error'.tr()),
               backgroundColor: Colors.red,
             ),
           );
         }
       }
     } else {
-      // Ajouter à la liste noire locale pour éviter la réapparition au refresh
+      // Retirer localement immédiatement
       setState(() {
         _refusedTripIds.add(trip.id);
         _trips.removeWhere((t) => t.id == trip.id);
       });
+      // Informer le backend — le backend NE doit PAS annuler le trip,
+      // il doit seulement marquer ce livreur comme ayant refusé et
+      // garder le trip disponible pour les autres livreurs.
+      TripService.refuseTrip(trip.id);
     }
   }
 

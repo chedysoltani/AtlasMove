@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../services/auth_service.dart';
 import '../models/responses/auth_response.dart';
 import '../models/user.dart';
@@ -40,8 +41,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Erreur: Paramètres de connexion manquants'),
+            SnackBar(
+              content: Text('auth.missing_login_params'.tr()),
               backgroundColor: Colors.red,
             ),
           );
@@ -100,7 +101,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Connexion réussie! Bienvenue ${response.user.fullName}'),
+            content: Text('auth.login_success'.tr(namedArgs: {'name': response.user.fullName})),
             backgroundColor: AppTheme.successColor,
             duration: const Duration(seconds: 3),
           ),
@@ -184,9 +185,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           icon: const Icon(Icons.arrow_back, color: AppTheme.primaryColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Vérification OTP',
-          style: TextStyle(
+        title: Text(
+          'auth.otp_title'.tr(),
+          style: const TextStyle(
             color: AppTheme.primaryColor,
             fontWeight: FontWeight.bold,
           ),
@@ -209,9 +210,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               ),
               const SizedBox(height: 20),
               
-              const Text(
-                'Vérification à deux facteurs',
-                style: TextStyle(
+              Text(
+                'auth.otp_2fa_title'.tr(),
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.primaryColor,
@@ -219,9 +220,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              
+
               Text(
-                'Un code OTP a été envoyé à\n${widget.email}',
+                'auth.otp_sent_to'.tr(namedArgs: {'email': widget.email}),
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey.shade600,
@@ -257,15 +258,15 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
               // Champ OTP
               CustomTextField(
                 controller: _otpController,
-                labelText: 'Code OTP',
-                hintText: 'Entrez le code à 6 chiffres',
+                labelText: 'auth.otp_verify'.tr(),
+                hintText: 'auth.otp_subtitle'.tr(),
                 keyboardType: TextInputType.number,
                 maxLength: 6,
                 textInputAction: TextInputAction.done,
                 prefixIcon: const Icon(Icons.security),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Le code OTP est requis';
+                    return 'auth.field_required'.tr();
                   }
                   if (value.length != 6) {
                     return 'Le code OTP doit contenir 6 chiffres';
@@ -292,7 +293,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                     Icon(Icons.timer, color: Colors.blue.shade600, size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      'Code valide pour: ${_formatTime(_remainingSeconds)}',
+                      'auth.otp_valid_for'.tr(namedArgs: {'time': _formatTime(_remainingSeconds)}),
                       style: TextStyle(
                         color: Colors.blue.shade600,
                         fontWeight: FontWeight.bold,
@@ -305,7 +306,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
               // Bouton de vérification
               CustomButton(
-                text: _isLoading ? 'Vérification...' : 'Vérifier le code',
+                text: _isLoading ? 'auth.otp_verifying'.tr() : 'auth.otp_verify_btn'.tr(),
                 onPressed: _isLoading ? null : _verifyOtp,
                 isLoading: _isLoading,
                 width: double.infinity,
@@ -314,7 +315,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
               // Bouton de renvoi
               CustomButton(
-                text: _canResend ? 'Renvoyer le code' : 'Renvoyer (${_formatTime(_remainingSeconds)})',
+                text: _canResend
+                    ? 'auth.otp_resend'.tr()
+                    : 'auth.otp_countdown'.tr(namedArgs: {'seconds': _formatTime(_remainingSeconds)}),
                 onPressed: (_canResend && !_isLoading) ? _resendOtp : null,
                 type: ButtonType.text,
                 width: double.infinity,

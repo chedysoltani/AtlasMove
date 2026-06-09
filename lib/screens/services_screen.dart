@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider_pkg;
+import 'package:easy_localization/easy_localization.dart';
 import '../models/service_models.dart';
 import '../services/service_api.dart';
 import '../providers/services_provider.dart';
@@ -53,9 +54,9 @@ void initState() {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Services',
-          style: TextStyle(
+        title: Text(
+          'services.title'.tr(),
+          style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w600,
           ),
@@ -98,7 +99,7 @@ void initState() {
             Icon(Icons.error_outline, size: 64, color: Colors.red.shade300),
             const SizedBox(height: 16),
             Text(
-              'Erreur de chargement',
+              'common.error'.tr(),
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -113,7 +114,7 @@ void initState() {
             ),
             const SizedBox(height: 16),
             CustomButton(
-              text: 'Réessayer',
+              text: 'common.retry'.tr(),
               onPressed: () => ref.read(servicesProvider.notifier).refresh(),
             ),
           ],
@@ -129,7 +130,7 @@ void initState() {
             Icon(Icons.category_outlined, size: 64, color: Colors.grey.shade300),
             const SizedBox(height: 16),
             Text(
-              'Aucun service disponible',
+              'services.no_services'.tr(),
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -138,7 +139,7 @@ void initState() {
             ),
             const SizedBox(height: 8),
             Text(
-              'Essayez de modifier les filtres',
+              'common.no_data'.tr(), // TODO: add translation key for "Essayez de modifier les filtres"
               style: TextStyle(color: Colors.grey.shade500),
             ),
           ],
@@ -315,9 +316,9 @@ void initState() {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text(
-                    'Affecter',
-                    style: TextStyle(
+                  child: Text(
+                    'services.accept_mission'.tr(),
+                    style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -355,7 +356,7 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text("S'affecter à ${widget.service.name}"),
+      title: Text('services.assign_to'.tr(namedArgs: {'name': widget.service.name})),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -369,7 +370,7 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
           
           if (widget.service.requiresDocument) ...[
             Text(
-              'Document requis',
+              'services.document_required'.tr(),
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
                 color: Colors.black,
@@ -386,9 +387,9 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      _documentUrl != null 
-                          ? 'Document téléchargé' 
-                          : 'Aucun document sélectionné',
+                      _documentUrl != null
+                          ? 'common.completed'.tr() // TODO: add translation key for "Document téléchargé"
+                          : 'common.no_data'.tr(), // TODO: add translation key for "Aucun document sélectionné"
                       style: TextStyle(
                         color: _documentUrl != null 
                             ? Colors.green.shade700 
@@ -420,7 +421,7 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Ce service est actuellement indisponible',
+                      'common.no_data'.tr(), // TODO: add translation key for "Ce service est actuellement indisponible"
                       style: TextStyle(color: Colors.red.shade700),
                     ),
                   ),
@@ -433,17 +434,17 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
+          child: Text('common.cancel'.tr()),
         ),
         ElevatedButton(
           onPressed: (_isLoading || (!widget.service.isActive)) ? null : _assignToService,
-          child: _isLoading 
+          child: _isLoading
               ? const SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Confirmer'),
+              : Text('common.confirm'.tr()),
         ),
       ],
     );
@@ -454,19 +455,19 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       final file = await ServiceApi.pickDocument();
       if (file != null) {
         setState(() => _isLoading = true);
-        
+
         final token = provider_pkg.Provider.of<AuthProvider>(context, listen: false).token ?? '';
         final url = await ServiceApi.uploadDocument(token: token, file: file);
-        
+
         setState(() {
           _documentUrl = url;
           _isLoading = false;
         });
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Document téléchargé avec succès'),
+            SnackBar(
+              content: Text('common.completed'.tr()), // TODO: add translation key for "Document téléchargé avec succès"
               backgroundColor: Colors.green,
             ),
           );
@@ -477,7 +478,7 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text('${'common.error'.tr()}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -488,8 +489,8 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
   Future<void> _assignToService() async {
     if (widget.service.requiresDocument && _documentUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez télécharger un document'),
+        SnackBar(
+          content: Text('common.no_data'.tr()), // TODO: add translation key for "Veuillez télécharger un document"
           backgroundColor: Colors.red,
         ),
       );
@@ -509,8 +510,8 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Demande envoyée avec succès'),
+          SnackBar(
+            content: Text('services.accept_mission'.tr()), // TODO: add translation key for "Demande envoyée avec succès"
             backgroundColor: Colors.green,
           ),
         );
@@ -519,7 +520,7 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text('${'common.error'.tr()}: $e'),
             backgroundColor: Colors.red,
           ),
         );

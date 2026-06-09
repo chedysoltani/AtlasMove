@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/painting.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
 
@@ -202,9 +203,9 @@ class _BookingScreenState extends State<BookingScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Réserver un trajet',
-          style: TextStyle(
+        title: Text(
+          'booking.title'.tr(),
+          style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w600,
           ),
@@ -325,7 +326,7 @@ class _BookingScreenState extends State<BookingScreen> {
             
             // Find Driver Button
             CustomButton(
-              text: 'Trouver un chauffeur',
+              text: 'booking.find_driver'.tr(),
               onPressed: _findDriver,
               height: 50,
             ),
@@ -339,9 +340,9 @@ class _BookingScreenState extends State<BookingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Catégorie de transport',
-          style: TextStyle(
+        Text(
+          'booking.category'.tr(),
+          style: const TextStyle(
             color: Colors.black,
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -351,21 +352,21 @@ class _BookingScreenState extends State<BookingScreen> {
         Row(
           children: [
             _buildCategoryCard(
-              'Transport',
+              'booking.transport'.tr(),
               Icons.local_taxi,
               TransportCategory.transport,
               Colors.blue,
             ),
             const SizedBox(width: 12),
             _buildCategoryCard(
-              'Camion',
+              'booking.camion'.tr(),
               Icons.local_shipping,
               TransportCategory.camion,
               Colors.green,
             ),
             const SizedBox(width: 12),
             _buildCategoryCard(
-              'Autre',
+              'booking.other'.tr(),
               Icons.directions_car,
               TransportCategory.autre,
               Colors.purple,
@@ -451,9 +452,9 @@ class _BookingScreenState extends State<BookingScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          'Moyen de transport',
-          style: TextStyle(
+        Text(
+          'booking.transport_type'.tr(),
+          style: const TextStyle(
             color: Colors.black,
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -464,7 +465,7 @@ class _BookingScreenState extends State<BookingScreen> {
           children: [
             Expanded(
               child: _buildServiceCard(
-                'Taxi',
+                'booking.taxi'.tr(),
                 Icons.local_taxi,
                 TransportService.taxi,
                 Colors.blue,
@@ -474,7 +475,7 @@ class _BookingScreenState extends State<BookingScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: _buildServiceCard(
-                'Moto-taxi',
+                'booking.moto_taxi'.tr(),
                 Icons.motorcycle,
                 TransportService.motoTaxi,
                 Colors.orange,
@@ -516,9 +517,9 @@ class _BookingScreenState extends State<BookingScreen> {
                   size: 24,
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  'Services de camion',
-                  style: TextStyle(
+                Text(
+                  'booking.truck_services'.tr(),
+                  style: const TextStyle(
                     color: Colors.black,
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -537,7 +538,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   children: [
                     Expanded(
                       child: _buildCamionServiceCard(
-                        'Livraison',
+                        'booking.delivery'.tr(),
                         Icons.local_shipping,
                         CamionService.livraison,
                         Colors.green,
@@ -547,7 +548,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _buildCamionServiceCard(
-                        'Déménagement',
+                        'booking.moving'.tr(),
                         Icons.moving,
                         CamionService.demenagement,
                         Colors.blue,
@@ -560,7 +561,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: _buildCamionServiceCard(
-                    'Poids lourd',
+                    'booking.heavy_truck'.tr(),
                     Icons.local_shipping,
                     CamionService.poidsLourd,
                     Colors.red,
@@ -641,9 +642,9 @@ class _BookingScreenState extends State<BookingScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          'Autre véhicule',
-          style: TextStyle(
+        Text(
+          'booking.other_vehicle'.tr(),
+          style: const TextStyle(
             color: Colors.black,
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -846,8 +847,8 @@ class _BookingScreenState extends State<BookingScreen> {
             children: [
               TextField(
                 controller: _departureController,
-                decoration: const InputDecoration(
-                  hintText: 'Point de départ',
+                decoration: InputDecoration(
+                  hintText: 'booking.departure'.tr(),
                   prefixIcon: Icon(Icons.location_on, color: AppTheme.primaryColor),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.all(16),
@@ -856,8 +857,8 @@ class _BookingScreenState extends State<BookingScreen> {
               const Divider(height: 1, color: Colors.grey),
               TextField(
                 controller: _destinationController,
-                decoration: const InputDecoration(
-                  hintText: 'Destination',
+                decoration: InputDecoration(
+                  hintText: 'booking.destination'.tr(),
                   prefixIcon: Icon(Icons.flag, color: AppTheme.primaryColor),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.all(16),
@@ -874,9 +875,9 @@ class _BookingScreenState extends State<BookingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Quand ?',
-          style: TextStyle(
+        Text(
+          'booking.schedule'.tr(),
+          style: const TextStyle(
             color: Colors.black,
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -902,7 +903,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     ),
                   ),
                   child: Text(
-                    'Maintenant',
+                    'booking.now'.tr(),
                     style: TextStyle(
                       color: _isNow ? Colors.white : Colors.black,
                       fontWeight: FontWeight.w600,
@@ -933,7 +934,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   child: Text(
                     _selectedDateTime != null 
                         ? '${_selectedDateTime!.day}/${_selectedDateTime!.month}/${_selectedDateTime!.year} ${_selectedDateTime!.hour}:${_selectedDateTime!.minute.toString().padLeft(2, '0')}'
-                        : 'Programmer',
+                        : 'booking.schedule'.tr(),
                     style: TextStyle(
                       color: !_isNow ? Colors.white : Colors.black,
                       fontWeight: FontWeight.w600,
@@ -965,10 +966,10 @@ class _BookingScreenState extends State<BookingScreen> {
         TextField(
           controller: _passengersController,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Nombre de passagers',
-            prefixIcon: Icon(Icons.people, color: AppTheme.primaryColor),
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: 'booking.passenger_count'.tr(),
+            prefixIcon: const Icon(Icons.people, color: AppTheme.primaryColor),
+            border: const OutlineInputBorder(),
           ),
         ),
       ],
@@ -990,20 +991,20 @@ class _BookingScreenState extends State<BookingScreen> {
         const SizedBox(height: 12),
         TextField(
           controller: _packageTypeController,
-          decoration: const InputDecoration(
-            labelText: 'Type de colis',
-            prefixIcon: Icon(Icons.inventory_2, color: AppTheme.primaryColor),
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: 'booking.package_type'.tr(),
+            prefixIcon: const Icon(Icons.inventory_2, color: AppTheme.primaryColor),
+            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _weightController,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Poids (kg)',
-            prefixIcon: Icon(Icons.scale, color: AppTheme.primaryColor),
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: 'booking.weight_kg'.tr(),
+            prefixIcon: const Icon(Icons.scale, color: AppTheme.primaryColor),
+            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 12),
@@ -1077,7 +1078,7 @@ class _BookingScreenState extends State<BookingScreen> {
           children: [
             Expanded(
               child: CheckboxListTile(
-                title: const Text('Fragile'),
+                title: Text('booking.fragile'.tr()),
                 value: _isFragile,
                 onChanged: (value) {
                   setState(() {
@@ -1088,7 +1089,7 @@ class _BookingScreenState extends State<BookingScreen> {
             ),
             Expanded(
               child: CheckboxListTile(
-                title: const Text('Aide au chargement'),
+                title: Text('booking.loading_help'.tr()),
                 value: _needHelp,
                 onChanged: (value) {
                   setState(() {
@@ -1120,20 +1121,20 @@ class _BookingScreenState extends State<BookingScreen> {
           TextField(
             controller: _durationController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Durée (heures)',
-              prefixIcon: Icon(Icons.access_time, color: AppTheme.primaryColor),
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: 'booking.duration_hours'.tr(),
+              prefixIcon: const Icon(Icons.access_time, color: AppTheme.primaryColor),
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _peopleController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Nombre de personnes',
-              prefixIcon: Icon(Icons.people, color: AppTheme.primaryColor),
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: 'booking.person_count'.tr(),
+              prefixIcon: const Icon(Icons.people, color: AppTheme.primaryColor),
+              border: const OutlineInputBorder(),
             ),
           ),
         ],
@@ -1153,20 +1154,20 @@ class _BookingScreenState extends State<BookingScreen> {
           const SizedBox(height: 12),
           TextField(
             controller: _carTypeController,
-            decoration: const InputDecoration(
-              labelText: 'Type de voiture',
-              prefixIcon: Icon(Icons.directions_car, color: AppTheme.primaryColor),
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: 'booking.car_type'.tr(),
+              prefixIcon: const Icon(Icons.directions_car, color: AppTheme.primaryColor),
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _passengersController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Nombre de passagers',
-              prefixIcon: Icon(Icons.people, color: AppTheme.primaryColor),
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: 'booking.passenger_count'.tr(),
+              prefixIcon: const Icon(Icons.people, color: AppTheme.primaryColor),
+              border: const OutlineInputBorder(),
             ),
           ),
         ],
@@ -1294,71 +1295,71 @@ class _BookingScreenState extends State<BookingScreen> {
     // Validation
     if (_departureController.text.isEmpty || _destinationController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez remplir les points de départ et de destination'),
+        SnackBar(
+          content: Text('booking.fill_departure_destination'.tr()),
           backgroundColor: AppTheme.errorColor,
         ),
       );
       return;
     }
-    
+
     if (_selectedCategory == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner une catégorie de transport'),
+        SnackBar(
+          content: Text('booking.category'.tr()),
           backgroundColor: AppTheme.errorColor,
         ),
       );
       return;
     }
-    
+
     // Service-specific validation
     if (_selectedCategory == TransportCategory.transport && _selectedTransportService == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner un moyen de transport'),
+        SnackBar(
+          content: Text('booking.select_transport'.tr()),
           backgroundColor: AppTheme.errorColor,
         ),
       );
       return;
     }
-    
+
     if (_selectedCategory == TransportCategory.camion) {
       if (_selectedCamionService == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Veuillez sélectionner un service de camion'),
+          SnackBar(
+            content: Text('booking.select_truck_service'.tr()),
             backgroundColor: AppTheme.errorColor,
           ),
         );
         return;
       }
-      
+
       if (_selectedTruckDiameter == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Veuillez sélectionner le diamètre du camion'),
+          SnackBar(
+            content: Text('booking.select_truck_diameter'.tr()),
             backgroundColor: AppTheme.errorColor,
           ),
         );
         return;
       }
     }
-    
+
     if (_selectedCategory == TransportCategory.autre && _selectedAutreService == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez sélectionner un type de véhicule'),
+        SnackBar(
+          content: Text('booking.select_vehicle_type'.tr()),
           backgroundColor: AppTheme.errorColor,
         ),
       );
       return;
     }
-    
+
     // Simulate finding driver and navigate to payment
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Chauffeurs disponibles !'),
+      SnackBar(
+        content: Text('booking.driver_found'.tr()),
         backgroundColor: AppTheme.primaryColor,
       ),
     );

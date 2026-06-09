@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/service_models.dart';
 import '../providers/assignments_provider.dart';
 import '../utils/app_theme.dart';
@@ -31,9 +32,9 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Mes Affectations',
-          style: TextStyle(
+        title: Text(
+          'services.assignments'.tr(),
+          style: const TextStyle(
             color: Colors.black,
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -98,9 +99,9 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
                 color: Colors.grey[400],
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Aucun assignement actif',
-                style: TextStyle(
+              Text(
+                'services.no_assignment'.tr(),
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: Colors.black87,
@@ -108,7 +109,7 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
               ),
               const SizedBox(height: 8),
               Text(
-                'pour le moment',
+                'common.no_data'.tr(), // TODO: add translation key for "pour le moment"
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -147,9 +148,9 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Assignement Actuel',
-                        style: TextStyle(
+                      Text(
+                        'services.assignments'.tr(),
+                        style: const TextStyle(
                           fontSize: 12,
                           color: Colors.grey,
                           fontWeight: FontWeight.w500,
@@ -195,9 +196,9 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Historique des assignements',
-          style: TextStyle(
+        Text(
+          'services.history'.tr(),
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: Colors.black,
@@ -216,7 +217,7 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
                   Icon(Icons.error_outline, color: Colors.red[400], size: 48),
                   const SizedBox(height: 8),
                   Text(
-                    'Erreur de chargement',
+                    'common.error'.tr(),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -234,7 +235,7 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
                   ),
                   const SizedBox(height: 12),
                   CustomButton(
-                    text: 'Réessayer',
+                    text: 'common.retry'.tr(),
                     onPressed: () {
                       ref.read(assignmentsProvider.notifier).clearError();
                       ref.read(assignmentsProvider.notifier).refreshAll();
@@ -257,9 +258,9 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
                     color: Colors.grey[400],
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Aucun historique',
-                    style: TextStyle(
+                  Text(
+                    'services.no_assignment'.tr(),
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
@@ -267,7 +268,7 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Vous n\'avez pas encore d\'assignements',
+                    'common.no_data'.tr(),
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[600],
@@ -320,7 +321,7 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Assigné le ${_formatDate(assignment.createdAt)}',
+                        'services.assigned_on'.tr(namedArgs: {'date': _formatDate(assignment.createdAt)}),
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -430,13 +431,13 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
   String _getStatusText(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return 'En attente';
+        return 'common.pending'.tr();
       case 'approved':
-        return 'Approuvé';
+        return 'common.approved'.tr();
       case 'rejected':
-        return 'Rejeté';
+        return 'common.rejected'.tr();
       case 'cancelled':
-        return 'Annulé';
+        return 'common.cancelled'.tr();
       default:
         return status;
     }

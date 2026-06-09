@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/rendezvous_models.dart';
 import '../services/rendezvous_service.dart';
 import 'client_rendezvous_booking_screen.dart';
@@ -151,11 +152,11 @@ class _ClientRendezvousHistoryScreenState
     try {
       await RendezvousService.cancelRendezvous(rdv.id);
       if (mounted) {
-        _showSnack('Rendez-vous annulé', success: true);
+        _showSnack('rdv.cancelled'.tr(), success: true);
         _loadHistory(refresh: true);
       }
     } catch (e) {
-      if (mounted) _showSnack('Erreur : $e', success: false);
+      if (mounted) _showSnack('${'common.error'.tr()} : $e', success: false);
     }
   }
 
@@ -182,7 +183,7 @@ class _ClientRendezvousHistoryScreenState
               ),
               const SizedBox(height: 16),
               Text(
-                'Annuler ce rendez-vous ?',
+                'rdv.cancelled'.tr(),
                 style: GoogleFonts.poppins(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
@@ -213,7 +214,7 @@ class _ClientRendezvousHistoryScreenState
                         ),
                       ),
                       child: Text(
-                        'Retour',
+                        'common.back'.tr(),
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           color: _textSecondary,
@@ -234,7 +235,7 @@ class _ClientRendezvousHistoryScreenState
                         elevation: 0,
                       ),
                       child: Text(
-                        'Annuler',
+                        'common.cancel'.tr(),
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
@@ -403,7 +404,7 @@ class _ClientRendezvousHistoryScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Mes Rendez-vous',
+                            'rdv.my_rdv'.tr(),
                             style: GoogleFonts.poppins(
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
@@ -411,7 +412,7 @@ class _ClientRendezvousHistoryScreenState
                             ),
                           ),
                           Text(
-                            '${_upcoming.length + _past.length} rendez-vous au total',
+                            'rdv.total'.tr(namedArgs: {'count': '${_upcoming.length + _past.length}'}),
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.white.withOpacity(0.55),
@@ -443,8 +444,8 @@ class _ClientRendezvousHistoryScreenState
         ),
         child: Row(
           children: [
-            _tabItem(0, Icons.upcoming_rounded, 'À venir', _upcoming.length),
-            _tabItem(1, Icons.history_rounded, 'Passés', _past.length),
+            _tabItem(0, Icons.upcoming_rounded, 'rdv.available'.tr(), _upcoming.length), // TODO: add translation key for "À venir"
+            _tabItem(1, Icons.history_rounded, 'rdv.history'.tr(), _past.length), // TODO: add translation key for "Passés"
           ],
         ),
       ),
@@ -575,7 +576,7 @@ class _ClientRendezvousHistoryScreenState
           ),
           const SizedBox(height: 16),
           Text(
-            'Chargement...',
+            'common.loading'.tr(),
             style: GoogleFonts.poppins(fontSize: 13, color: _textSecondary),
           ),
         ],
@@ -602,7 +603,7 @@ class _ClientRendezvousHistoryScreenState
             ),
             const SizedBox(height: 16),
             Text(
-              'Erreur de chargement',
+              'common.error'.tr(),
               style: GoogleFonts.poppins(
                   fontSize: 16, fontWeight: FontWeight.w700, color: _textPrimary),
             ),
@@ -613,7 +614,7 @@ class _ClientRendezvousHistoryScreenState
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
-            _orangeButton('Réessayer', () => _loadHistory(refresh: true)),
+            _orangeButton('common.retry'.tr(), () => _loadHistory(refresh: true)),
           ],
         ),
       ),
@@ -642,15 +643,15 @@ class _ClientRendezvousHistoryScreenState
             ),
             const SizedBox(height: 16),
             Text(
-              isUpcoming ? 'Aucun rendez-vous à venir' : 'Aucun historique',
+              'rdv.no_rdv'.tr(),
               style: GoogleFonts.poppins(
                   fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary),
             ),
             const SizedBox(height: 6),
             Text(
               isUpcoming
-                  ? 'Créez un nouveau rendez-vous en appuyant sur + '
-                  : 'Vos rendez-vous passés apparaîtront ici',
+                  ? 'rdv.book'.tr()
+                  : 'rdv.history'.tr(), // TODO: add translation key for "Vos rendez-vous passés apparaîtront ici"
               style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
               textAlign: TextAlign.center,
             ),
@@ -727,7 +728,7 @@ class _ClientRendezvousHistoryScreenState
               const Icon(Icons.add_rounded, color: Colors.white, size: 20),
               const SizedBox(width: 8),
               Text(
-                'Nouveau RDV',
+                'rdv.book'.tr(),
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
@@ -772,13 +773,13 @@ class _RdvCard extends StatelessWidget {
   String _statusLabel(String status) {
     switch (status) {
       case 'pending':
-        return 'En attente';
+        return 'rdv.pending'.tr();
       case 'accepted':
-        return 'Confirmé';
+        return 'rdv.confirmed'.tr();
       case 'completed':
-        return 'Terminé';
+        return 'rdv.completed'.tr();
       case 'cancelled':
-        return 'Annulé';
+        return 'rdv.cancelled'.tr();
       default:
         return status;
     }
@@ -919,7 +920,7 @@ class _RdvCard extends StatelessWidget {
                         size: 15, color: Color(0xFFEF4444)),
                     const SizedBox(width: 6),
                     Text(
-                      'Annuler ce rendez-vous',
+                      'rdv.cancelled'.tr(),
                       style: GoogleFonts.poppins(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,

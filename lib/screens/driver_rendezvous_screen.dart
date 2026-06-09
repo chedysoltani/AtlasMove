@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/rendezvous_models.dart';
 import '../services/rendezvous_service.dart';
 
@@ -145,7 +146,7 @@ class _DriverRendezvousScreenState extends State<DriverRendezvousScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Rendez-vous',
+                            'rdv.title'.tr(),
                             style: GoogleFonts.poppins(
                               fontSize: 20,
                               fontWeight: FontWeight.w700,
@@ -153,7 +154,7 @@ class _DriverRendezvousScreenState extends State<DriverRendezvousScreen>
                             ),
                           ),
                           Text(
-                            'Gérez vos courses planifiées',
+                            'rdv.my_rdv'.tr(), // TODO: add translation key for "Gérez vos courses planifiées"
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.white.withOpacity(0.55),
@@ -185,9 +186,9 @@ class _DriverRendezvousScreenState extends State<DriverRendezvousScreen>
         ),
         child: Row(
           children: [
-            _tabItem(0, Icons.search_rounded, 'Disponibles'),
-            _tabItem(1, Icons.calendar_month_rounded, 'Planning'),
-            _tabItem(2, Icons.history_rounded, 'Historique'),
+            _tabItem(0, Icons.search_rounded, 'rdv.available'.tr()),
+            _tabItem(1, Icons.calendar_month_rounded, 'rdv.my_rdv'.tr()), // TODO: add translation key for "Planning"
+            _tabItem(2, Icons.history_rounded, 'rdv.history'.tr()),
           ],
         ),
       ),
@@ -403,11 +404,11 @@ class _AvailableTabState extends State<_AvailableTab>
       await RendezvousService.acceptBooking(rdv.id);
       if (mounted) {
         _showSnack(context,
-            'RDV du ${DateFormat('dd/MM/yyyy à HH:mm', 'fr').format(rdv.scheduledAt)} accepté !');
+            '${'rdv.accept'.tr()} ${DateFormat('dd/MM/yyyy à HH:mm', 'fr').format(rdv.scheduledAt)}');
         _refresh();
       }
     } catch (e) {
-      if (mounted) _showSnack(context, 'Erreur : $e', success: false);
+      if (mounted) _showSnack(context, '${'common.error'.tr()} : $e', success: false);
     } finally {
       if (mounted) setState(() => _acceptingIds.remove(rdv.id));
     }
@@ -455,7 +456,7 @@ class _AvailableTabState extends State<_AvailableTab>
             child: const CircularProgressIndicator(color: _orange, strokeWidth: 2.5),
           ),
           const SizedBox(height: 14),
-          Text('Recherche des RDV disponibles...',
+          Text('common.loading'.tr(),
               style: GoogleFonts.poppins(fontSize: 13, color: _textSecondary)),
         ]),
       );
@@ -475,11 +476,11 @@ class _AvailableTabState extends State<_AvailableTab>
                     color: _textSecondary, size: 32),
               ),
               const SizedBox(height: 16),
-              Text('Aucun rendez-vous disponible',
+              Text('rdv.no_rdv'.tr(),
                   style: GoogleFonts.poppins(
                       fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary)),
               const SizedBox(height: 6),
-              Text('Tirez vers le bas pour actualiser',
+              Text('common.no_data'.tr(), // TODO: add translation key for "Tirez vers le bas pour actualiser"
                   style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary)),
             ]),
           )
@@ -498,7 +499,7 @@ class _AvailableTabState extends State<_AvailableTab>
                   color: Color(0xFFEF4444), size: 30),
             ),
             const SizedBox(height: 16),
-            Text('Erreur de chargement',
+            Text('common.error'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 15, fontWeight: FontWeight.w700, color: _textPrimary)),
             const SizedBox(height: 6),
@@ -506,7 +507,7 @@ class _AvailableTabState extends State<_AvailableTab>
                 style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
                 textAlign: TextAlign.center),
             const SizedBox(height: 20),
-            _OrangeBtn('Réessayer', _refresh),
+            _OrangeBtn('common.retry'.tr(), _refresh),
           ]),
         ),
       );
@@ -580,7 +581,7 @@ class _AvailableCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'En attente',
+                    'rdv.pending'.tr(),
                     style: GoogleFonts.poppins(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -644,7 +645,7 @@ class _AvailableCard extends StatelessWidget {
                           : const Icon(Icons.check_circle_rounded,
                               color: Colors.white, size: 18),
                       label: Text(
-                        isAccepting ? 'Acceptation…' : 'Accepter ce RDV',
+                        isAccepting ? 'common.loading'.tr() : 'rdv.accept'.tr(),
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
@@ -714,10 +715,10 @@ class _PlanningTabState extends State<_PlanningTab>
       context,
       icon: Icons.undo_rounded,
       iconColor: const Color(0xFFF59E0B),
-      title: 'Libérer ce rendez-vous ?',
+      title: 'rdv.refuse'.tr(), // TODO: add translation key for "Libérer ce rendez-vous ?"
       subtitle:
-          'Le RDV du ${DateFormat('dd/MM/yyyy à HH:mm', 'fr').format(rdv.scheduledAt)} sera remis disponible.',
-      confirmLabel: 'Libérer',
+          '${DateFormat('dd/MM/yyyy à HH:mm', 'fr').format(rdv.scheduledAt)}',
+      confirmLabel: 'rdv.refuse'.tr(),
       confirmColor: const Color(0xFFF59E0B),
     );
     if (confirmed != true) return;
@@ -727,11 +728,11 @@ class _PlanningTabState extends State<_PlanningTab>
     try {
       await RendezvousService.rejectBooking(rdv.id);
       if (mounted) {
-        _showSnack(context, 'Rendez-vous libéré avec succès');
+        _showSnack(context, 'rdv.cancelled'.tr());
         _load();
       }
     } catch (e) {
-      if (mounted) _showSnack(context, 'Erreur : $e', success: false);
+      if (mounted) _showSnack(context, '${'common.error'.tr()} : $e', success: false);
     } finally {
       if (mounted) setState(() => _releasingIds.remove(rdv.id));
     }
@@ -739,7 +740,7 @@ class _PlanningTabState extends State<_PlanningTab>
 
   void _copyCoords(Rendezvous rdv) {
     Clipboard.setData(ClipboardData(text: '${rdv.latitude}, ${rdv.longitude}'));
-    _showSnack(context, 'Coordonnées copiées');
+    _showSnack(context, 'rdv.address'.tr()); // TODO: add translation key for "Coordonnées copiées"
   }
 
   @override
@@ -791,7 +792,7 @@ class _PlanningTabState extends State<_PlanningTab>
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
-            isToday ? "Aujourd'hui" : DateFormat('EEEE dd MMMM', 'fr').format(date),
+            isToday ? 'rdv.today'.tr() : DateFormat('EEEE dd MMMM', 'fr').format(date),
             style: GoogleFonts.poppins(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -813,7 +814,7 @@ class _PlanningTabState extends State<_PlanningTab>
             child: const CircularProgressIndicator(color: _orange, strokeWidth: 2.5),
           ),
           const SizedBox(height: 14),
-          Text('Chargement du planning...',
+          Text('common.loading'.tr(),
               style: GoogleFonts.poppins(fontSize: 13, color: _textSecondary)),
         ]),
       );
@@ -833,11 +834,11 @@ class _PlanningTabState extends State<_PlanningTab>
                     color: _textSecondary, size: 32),
               ),
               const SizedBox(height: 16),
-              Text('Aucun RDV accepté ce mois-ci',
+              Text('rdv.no_rdv'.tr(),
                   style: GoogleFonts.poppins(
                       fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary)),
               const SizedBox(height: 6),
-              Text('Acceptez des RDV dans l\'onglet Disponibles',
+              Text('rdv.available'.tr(), // TODO: add translation key for "Acceptez des RDV dans l'onglet Disponibles"
                   style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary)),
             ]),
           )
@@ -856,7 +857,7 @@ class _PlanningTabState extends State<_PlanningTab>
                   color: Color(0xFFEF4444), size: 30),
             ),
             const SizedBox(height: 16),
-            Text('Erreur',
+            Text('common.error'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 15, fontWeight: FontWeight.w700, color: _textPrimary)),
             const SizedBox(height: 6),
@@ -864,7 +865,7 @@ class _PlanningTabState extends State<_PlanningTab>
                 style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
                 textAlign: TextAlign.center),
             const SizedBox(height: 20),
-            _OrangeBtn('Réessayer', _load),
+            _OrangeBtn('common.retry'.tr(), _load),
           ]),
         ),
       );
@@ -937,7 +938,7 @@ class _PlanningCard extends StatelessWidget {
                     color: _green.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20)),
                 child: Text(
-                  'Confirmé',
+                  'rdv.confirmed'.tr(),
                   style: GoogleFonts.poppins(
                       fontSize: 11, fontWeight: FontWeight.w700, color: _green),
                 ),
@@ -953,7 +954,7 @@ class _PlanningCard extends StatelessWidget {
               _infoRow(Icons.location_on_rounded, rdv.address),
               if (rdv.clientName != null) ...[
                 const SizedBox(height: 8),
-                _infoRow(Icons.person_rounded, 'Client : ${rdv.clientName}'),
+                _infoRow(Icons.person_rounded, 'rdv.client_name'.tr(namedArgs: {'name': rdv.clientName!})),
               ],
               if (rdv.clientPhone != null) ...[
                 const SizedBox(height: 8),
@@ -969,7 +970,7 @@ class _PlanningCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onNavigate,
                     icon: const Icon(Icons.navigation_rounded, size: 16, color: _navy),
-                    label: Text('Naviguer',
+                    label: Text('rdv.address'.tr(), // TODO: add translation key for "Naviguer"
                         style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w600, color: _navy, fontSize: 13)),
                     style: OutlinedButton.styleFrom(
@@ -992,7 +993,7 @@ class _PlanningCard extends StatelessWidget {
                         : const Icon(Icons.undo_rounded,
                             size: 16, color: Color(0xFFF59E0B)),
                     label: Text(
-                      isReleasing ? 'Libération…' : 'Libérer',
+                      isReleasing ? 'common.loading'.tr() : 'rdv.refuse'.tr(),
                       style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           color: const Color(0xFFF59E0B),
@@ -1132,7 +1133,7 @@ class _HistoryTabState extends State<_HistoryTab>
             child: const CircularProgressIndicator(color: _orange, strokeWidth: 2.5),
           ),
           const SizedBox(height: 14),
-          Text('Chargement de l\'historique...',
+          Text('common.loading'.tr(),
               style: GoogleFonts.poppins(fontSize: 13, color: _textSecondary)),
         ]),
       );
@@ -1146,11 +1147,11 @@ class _HistoryTabState extends State<_HistoryTab>
             child: const Icon(Icons.history_rounded, color: _textSecondary, size: 32),
           ),
           const SizedBox(height: 16),
-          Text('Aucun historique disponible',
+          Text('rdv.no_rdv'.tr(),
               style: GoogleFonts.poppins(
                   fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary)),
           const SizedBox(height: 6),
-          Text('Vos courses passées apparaîtront ici',
+          Text('rdv.history'.tr(), // TODO: add translation key for "Vos courses passées apparaîtront ici"
               style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary)),
         ]),
       );
@@ -1166,7 +1167,7 @@ class _HistoryTabState extends State<_HistoryTab>
               child: const Icon(Icons.wifi_off_rounded, color: Color(0xFFEF4444), size: 30),
             ),
             const SizedBox(height: 16),
-            Text('Erreur de chargement',
+            Text('common.error'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 15, fontWeight: FontWeight.w700, color: _textPrimary)),
             const SizedBox(height: 6),
@@ -1174,7 +1175,7 @@ class _HistoryTabState extends State<_HistoryTab>
                 style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
                 textAlign: TextAlign.center),
             const SizedBox(height: 20),
-            _OrangeBtn('Réessayer', () => _load(refresh: true)),
+            _OrangeBtn('common.retry'.tr(), () => _load(refresh: true)),
           ]),
         ),
       );
@@ -1196,10 +1197,10 @@ class _HistoryCard extends StatelessWidget {
 
   String _statusLabel(String s) {
     switch (s) {
-      case 'completed': return 'Terminé';
-      case 'cancelled': return 'Annulé';
-      case 'accepted':  return 'Confirmé';
-      default:          return 'En attente';
+      case 'completed': return 'rdv.completed'.tr();
+      case 'cancelled': return 'rdv.cancelled'.tr();
+      case 'accepted':  return 'rdv.confirmed'.tr();
+      default:          return 'rdv.pending'.tr();
     }
   }
 
@@ -1279,7 +1280,7 @@ class _HistoryCard extends StatelessWidget {
               _infoRow(Icons.timer_rounded, '${rdv.durationMinutes} minutes'),
               if (rdv.clientName != null) ...[
                 const SizedBox(height: 8),
-                _infoRow(Icons.person_rounded, 'Client : ${rdv.clientName}'),
+                _infoRow(Icons.person_rounded, 'rdv.client_name'.tr(namedArgs: {'name': rdv.clientName!})),
               ],
             ]),
           ),
@@ -1374,7 +1375,7 @@ Future<bool?> _confirmDialog(
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: Text('Annuler',
+                  child: Text('common.cancel'.tr(),
                       style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600, color: _textSecondary)),
                 ),

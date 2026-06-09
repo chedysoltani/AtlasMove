@@ -18,6 +18,10 @@ class NotificationService extends ChangeNotifier {
   static void Function(Map<String, dynamic>)? onDriverLocationReceived;
   static void Function(Map<String, dynamic>)? onTripStatusReceived;
 
+  // Trip cancelled / expired — set by any screen that needs to react
+  // Payload: { "tripId": String, "status": "cancelled_by_livreur", "reason": String? }
+  static void Function(Map<String, dynamic>)? onTripCancelledReceived;
+
   // Referral bonus notification callback — set in main.dart to show in-app overlay
   static void Function(int pointsGained, String message)? onReferralBonusReceived;
 
@@ -99,6 +103,26 @@ class NotificationService extends ChangeNotifier {
         if (data != null) onTripStatusReceived?.call(data);
       });
 
+      // Sent by backend when trip is cancelled (all drivers refused or timeout)
+      _socket!.on('trip.cancelled', (payload) {
+        debugPrint('🚫 NotificationService: trip.cancelled reçu: $payload');
+        final raw = _toMap(payload);
+        if (raw == null) return;
+        // Unwrap { data: {...} } envelope if present
+        final data = (raw['data'] is Map)
+            ? Map<String, dynamic>.from(raw['data'] as Map)
+            : raw;
+        // Forward to status notifier (normalise status field)
+        final normalized = {
+          'tripId': data['tripId'] ?? data['id'],
+          'status': data['status'] ?? 'cancelled_by_livreur',
+          'reason': data['reason'] ?? data['message'],
+        };
+        onTripCancelledReceived?.call(normalized);
+        // Also forward through onTripStatusReceived so ride_state_provider reacts
+        onTripStatusReceived?.call(normalized);
+      });
+
       _socket!.on('referral_bonus_received', (payload) {
         final data = _toMap(payload);
         if (data != null) {
@@ -152,6 +176,12 @@ class NotificationService extends ChangeNotifier {
     _socket = null;
     _isConnected = false;
     notifyListeners();
+  }
+
+  /// Reconnexion après refresh de token — déconnecte puis reconnecte avec le nouveau token.
+  Future<void> reconnect() async {
+    disconnect();
+    await initialize();
   }
 
   /// Récupérer l'historique des notifications via l'API REST

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../models/requests/register_request.dart';
@@ -95,7 +96,7 @@ class _SignupScreenState extends State<SignupScreen>
       final response = await AuthService.registerClient(request);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Bienvenue ${response.user.fullName} !'),
+          content: Text('auth.welcome_user'.tr(namedArgs: {'name': response.user.fullName})),
           backgroundColor: AppTheme.successColor,
         ));
         Navigator.pop(context);
@@ -145,84 +146,84 @@ class _SignupScreenState extends State<SignupScreen>
                       // Name row
                       _a(0, Row(children: [
                         Expanded(child: _field(
-                          ctrl: _firstNameCtrl, hint: 'Prénom',
+                          ctrl: _firstNameCtrl, hint: 'auth.first_name'.tr(),
                           icon: Icons.person_rounded,
                           action: TextInputAction.next,
                           validator: (v) => (v == null || v.isEmpty)
-                              ? 'Obligatoire' : null,
+                              ? 'auth.field_required'.tr() : null,
                         )),
                         const SizedBox(width: 10),
                         Expanded(child: _field(
-                          ctrl: _lastNameCtrl, hint: 'Nom',
+                          ctrl: _lastNameCtrl, hint: 'auth.last_name'.tr(),
                           icon: Icons.person_outline_rounded,
                           action: TextInputAction.next,
                           validator: (v) => (v == null || v.isEmpty)
-                              ? 'Obligatoire' : null,
+                              ? 'auth.field_required'.tr() : null,
                         )),
                       ])),
                       const SizedBox(height: 11),
                       _a(1, _field(
-                        ctrl: _emailCtrl, hint: 'Adresse email',
+                        ctrl: _emailCtrl, hint: 'auth.email_hint'.tr(),
                         icon: Icons.mail_outline_rounded,
                         keyboard: TextInputType.emailAddress,
                         action: TextInputAction.next,
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Obligatoire';
+                          if (v == null || v.isEmpty) return 'auth.field_required'.tr();
                           if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                              .hasMatch(v)) return 'Email invalide';
+                              .hasMatch(v)) return 'auth.email_invalid'.tr();
                           return null;
                         },
                       )),
                       const SizedBox(height: 11),
                       _a(2, _field(
-                        ctrl: _phoneCtrl, hint: 'Téléphone',
+                        ctrl: _phoneCtrl, hint: 'auth.phone'.tr(),
                         icon: Icons.phone_outlined,
                         keyboard: TextInputType.phone,
                         action: TextInputAction.next,
                         validator: (v) => (v == null || v.isEmpty)
-                            ? 'Obligatoire' : null,
+                            ? 'auth.field_required'.tr() : null,
                       )),
                       const SizedBox(height: 11),
                       _a(3, _field(
-                        ctrl: _passwordCtrl, hint: 'Mot de passe',
+                        ctrl: _passwordCtrl, hint: 'auth.password_hint'.tr(),
                         icon: Icons.lock_outline_rounded,
                         obscure: _obscurePassword,
                         action: TextInputAction.next,
                         suffix: _eyeIcon(_obscurePassword,
                             () => setState(() => _obscurePassword = !_obscurePassword)),
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Obligatoire';
-                          if (v.length < 8) return 'Minimum 8 caractères';
+                          if (v == null || v.isEmpty) return 'auth.field_required'.tr();
+                          if (v.length < 8) return 'auth.password_min8'.tr();
                           return null;
                         },
                       )),
                       const SizedBox(height: 11),
                       _a(4, _field(
                         ctrl: _confirmPasswordCtrl,
-                        hint: 'Confirmer le mot de passe',
+                        hint: 'auth.confirm_password'.tr(),
                         icon: Icons.lock_outline_rounded,
                         obscure: _obscureConfirm,
                         action: TextInputAction.next,
                         suffix: _eyeIcon(_obscureConfirm,
                             () => setState(() => _obscureConfirm = !_obscureConfirm)),
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Obligatoire';
+                          if (v == null || v.isEmpty) return 'auth.field_required'.tr();
                           if (v != _passwordCtrl.text)
-                            return 'Mots de passe différents';
+                            return 'auth.passwords_mismatch'.tr();
                           return null;
                         },
                       )),
                       const SizedBox(height: 11),
                       _a(5, _field(
                         ctrl: _referralCtrl,
-                        hint: 'Code de parrainage (facultatif)',
+                        hint: 'auth.referral_code_hint'.tr(),
                         icon: Icons.card_giftcard_rounded,
                         action: TextInputAction.done,
                         validator: (v) {
                           if (v != null && v.trim().isNotEmpty) {
                             if (!RegExp(r'^ATLAS-[A-Z0-9]{6}$')
                                 .hasMatch(v.trim().toUpperCase()))
-                              return 'Format invalide. Ex: ATLAS-J8K9F2';
+                              return 'auth.referral_format_error'.tr();
                           }
                           return null;
                         },
@@ -297,11 +298,11 @@ class _SignupScreenState extends State<SignupScreen>
                     color: Colors.white.withOpacity(0.9))),
                 ]),
                 const SizedBox(height: 10),
-                Text('Créer un compte', style: GoogleFonts.poppins(
+                Text('auth.register_title'.tr(), style: GoogleFonts.poppins(
                   fontSize: 26, fontWeight: FontWeight.w800,
                   color: Colors.white, height: 1.1)),
                 const SizedBox(height: 4),
-                Text('Rejoignez AtlasMove dès aujourd\'hui',
+                Text('auth.signup_subtitle'.tr(),
                   style: GoogleFonts.poppins(
                     fontSize: 13, color: Colors.white.withOpacity(0.5))),
                 const SizedBox(height: 20),
@@ -393,7 +394,7 @@ class _SignupScreenState extends State<SignupScreen>
             ? const SizedBox(width: 20, height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2.5,
                     valueColor: AlwaysStoppedAnimation(Colors.white)))
-            : Text('S\'inscrire', style: GoogleFonts.poppins(
+            : Text('auth.register_btn'.tr(), style: GoogleFonts.poppins(
                 fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
       ),
     );
@@ -402,12 +403,12 @@ class _SignupScreenState extends State<SignupScreen>
   Widget _buildLoginRow() => Row(
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
-      Text('Déjà un compte ?', style: GoogleFonts.poppins(
+      Text('auth.have_account'.tr(), style: GoogleFonts.poppins(
           fontSize: 13, color: const Color(0xFF9BA3B4))),
       const SizedBox(width: 4),
       GestureDetector(
         onTap: () => Navigator.pop(context),
-        child: Text('Se connecter', style: GoogleFonts.poppins(
+        child: Text('auth.login_btn'.tr(), style: GoogleFonts.poppins(
             fontSize: 13, fontWeight: FontWeight.w600, color: _orange)),
       ),
     ],

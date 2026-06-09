@@ -176,6 +176,20 @@ class TripService {
       debugPrint('=== TripService.acceptTrip() END ===');
     }
   }
+  /// Notifie le backend que ce livreur refuse ce trip.
+  /// Le backend doit garder le trip disponible pour les autres livreurs.
+  /// En cas d'erreur (endpoint absent), on absorbe silencieusement — le refus local reste effectif.
+  static Future<void> refuseTrip(String tripId) async {
+    try {
+      final response = await HttpClient.patch('/l/trips/$tripId/refuse');
+      debugPrint(response.isSuccess
+          ? '✅ TripService: refus envoyé pour $tripId'
+          : '⚠️ TripService: refus HTTP ${response.statusCode} — refus local seulement');
+    } catch (e) {
+      debugPrint('⚠️ TripService: refuseTrip exception ($e) — refus local seulement');
+    }
+  }
+
   static Future<AvailableTrip?> getActiveTrip() async {
     debugPrint('=== TripService.getActiveTrip() START ===');
     try {

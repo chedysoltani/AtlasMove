@@ -14,6 +14,14 @@ class HttpClient {
 
   // Mutex pour éviter plusieurs refresh simultanés
   static bool _isRefreshing = false;
+
+  /// Appelé quand la session expire définitivement (refresh token aussi invalide).
+  /// Branché dans main.dart pour naviguer vers /login et déconnecter les sockets.
+  static void Function()? onSessionExpired;
+
+  /// Appelé après chaque refresh de token réussi.
+  /// Branché dans main.dart pour reconnecter les sockets avec le nouveau token.
+  static void Function()? onTokenRefreshed;
   
   /// Headers par défaut pour toutes les requêtes
   static Future<Map<String, String>> _defaultHeaders() async {
@@ -160,16 +168,24 @@ class HttpClient {
       if (isMultipart) {
         // Pour les requêtes multipart (upload de fichiers)
         final multipartRequest = http.MultipartRequest(method, uri);
-        
-        // Ajouter les champs de formulaire
-        body?.forEach((key, value) {
-          if (value is String) {
-            multipartRequest.fields[key] = value;
+        multipartRequest.headers.addAll(finalHeaders);
+
+        if (body != null) {
+          for (final entry in body.entries) {
+            final value = entry.value;
+            if (value is String && value.isNotEmpty && !value.startsWith('http') && File(value).existsSync()) {
+              // C'est un chemin de fichier local — l'envoyer comme fichier
+              multipartRequest.files.add(
+                await http.MultipartFile.fromPath(entry.key, value),
+              );
+            } else if (value != null) {
+              multipartRequest.fields[entry.key] = value.toString();
+            }
           }
-        });
-        
+        }
+
         request = multipartRequest;
-        debugPrint('📦 Multipart Fields: ${multipartRequest.fields}');
+        debugPrint('📦 Multipart Files: ${multipartRequest.files.map((f) => f.filename)}');
       } else {
         // Pour les requêtes JSON normales
         request = http.Request(method, uri);
@@ -214,6 +230,7 @@ class HttpClient {
         } else {
           // Refresh échoué → session expirée
           await TokenStorage.clearTokens();
+          onSessionExpired?.call();
           throw SessionExpiredException();
         }
       }
@@ -275,6 +292,7 @@ class HttpClient {
             refreshToken: newRefresh as String?,
           );
           debugPrint('✅ Token rafraîchi avec succès');
+          onTokenRefreshed?.call();
           return newAccess;
         }
       }

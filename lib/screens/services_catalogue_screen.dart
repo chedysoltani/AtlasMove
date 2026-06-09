@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart' as provider_pkg;
+import 'package:easy_localization/easy_localization.dart';
 import '../models/service_models.dart';
 import '../services/service_api.dart';
 import '../providers/services_provider.dart';
@@ -36,9 +37,9 @@ class _ServicesCatalogueScreenState extends ConsumerState<ServicesCatalogueScree
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Catalogue des Services',
-          style: TextStyle(
+        title: Text(
+          'services.catalogue'.tr(),
+          style: const TextStyle(
             color: Colors.black,
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -66,7 +67,7 @@ class _ServicesCatalogueScreenState extends ConsumerState<ServicesCatalogueScree
               Icon(Icons.error_outline, size: 64, color: Colors.grey.shade400),
               const SizedBox(height: 16),
               Text(
-                'Erreur de chargement',
+                'common.error'.tr(),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -81,7 +82,7 @@ class _ServicesCatalogueScreenState extends ConsumerState<ServicesCatalogueScree
               ),
               const SizedBox(height: 16),
               CustomButton(
-                text: 'Réessayer',
+                text: 'common.retry'.tr(),
                 onPressed: () => catalogueNotifier.fetchCatalogue(),
               ),
             ],
@@ -103,7 +104,7 @@ class _ServicesCatalogueScreenState extends ConsumerState<ServicesCatalogueScree
             Icon(Icons.category_outlined, size: 64, color: Colors.grey.shade300),
             const SizedBox(height: 16),
             Text(
-              'Aucune catégorie disponible',
+              'services.no_services'.tr(),
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -192,7 +193,7 @@ class _ServicesCatalogueScreenState extends ConsumerState<ServicesCatalogueScree
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'Aucun service dans cette catégorie',
+                      'services.no_services'.tr(),
                       style: TextStyle(
                         color: Colors.grey.shade500,
                         fontStyle: FontStyle.italic,
@@ -294,7 +295,7 @@ class _ServicesCatalogueScreenState extends ConsumerState<ServicesCatalogueScree
                 Icon(Icons.description, size: 12, color: Colors.orange.shade700),
                 const SizedBox(width: 4),
                 Text(
-                  'Document requis',
+                  'services.accept_mission'.tr(), // TODO: add translation key for "Document requis"
                   style: TextStyle(
                     fontSize: 10,
                     color: Colors.orange.shade700,
@@ -307,7 +308,7 @@ class _ServicesCatalogueScreenState extends ConsumerState<ServicesCatalogueScree
                 Icon(Icons.warning, size: 12, color: Colors.red.shade700),
                 const SizedBox(width: 4),
                 Text(
-                  'Indisponible',
+                  'common.no_data'.tr(), // TODO: add translation key for "Indisponible"
                   style: TextStyle(
                     fontSize: 10,
                     color: Colors.red.shade700,
@@ -330,8 +331,8 @@ class _ServicesCatalogueScreenState extends ConsumerState<ServicesCatalogueScree
               ],
               
               CustomButton(
-                text: "S'affecter",
-                onPressed: service.isActive 
+                text: 'services.accept_mission'.tr(),
+                onPressed: service.isActive
                     ? () => _showAssignmentDialog(context, service)
                     : null,
                 height: 28,
@@ -389,7 +390,7 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text("S'affecter à ${widget.service.name}"),
+      title: Text('services.assign_to'.tr(namedArgs: {'name': widget.service.name})),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -403,7 +404,7 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
           
           if (widget.service.requiresDocument) ...[
             Text(
-              'Document requis',
+              'services.accept_mission'.tr(), // TODO: add translation key for "Document requis"
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
                 color: Colors.black,
@@ -420,9 +421,9 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      _documentUrl != null 
-                          ? 'Document téléchargé' 
-                          : 'Aucun document sélectionné',
+                      _documentUrl != null
+                          ? 'common.completed'.tr() // TODO: add translation key for "Document téléchargé"
+                          : 'common.no_data'.tr(), // TODO: add translation key for "Aucun document sélectionné"
                       style: TextStyle(
                         color: _documentUrl != null 
                             ? Colors.green.shade700 
@@ -454,7 +455,7 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Ce service est actuellement indisponible',
+                      'common.no_data'.tr(), // TODO: add translation key for "Ce service est actuellement indisponible"
                       style: TextStyle(color: Colors.red.shade700),
                     ),
                   ),
@@ -467,17 +468,17 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
+          child: Text('common.cancel'.tr()),
         ),
         ElevatedButton(
           onPressed: (_isLoading || (!widget.service.isActive)) ? null : _assignToService,
-          child: _isLoading 
+          child: _isLoading
               ? const SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Confirmer'),
+              : Text('common.confirm'.tr()),
         ),
       ],
     );
@@ -499,8 +500,8 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Document téléchargé avec succès'),
+            SnackBar(
+              content: Text('common.completed'.tr()), // TODO: add translation key for "Document téléchargé avec succès"
               backgroundColor: Colors.green,
             ),
           );
@@ -511,7 +512,7 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text('${'common.error'.tr()}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -528,8 +529,8 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
     if (widget.service.requiresDocument && _documentUrl == null) {
       print('DEBUG: CATALOGUE - Document requis mais non fourni');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez télécharger un document'),
+        SnackBar(
+          content: Text('common.no_data'.tr()), // TODO: add translation key for "Veuillez télécharger un document"
           backgroundColor: Colors.red,
         ),
       );
@@ -554,10 +555,10 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       if (mounted) {
         Navigator.of(context).pop(); // Fermer le dialogue
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Assignement enregistré avec succès !\nVotre demande est en attente d\'approbation par l\'administrateur.'),
+          SnackBar(
+            content: Text('services.accept_mission'.tr()), // TODO: add translation key for "Assignement enregistré avec succès"
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 4),
+            duration: const Duration(seconds: 4),
           ),
         );
         
@@ -579,7 +580,7 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text('${'common.error'.tr()}: $e'),
             backgroundColor: Colors.red,
           ),
         );

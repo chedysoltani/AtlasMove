@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -157,11 +158,11 @@ class _PaymentPageState extends State<PaymentPage>
                   size: 16, color: Colors.white70),
             ),
           ),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Paiement',
+              'payment.title'.tr(),
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -198,8 +199,8 @@ class _PaymentPageState extends State<PaymentPage>
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Total à payer',
-                  style: TextStyle(color: Colors.white54, fontSize: 13)),
+              Text('payment.amount'.tr(),
+                  style: const TextStyle(color: Colors.white54, fontSize: 13)),
               const SizedBox(height: 4),
               const Text('89,900 TND',
                   style: TextStyle(
@@ -242,8 +243,8 @@ class _PaymentPageState extends State<PaymentPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Mode de paiement',
-            style: TextStyle(
+        Text('payment.method'.tr(),
+            style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w600)),
@@ -307,8 +308,8 @@ class _PaymentPageState extends State<PaymentPage>
       children: [
         _buildCreditCard(),
         const SizedBox(height: 24),
-        const Text('Détails de la carte',
-            style: TextStyle(
+        Text('payment.cards_title'.tr(), // TODO: add translation key for "Détails de la carte"
+            style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w600)),
@@ -393,8 +394,8 @@ class _PaymentPageState extends State<PaymentPage>
               ),
             ),
             const SizedBox(width: 10),
-            const Text('Sauvegarder cette carte',
-                style: TextStyle(color: Colors.white70, fontSize: 13)),
+            Text('payment.add_card'.tr(), // TODO: add translation key for "Sauvegarder cette carte"
+                style: const TextStyle(color: Colors.white70, fontSize: 13)),
           ],
         ),
       ],
@@ -679,8 +680,8 @@ class _PaymentPageState extends State<PaymentPage>
                 color: Color(0xFF10B981), size: 34),
           ),
           const SizedBox(height: 16),
-          const Text('Paiement à la livraison',
-              style: TextStyle(
+          Text('payment.title'.tr(), // TODO: add translation key for "Paiement à la livraison"
+              style: const TextStyle(
                   color: Colors.white,
                   fontSize: 17,
                   fontWeight: FontWeight.w600)),
@@ -758,8 +759,8 @@ class _PaymentPageState extends State<PaymentPage>
                     const SizedBox(width: 8),
                     Text(
                       _selectedMethod == PaymentMethod.cash
-                          ? 'Confirmer la commande'
-                          : 'Payer 89,900 TND',
+                          ? 'common.confirm'.tr() // TODO: add translation key for "Confirmer la commande"
+                          : 'payment.title'.tr(), // TODO: add translation key for "Payer 89,900 TND"
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -806,13 +807,13 @@ class _PaymentPageState extends State<PaymentPage>
                     color: Color(0xFF10B981), size: 40),
               ),
               const SizedBox(height: 16),
-              const Text('Paiement réussi !',
-                  style: TextStyle(
+              Text('payment.title'.tr(), // TODO: add translation key for "Paiement réussi !"
+                  style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,
                       fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
-              Text('Votre commande a été confirmée.',
+              Text('common.confirm'.tr(), // TODO: add translation key for "Votre commande a été confirmée."
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       color: Colors.white.withOpacity(0.6), fontSize: 14)),
@@ -827,8 +828,8 @@ class _PaymentPageState extends State<PaymentPage>
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('Retour à l\'accueil',
-                      style: TextStyle(
+                  child: Text('common.back'.tr(),
+                      style: const TextStyle(
                           color: Colors.white, fontWeight: FontWeight.w600)),
                 ),
               ),

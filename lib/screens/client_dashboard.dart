@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../services/trip_service.dart';
 import '../models/trip_models.dart';
 import '../services/notification_service.dart';
+import '../services/call_service.dart';
 import '../widgets/notification_sheet.dart';
 
 class ClientDashboard extends StatefulWidget {
@@ -43,6 +45,7 @@ class _ClientDashboardState extends State<ClientDashboard>
     )..forward();
     _loadDashboardData();
     NotificationService().initialize();
+    CallService().connectSocket();
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
@@ -176,7 +179,7 @@ class _ClientDashboardState extends State<ClientDashboard>
                     const SizedBox(height: 22),
 
                     // Stats
-                    _buildSectionTitle('Résumé', Icons.bar_chart_rounded,
+                    _buildSectionTitle('client.summary'.tr(), Icons.bar_chart_rounded,
                         onRefresh: _loadDashboardData),
                     const SizedBox(height: 12),
                     _buildStatsRow(),
@@ -187,7 +190,7 @@ class _ClientDashboardState extends State<ClientDashboard>
                     const SizedBox(height: 22),
 
                     // Activité récente
-                    _buildSectionTitle('Activité récente',
+                    _buildSectionTitle('client.recent_activity'.tr(),
                         Icons.history_rounded, onSeeAll: _navigateToHistory),
                     const SizedBox(height: 12),
                     _buildRecentActivity(),
@@ -242,10 +245,10 @@ class _ClientDashboardState extends State<ClientDashboard>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Bonjour 👋',
+                        Text('client.welcome'.tr(namedArgs: {'name': '👋'}),
                           style: GoogleFonts.poppins(
                             fontSize: 12, color: Colors.white54)),
-                        Text('Mon tableau de bord',
+                        Text('client.dashboard_title'.tr(),
                           style: GoogleFonts.poppins(
                             fontSize: 15, fontWeight: FontWeight.w700,
                             color: Colors.white)),
@@ -356,12 +359,12 @@ class _ClientDashboardState extends State<ClientDashboard>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Créer une course',
+                  Text('client.create_ride'.tr(),
                     style: GoogleFonts.poppins(
                       fontSize: 15, fontWeight: FontWeight.w700,
                       color: Colors.white)),
                   const SizedBox(height: 2),
-                  Text('Trouvez un chauffeur en quelques secondes',
+                  Text('client.driver_search_hint'.tr(),
                     style: GoogleFonts.poppins(
                       fontSize: 11, color: Colors.white54)),
                 ],
@@ -391,7 +394,7 @@ class _ClientDashboardState extends State<ClientDashboard>
         _statChip(
           icon: Icons.route_rounded,
           value: loading ? '...' : _statsTripsCount,
-          label: 'Trajets',
+          label: 'client.trips'.tr(),
           color: const Color(0xFF3B82F6),
           onTap: _navigateToHistory,
         ),
@@ -399,14 +402,14 @@ class _ClientDashboardState extends State<ClientDashboard>
         _statChip(
           icon: Icons.account_balance_wallet_rounded,
           value: loading ? '...' : _statsTotalAmount,
-          label: 'Dépensé',
+          label: 'client.spent'.tr(),
           color: const Color(0xFF22C55E),
         ),
         const SizedBox(width: 10),
         _statChip(
           icon: Icons.event_available_rounded,
           value: loading ? '...' : (_statsUpcomingRdv > 0 ? '$_statsUpcomingRdv RDV' : '0 RDV'),
-          label: 'À venir',
+          label: 'rdv.upcoming'.tr(),
           color: _orange,
           onTap: () => Navigator.pushNamed(context, '/client_rendezvous_history'),
         ),
@@ -495,11 +498,11 @@ class _ClientDashboardState extends State<ClientDashboard>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Rendez-vous',
+                  Text('rdv.title'.tr(),
                     style: GoogleFonts.poppins(
                       fontSize: 14, fontWeight: FontWeight.w700,
                       color: Colors.white)),
-                  Text('Réservez un service planifié',
+                  Text('client.book_scheduled'.tr(),
                     style: GoogleFonts.poppins(
                       fontSize: 11, color: Colors.white60)),
                 ],
@@ -515,7 +518,7 @@ class _ClientDashboardState extends State<ClientDashboard>
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text('Réserver',
+                child: Text('rdv.reserve'.tr(),
                   style: GoogleFonts.poppins(
                     fontSize: 12, fontWeight: FontWeight.w700,
                     color: const Color(0xFF4F46E5))),
@@ -560,11 +563,11 @@ class _ClientDashboardState extends State<ClientDashboard>
                   color: Color(0xFF9BA3B4), size: 26),
             ),
             const SizedBox(height: 10),
-            Text('Aucun trajet récent',
+            Text('client.no_trips'.tr(),
               style: GoogleFonts.poppins(
                 fontSize: 13, fontWeight: FontWeight.w600,
                 color: const Color(0xFF475569))),
-            Text('Vos courses apparaîtront ici',
+            Text('client.trips_hint'.tr(),
               style: GoogleFonts.poppins(
                 fontSize: 11, color: const Color(0xFF9BA3B4))),
           ],
@@ -669,11 +672,11 @@ class _ClientDashboardState extends State<ClientDashboard>
 
   (String, Color) _statusInfo(String status) {
     switch (status.toLowerCase()) {
-      case 'completed': return ('Terminé', const Color(0xFF22C55E));
-      case 'cancelled': return ('Annulé', const Color(0xFFEF4444));
-      case 'accepted': return ('Accepté', const Color(0xFF3B82F6));
+      case 'completed': return ('common.completed'.tr(), const Color(0xFF22C55E));
+      case 'cancelled': return ('common.cancelled'.tr(), const Color(0xFFEF4444));
+      case 'accepted': return ('common.accepted'.tr(), const Color(0xFF3B82F6));
       case 'in_progress':
-      case 'started': return ('En cours', _orange);
+      case 'started': return ('common.in_progress'.tr(), _orange);
       default: return (status, const Color(0xFF9BA3B4));
     }
   }
@@ -696,11 +699,11 @@ class _ClientDashboardState extends State<ClientDashboard>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _navItem(Icons.home_rounded, 'Accueil', 0),
-              _navItem(Icons.directions_car_rounded, 'Course', 1),
-              _navItem(Icons.card_giftcard_rounded, 'Fidélité', 2),
-              _navItem(Icons.credit_card_rounded, 'Cartes', 3),
-              _navItem(Icons.person_rounded, 'Profil', 4),
+              _navItem(Icons.home_rounded, 'nav.home'.tr(), 0),
+              _navItem(Icons.directions_car_rounded, 'client.create_ride'.tr(), 1),
+              _navItem(Icons.card_giftcard_rounded, 'nav.loyalty'.tr(), 2),
+              _navItem(Icons.credit_card_rounded, 'nav.cards'.tr(), 3),
+              _navItem(Icons.person_rounded, 'nav.profile'.tr(), 4),
             ],
           ),
         ),
@@ -767,7 +770,7 @@ class _ClientDashboardState extends State<ClientDashboard>
         if (onSeeAll != null)
           GestureDetector(
             onTap: onSeeAll,
-            child: Text('Voir tout', style: GoogleFonts.poppins(
+            child: Text('nav.history'.tr(), style: GoogleFonts.poppins(
               fontSize: 12, fontWeight: FontWeight.w600, color: _orange))),
       ],
     );
