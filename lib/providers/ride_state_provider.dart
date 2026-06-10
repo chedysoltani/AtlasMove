@@ -88,9 +88,18 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
   // ── WebSocket handlers ──────────────────────────────────────────────────────
 
   void _onWsDriverLocation(Map<String, dynamic> data) {
-    if (data['tripId'] != state.tripId) return;
-    final lat = (data['latitude'] as num?)?.toDouble();
-    final lng = (data['longitude'] as num?)?.toDouble();
+    // Unwrap { data: {...} } envelope emitted by some backend versions
+    final p = (data['data'] is Map)
+        ? Map<String, dynamic>.from(data['data'] as Map)
+        : data;
+
+    // Accept camelCase or snake_case tripId; if absent, accept unconditionally
+    final eventTripId = p['tripId'] as String? ?? p['trip_id'] as String?;
+    if (eventTripId != null && eventTripId != state.tripId) return;
+
+    // Accept both latitude/longitude and lat/lng
+    final lat = ((p['latitude'] ?? p['lat']) as num?)?.toDouble();
+    final lng = ((p['longitude'] ?? p['lng']) as num?)?.toDouble();
     if (lat == null || lng == null) return;
 
     _resetStallTimer();
@@ -98,15 +107,22 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
     state = state.copyWith(
       driverLocation: DriverLocation(
         position: LatLng(lat, lng),
-        heading: (data['heading'] as num?)?.toDouble(),
+        heading: (p['heading'] as num?)?.toDouble(),
         updatedAt: DateTime.now(),
       ),
     );
   }
 
   void _onWsTripStatus(Map<String, dynamic> data) {
-    if (data['tripId'] != state.tripId) return;
-    final newStatus = _parse(data['status'] as String? ?? '');
+    // Unwrap { data: {...} } envelope
+    final p = (data['data'] is Map)
+        ? Map<String, dynamic>.from(data['data'] as Map)
+        : data;
+
+    final eventTripId = p['tripId'] as String? ?? p['trip_id'] as String?;
+    if (eventTripId != null && eventTripId != state.tripId) return;
+
+    final newStatus = _parse(p['status'] as String? ?? data['status'] as String? ?? '');
     if (newStatus == state.status || !mounted) return;
     state = state.copyWith(status: newStatus);
   }

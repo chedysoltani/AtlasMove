@@ -3,8 +3,65 @@ import 'package:flutter/foundation.dart';
 import '../models/trip_models.dart';
 import '../core/network/http_client.dart';
 
+class FareEstimate {
+  final double estimatedFare;
+  final String currency;
+  final double minBid;   // estimatedFare * 0.8
+  final double maxBid;   // estimatedFare * 1.5
+  final Map<String, dynamic> breakdown;
+
+  FareEstimate({
+    required this.estimatedFare,
+    required this.currency,
+    required this.breakdown,
+  })  : minBid = double.parse((estimatedFare * 0.8).toStringAsFixed(3)),
+        maxBid = double.parse((estimatedFare * 1.5).toStringAsFixed(3));
+
+  factory FareEstimate.fromJson(Map<String, dynamic> json) {
+    final fareRaw = json['estimatedFare'] ?? json['estimated_fare'];
+    final fare = (fareRaw as num).toDouble();
+    return FareEstimate(
+      estimatedFare: fare,
+      currency: json['currency'] as String? ?? 'TND',
+      breakdown: (json['breakdown'] as Map<String, dynamic>?)
+          ?? (json['pricing_breakdown'] as Map<String, dynamic>?)
+          ?? {},
+    );
+  }
+}
+
 class TripService {
-  
+
+  /// Spec backend : POST /trips/estimate-fare
+  /// Retourne le tarif estimé + les bornes min/max pour la négociation InDrive.
+  static Future<FareEstimate> estimateFare({
+    required String serviceId,
+    required double distanceKm,
+    required double durationMinutes,
+  }) async {
+    final response = await HttpClient.post('/trips/estimate-fare', body: {
+      'service_id': serviceId,
+      'distance_km': double.parse(distanceKm.toStringAsFixed(2)),
+      'duration_minutes': double.parse(durationMinutes.toStringAsFixed(1)),
+    });
+
+    if (!response.isSuccess) {
+      throw TripException(
+        message: response.json['message'] ?? 'Fare estimation failed',
+        statusCode: response.statusCode,
+      );
+    }
+
+    // Réponse backend : { data: { data: { message, data: { estimatedFare, ... } } } }
+    final l1 = response.json['data'];
+    final l2 = (l1 is Map && l1['data'] is Map) ? l1['data'] as Map : l1 as Map? ?? {};
+    final payload = (l2['data'] is Map)
+        ? l2['data'] as Map<String, dynamic>
+        : Map<String, dynamic>.from(l2);
+
+    return FareEstimate.fromJson(payload);
+  }
+
   static Future<TripResponse> createTrip({
     required String serviceId,
     required String pickupAddress,

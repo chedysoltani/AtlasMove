@@ -25,6 +25,16 @@ class NotificationService extends ChangeNotifier {
   // Referral bonus notification callback — set in main.dart to show in-app overlay
   static void Function(int pointsGained, String message)? onReferralBonusReceived;
 
+  // Spec backend — nouveaux événements
+  // trip.bid_received : { bid_id, driver_id, driver_name, proposed_fare }
+  static void Function(Map<String, dynamic>)? onBidReceived;
+  // trip.accepted : { trip_id, status: "accepted" } — côté client et chauffeur
+  static void Function(Map<String, dynamic>)? onTripAccepted;
+  // trip.created : { trip_id, pickup_address, offered_fare } — chauffeurs uniquement
+  static void Function(Map<String, dynamic>)? onTripCreated;
+  // chat.new_message : { trip_id, message_id, sender_id, content, created_at }
+  static void Function(Map<String, dynamic>)? onChatMessage;
+
   IO.Socket? _socket;
   List<NotificationItem> _notifications = [];
   int _unreadCount = 0;
@@ -92,7 +102,8 @@ class NotificationService extends ChangeNotifier {
         _handleIncomingNotification(payload);
       });
 
-      // Real-time ride tracking events (from backend NotificationGateway)
+      // Real-time ride tracking events
+      // Anciens noms conservés pour compatibilité
       _socket!.on('driver_location', (payload) {
         final data = _toMap(payload);
         if (data != null) onDriverLocationReceived?.call(data);
@@ -101,6 +112,36 @@ class NotificationService extends ChangeNotifier {
       _socket!.on('trip_status_update', (payload) {
         final data = _toMap(payload);
         if (data != null) onTripStatusReceived?.call(data);
+      });
+
+      // Spec backend — nouveaux noms d'événements
+      _socket!.on('location.updated', (payload) {
+        debugPrint('📍 location.updated raw: $payload');
+        final data = _toMap(payload);
+        if (data != null) onDriverLocationReceived?.call(data);
+      });
+
+      _socket!.on('trip.bid_received', (payload) {
+        final data = _toMap(payload);
+        if (data != null) onBidReceived?.call(data);
+      });
+
+      _socket!.on('trip.accepted', (payload) {
+        final data = _toMap(payload);
+        if (data != null) {
+          onTripAccepted?.call(data);
+          onTripStatusReceived?.call(data);
+        }
+      });
+
+      _socket!.on('trip.created', (payload) {
+        final data = _toMap(payload);
+        if (data != null) onTripCreated?.call(data);
+      });
+
+      _socket!.on('chat.new_message', (payload) {
+        final data = _toMap(payload);
+        if (data != null) onChatMessage?.call(data);
       });
 
       // Sent by backend when trip is cancelled (all drivers refused or timeout)

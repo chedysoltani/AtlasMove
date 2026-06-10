@@ -9,6 +9,7 @@ import '../models/requests/driver_register_request.dart';
 import '../models/responses/auth_response.dart';
 import '../models/responses/login_response.dart';
 import '../models/responses/driver_register_response.dart';
+import 'device_token_service.dart';
 
 /// Exception de validation personnalisée pour le service
 class ServiceValidationException implements Exception {
@@ -176,8 +177,11 @@ class AuthService {
             accessToken: authResponse.token,
             refreshToken: authResponse.refreshToken,
             userId: authResponse.user.id,
+            role: authResponse.user.role.name,
           );
           debugPrint('✅ Token sauvegardé avec succès depuis login');
+          // Enregistrer le token FCM après login réussi (spec: POST /users/devices)
+          DeviceTokenService().registerDevice().catchError((_) {});
         } else {
           debugPrint('⚠️ Authentification incomplète (OTP requis?), token non sauvegardé');
         }

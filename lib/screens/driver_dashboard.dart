@@ -174,11 +174,8 @@ class _DriverDashboardState extends State<DriverDashboard>
 
   Future<void> _initializeLocationTracking() async {
     try {
-      final token =
-          Provider.of<AuthProvider>(context, listen: false).token;
-      if (token == null || token.isEmpty) return;
-      await _locationTrackingService.sendCurrentLocation(token);
-      await _locationTrackingService.startLocationTracking(token);
+      await _locationTrackingService.sendCurrentLocation();
+      await _locationTrackingService.startLocationTracking();
     } catch (_) {}
   }
 

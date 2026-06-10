@@ -1,4 +1,4 @@
-package com.example.atlasmove
+package com.atlasmove.app
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

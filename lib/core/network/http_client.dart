@@ -149,9 +149,15 @@ class HttpClient {
     bool isRetry = false,
   }) async {
     try {
+      // Refresh proactif si le token est sur le point d'expirer (≥13 min)
+      if (!isRetry && await TokenStorage.isAccessTokenExpiringSoon()) {
+        debugPrint('🔄 Token proche expiration — refresh proactif...');
+        await _tryRefresh();
+      }
+
       // Construction de l'URL
       final uri = _buildUri(endpoint, queryParams);
-      
+
       // Fusion des headers
       final defaultHeaders = await _defaultHeaders();
       final finalHeaders = {

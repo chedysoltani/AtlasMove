@@ -5,6 +5,7 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'providers/locale_provider.dart';
 
 import 'utils/app_theme.dart';
@@ -62,6 +63,9 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
+
+  // Initialiser Firebase (requis pour FCM)
+  await Firebase.initializeApp();
 
   // Initialiser les données de localisation française pour DateFormat
   await initializeDateFormatting('fr', null);

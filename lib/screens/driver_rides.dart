@@ -78,8 +78,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
     );
 
     _pulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.05,
+      begin: 0.98,
+      end: 1.0,
     ).animate(CurvedAnimation(
       parent: _pulseController,
       curve: Curves.easeInOut,

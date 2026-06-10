@@ -162,6 +162,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
   bool _isDestinationFocused = false;
 
+  // Estimation tarifaire depuis l'API (spec: POST /trips/estimate-fare)
+  FareEstimate? _fareEstimate;
+  bool _isFetchingEstimate = false;
+
   @override
   void initState() {
     super.initState();
@@ -186,10 +190,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   }
 
   void _clearMapRoute() {
-    final n = ref.read(mapProvider.notifier);
-    n.clearPolylines();
-    n.removeMarker('pickup');
-    n.removeMarker('destination');
+    // Guard: ref is invalid after disposal
+    if (!mounted) return;
+    try {
+      final n = ref.read(mapProvider.notifier);
+      n.clearPolylines();
+      n.removeMarker('pickup');
+      n.removeMarker('destination');
+    } catch (_) {}
   }
 
   @override
@@ -197,6 +205,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     NotificationService.onTripCancelledReceived = null;
     _offersTimer?.cancel();
     _debounceTimer?.cancel();
+    // Clear map before super.dispose() while ref is still valid
     _clearMapRoute();
     _destinationController.removeListener(_onDestinationChanged);
     _destinationController.dispose();
@@ -304,6 +313,35 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     }
   }
 
+  // Appeler l'API d'estimation tarifaire après calcul de route ou changement de service
+  Future<void> _fetchFareEstimate() async {
+    if (_selectedService == null || _estimatedDistance == null || _estimatedDuration == null) return;
+    if (_isFetchingEstimate) return;
+    setState(() => _isFetchingEstimate = true);
+    try {
+      final durationMin = _parseDurationToMinutes(_estimatedDuration!).toDouble();
+      final estimate = await TripService.estimateFare(
+        serviceId: _selectedService!.id,
+        distanceKm: _estimatedDistance!,
+        durationMinutes: durationMin,
+      );
+      if (mounted) {
+        setState(() {
+          _fareEstimate = estimate;
+          // Initialiser l'offre dans les bornes si déjà saisie hors limite
+          if (_isNegotiable) {
+            final current = _customOfferedFare ?? estimate.estimatedFare;
+            _customOfferedFare = current.clamp(estimate.minBid, estimate.maxBid);
+          }
+        });
+      }
+    } catch (_) {
+      // Estimation locale en fallback — l'API est non bloquante
+    } finally {
+      if (mounted) setState(() => _isFetchingEstimate = false);
+    }
+  }
+
   Future<void> _calculateRoute(LatLng start, LatLng end) async {
     try {
       final distanceKm = _calculateDistance(start, end);
@@ -317,6 +355,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         });
       }
       _addRouteElements(start, end);
+      // Récupérer le tarif réel depuis l'API (spec: POST /trips/estimate-fare)
+      await _fetchFareEstimate();
       await _fitMapToBounds(start, end);
     } catch (e) {
       if (mounted) {
@@ -504,8 +544,23 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         timer.cancel();
         return;
       }
-      
+
       try {
+        // Fallback: vérifier le statut du trip au cas où le socket rate l'événement
+        final status = await TripService.getClientTripStatus(tripId);
+        if (status != null) {
+          final cancelled = status == 'cancelled_by_livreur' ||
+              status == 'cancelled_by_client' ||
+              status == 'cancelled_by_admin' ||
+              status == 'expired';
+          if (cancelled) {
+            timer.cancel();
+            NotificationService.onTripCancelledReceived = null;
+            if (mounted) _showTripExpiredDialog();
+            return;
+          }
+        }
+
         final offers = await TripService.getTripOffers(tripId);
         if (mounted) {
           setState(() {
@@ -1590,6 +1645,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                         _offersTimer?.cancel();
                         HapticFeedback.heavyImpact();
                         if (!mounted) return;
+                        final currentPos = ref.read(mapProvider).currentPosition;
+                        final finalPickupLat = _pickupCoordinates?.latitude ?? currentPos?.latitude;
+                        final finalPickupLng = _pickupCoordinates?.longitude ?? currentPos?.longitude;
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
@@ -1602,8 +1660,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                               driverRating: offer.driverRating,
                               driverVehicle: offer.driverVehicle,
                               destination: _destinationController.text,
-                              pickupLatitude: _pickupCoordinates?.latitude,
-                              pickupLongitude: _pickupCoordinates?.longitude,
+                              pickupLatitude: finalPickupLat,
+                              pickupLongitude: finalPickupLng,
                             ),
                           ),
                         );
@@ -2218,9 +2276,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                   color: _AppColors.white,
                   border: Border.all(color: _AppColors.gray200),
                   onTap: () {
-                    if (_customOfferedFare != null && _customOfferedFare! > 1.0) {
+                    final minBound = _fareEstimate?.minBid ?? 1.0;
+                    final current = _customOfferedFare ?? (_fareEstimate?.estimatedFare ?? defaultPrice);
+                    if (current > minBound) {
                       setState(() {
-                        _customOfferedFare = double.parse((_customOfferedFare! - 0.5).toStringAsFixed(2));
+                        _customOfferedFare = double.parse(
+                          (current - 0.5).clamp(minBound, double.infinity).toStringAsFixed(2),
+                        );
                       });
                     }
                   },
@@ -2267,9 +2329,15 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                   color: _AppColors.white,
                   border: Border.all(color: _AppColors.gray200),
                   onTap: () {
-                    setState(() {
-                      _customOfferedFare = double.parse(((_customOfferedFare ?? defaultPrice) + 0.5).toStringAsFixed(2));
-                    });
+                    final maxBound = _fareEstimate?.maxBid ?? double.infinity;
+                    final current = _customOfferedFare ?? (_fareEstimate?.estimatedFare ?? defaultPrice);
+                    if (current < maxBound) {
+                      setState(() {
+                        _customOfferedFare = double.parse(
+                          (current + 0.5).clamp(0, maxBound).toStringAsFixed(2),
+                        );
+                      });
+                    }
                   },
                   child: const Icon(Icons.add, color: _AppColors.gray600, size: 18),
                 ),
@@ -2282,11 +2350,26 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                 const Icon(Icons.info_outline_rounded, size: 12, color: _AppColors.gray400),
                 const SizedBox(width: 4),
                 Text(
-                  'booking.standard_estimated_fare'.tr(namedArgs: {'amount': defaultPrice.toStringAsFixed(2), 'currency': currency ?? ''}),
+                  _fareEstimate != null
+                      ? 'Estimé: ${_fareEstimate!.estimatedFare.toStringAsFixed(2)} ${_fareEstimate!.currency}  •  Min: ${_fareEstimate!.minBid.toStringAsFixed(2)}  •  Max: ${_fareEstimate!.maxBid.toStringAsFixed(2)}'
+                      : 'booking.standard_estimated_fare'.tr(namedArgs: {'amount': defaultPrice.toStringAsFixed(2), 'currency': currency ?? ''}),
                   style: const TextStyle(fontSize: 11, color: _AppColors.gray400),
                 ),
               ],
             ),
+            // Indicateur de chargement de l'estimation tarifaire API
+            if (_isFetchingEstimate)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1.5)),
+                    SizedBox(width: 6),
+                    Text('Calcul du tarif...', style: TextStyle(fontSize: 10, color: _AppColors.gray400)),
+                  ],
+                ),
+              ),
           ],
         ],
       ),
@@ -2675,6 +2758,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               setState(() {
                 _selectedService = service;
                 _customOfferedFare = service.basePrice;
+                _fareEstimate = null; // Réinitialiser — va être rechargé
               });
               if (!_serviceSectionExpanded) {
                 setState(() {
@@ -2682,6 +2766,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                   _sheetHeight = 0.75;
                 });
               }
+              // Rafraîchir le tarif API si la route est déjà calculée
+              _fetchFareEstimate();
             }
           : null,
       child: AnimatedContainer(

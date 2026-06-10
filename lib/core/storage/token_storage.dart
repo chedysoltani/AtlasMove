@@ -1,93 +1,93 @@
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Service pour gérer le stockage sécurisé des tokens d'authentification
+/// Stockage sécurisé des tokens — EncryptedSharedPreferences (Android) / Keychain (iOS)
 class TokenStorage {
-  static const String _accessTokenKey = 'access_token';
-  static const String _refreshTokenKey = 'refresh_token';
-  static const String _userIdKey = 'user_id';
+  static const _accessTokenKey = 'access_token';
+  static const _refreshTokenKey = 'refresh_token';
+  static const _userIdKey = 'user_id';
+  static const _userRoleKey = 'user_role';
+  static const _tokenSavedAtKey = 'token_saved_at';
 
-  /// Sauvegarder le token d'accès
-  static Future<void> saveAccessToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_accessTokenKey, token);
-  }
+  // Access token TTL 15 min — rafraîchir à 13 min pour laisser une marge
+  static const int _refreshBeforeExpirySeconds = 780;
 
-  /// Récupérer le token d'accès
+  static const _storage = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+  );
+
+  static Future<void> saveAccessToken(String token) =>
+      _storage.write(key: _accessTokenKey, value: token);
+
   static Future<String?> getAccessToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_accessTokenKey);
-    debugPrint('🔍 TokenStorage: Récupération du token: $token');
+    final token = await _storage.read(key: _accessTokenKey);
+    debugPrint('🔍 TokenStorage: token=${token != null ? "[présent]" : "null"}');
     return token;
   }
 
-  /// Sauvegarder le token de rafraîchissement
-  static Future<void> saveRefreshToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_refreshTokenKey, token);
-  }
+  static Future<void> saveRefreshToken(String token) =>
+      _storage.write(key: _refreshTokenKey, value: token);
 
-  /// Récupérer le token de rafraîchissement
-  static Future<String?> getRefreshToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_refreshTokenKey);
-  }
+  static Future<String?> getRefreshToken() =>
+      _storage.read(key: _refreshTokenKey);
 
-  /// Sauvegarder l'ID de l'utilisateur
-  static Future<void> saveUserId(String userId) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_userIdKey, userId);
-  }
+  static Future<void> saveUserId(String userId) =>
+      _storage.write(key: _userIdKey, value: userId);
 
-  /// Récupérer l'ID de l'utilisateur
-  static Future<String?> getUserId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_userIdKey);
-  }
+  static Future<String?> getUserId() => _storage.read(key: _userIdKey);
 
-  /// Sauvegarder tous les tokens d'authentification
+  static Future<void> saveUserRole(String role) =>
+      _storage.write(key: _userRoleKey, value: role);
+
+  static Future<String?> getUserRole() => _storage.read(key: _userRoleKey);
+
   static Future<void> saveAuthTokens({
     required String accessToken,
     String? refreshToken,
     String? userId,
+    String? role,
   }) async {
-    debugPrint('💾 TokenStorage: Sauvegarde des tokens...');
-    debugPrint('  - Access Token: $accessToken');
-    debugPrint('  - User ID: $userId');
-    
-    final prefs = await SharedPreferences.getInstance();
+    debugPrint('💾 TokenStorage: Sauvegarde sécurisée des tokens...');
     await Future.wait([
-      prefs.setString(_accessTokenKey, accessToken),
-      if (refreshToken != null) prefs.setString(_refreshTokenKey, refreshToken),
-      if (userId != null) prefs.setString(_userIdKey, userId),
+      _storage.write(key: _accessTokenKey, value: accessToken),
+      _storage.write(
+          key: _tokenSavedAtKey,
+          value: DateTime.now().millisecondsSinceEpoch.toString()),
+      if (refreshToken != null)
+        _storage.write(key: _refreshTokenKey, value: refreshToken),
+      if (userId != null) _storage.write(key: _userIdKey, value: userId),
+      if (role != null) _storage.write(key: _userRoleKey, value: role),
     ]);
-    
-    debugPrint('✅ TokenStorage: Tokens sauvegardés avec succès');
+    debugPrint('✅ TokenStorage: Tokens sauvegardés (stockage sécurisé)');
   }
 
-  /// Supprimer tous les tokens (déconnexion)
+  static Future<bool> isAccessTokenExpiringSoon() async {
+    final savedAtStr = await _storage.read(key: _tokenSavedAtKey);
+    if (savedAtStr == null) return false;
+    final savedAt = int.tryParse(savedAtStr) ?? 0;
+    final age = DateTime.now().millisecondsSinceEpoch - savedAt;
+    return age >= _refreshBeforeExpirySeconds * 1000;
+  }
+
   static Future<void> clearTokens() async {
-    final prefs = await SharedPreferences.getInstance();
     await Future.wait([
-      prefs.remove(_accessTokenKey),
-      prefs.remove(_refreshTokenKey),
-      prefs.remove(_userIdKey),
+      _storage.delete(key: _accessTokenKey),
+      _storage.delete(key: _refreshTokenKey),
+      _storage.delete(key: _userIdKey),
+      _storage.delete(key: _userRoleKey),
+      _storage.delete(key: _tokenSavedAtKey),
     ]);
   }
 
-  /// Vérifier si l'utilisateur est authentifié
   static Future<bool> isAuthenticated() async {
     final token = await getAccessToken();
     return token != null && token.isNotEmpty;
   }
 
-  /// Récupérer tous les tokens (pour le debug)
-  static Future<Map<String, String?>> getAllTokens() async {
-    final prefs = await SharedPreferences.getInstance();
-    return {
-      'access_token': prefs.getString(_accessTokenKey),
-      'refresh_token': prefs.getString(_refreshTokenKey),
-      'user_id': prefs.getString(_userIdKey),
-    };
-  }
+  static Future<Map<String, String?>> getAllTokens() async => {
+        'access_token': await _storage.read(key: _accessTokenKey),
+        'refresh_token': await _storage.read(key: _refreshTokenKey),
+        'user_id': await _storage.read(key: _userIdKey),
+      };
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "938476562996",
+    "project_id": "atlas-7a796",
+    "storage_bucket": "atlas-7a796.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:938476562996:android:77a10d3e1b8363a9c8f861",
+        "android_client_info": {
+          "package_name": "com.atlasmove.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBzIZm8sAHFA-eN-BKGssqJiCgjqCoNsM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../utils/app_theme.dart';
+import '../core/storage/token_storage.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -73,8 +74,19 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
-  void _navigateToLanding() {
-    Navigator.of(context).pushReplacementNamed('/landing');
+  Future<void> _navigateToLanding() async {
+    final token = await TokenStorage.getAccessToken();
+    final role = await TokenStorage.getUserRole();
+
+    if (!mounted) return;
+
+    if (token != null && token.isNotEmpty && role != null) {
+      // Utilisateur déjà connecté → aller directement au bon dashboard
+      final route = role == 'delivery' ? '/driver_main' : '/client_dashboard';
+      Navigator.of(context).pushReplacementNamed(route);
+    } else {
+      Navigator.of(context).pushReplacementNamed('/landing');
+    }
   }
 
   @override

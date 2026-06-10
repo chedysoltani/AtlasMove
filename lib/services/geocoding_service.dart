@@ -33,7 +33,7 @@ class GeocodingService {
   static String get _apiKey => dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
 
   static Map<String, String> get _headers => {
-        'X-Android-Package': 'com.example.atlasmove',
+        'X-Android-Package': 'com.atlasmove.app',
         'X-Android-Cert': 'FCF536AFE52BF36EFDAE04FCFF1E3B858ED9EB07',
         'Accept': 'application/json',
       };
