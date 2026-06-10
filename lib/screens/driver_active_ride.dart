@@ -17,6 +17,7 @@ import '../services/route_service.dart';
 import '../services/call_service.dart';
 import '../screens/active_call_screen.dart';
 import 'driver_main.dart';
+import '../services/location_foreground_service.dart';
 
 enum RidePhase { arriving, started, completed }
 
@@ -625,6 +626,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
                 try {
                   await TripService.cancelTrip(widget.trip.id, reasonController.text);
+                  await LocationForegroundService.stop();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('common.cancelled'.tr()), backgroundColor: Colors.orange),
@@ -958,6 +960,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   Future<void> _completeRide() async {
     try {
       await TripService.updateTripStatus(widget.trip.id, 'completed');
+      await LocationForegroundService.stop();
       if (!mounted) return;
       _showCompletionSummary();
     } catch (e) {

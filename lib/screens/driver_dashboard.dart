@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../utils/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../services/location_tracking_service.dart';
+import '../services/location_foreground_service.dart';
 import '../services/notification_service.dart';
 import '../services/call_service.dart';
 import '../services/trip_service.dart';
@@ -107,7 +108,6 @@ class _DriverDashboardState extends State<DriverDashboard>
     DriverService.isOnlineNotifier.removeListener(_onAvailabilityChanged);
     _mapController?.dispose();
     _positionSub?.cancel();
-    _locationTrackingService.dispose();
     _onlineAnimController.dispose();
     super.dispose();
   }
@@ -174,8 +174,7 @@ class _DriverDashboardState extends State<DriverDashboard>
 
   Future<void> _initializeLocationTracking() async {
     try {
-      await _locationTrackingService.sendCurrentLocation();
-      await _locationTrackingService.startLocationTracking();
+      await LocationForegroundService.start();
     } catch (_) {}
   }
 

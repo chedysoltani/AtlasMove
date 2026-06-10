@@ -56,6 +56,7 @@ import 'screens/driver_rendezvous_screen.dart';
 import 'screens/incoming_call_screen.dart';
 import 'screens/active_call_screen.dart';
 import 'services/call_service.dart';
+import 'services/location_foreground_service.dart';
 import 'core/network/http_client.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -66,6 +67,9 @@ void main() async {
 
   // Initialiser Firebase (requis pour FCM)
   await Firebase.initializeApp();
+
+  // Pré-configurer le foreground service (sans le démarrer)
+  LocationForegroundService.init();
 
   // Initialiser les données de localisation française pour DateFormat
   await initializeDateFormatting('fr', null);

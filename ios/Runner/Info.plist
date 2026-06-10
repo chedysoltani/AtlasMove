@@ -61,5 +61,12 @@
 	<!-- Configuration Google Maps -->
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
+
+	<!-- Arrière-plan localisation (livreur) -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+	</array>
 </dict>
 </plist>
