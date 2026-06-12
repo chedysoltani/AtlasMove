@@ -16,6 +16,7 @@ import '../services/call_service.dart';
 import '../services/trip_service.dart';
 import '../services/subscription_service.dart';
 import '../services/driver_service.dart';
+import '../core/network/http_client.dart';
 import '../widgets/notification_sheet.dart';
 import 'driver_active_ride.dart';
 
@@ -191,11 +192,25 @@ class _DriverDashboardState extends State<DriverDashboard>
     } catch (_) {}
   }
 
+  bool get _canGoOnline {
+    final sub = _subService.subscription;
+    if (sub == null) return false;
+    return sub.isValid;
+  }
+
   Future<void> _toggleOnline() async {
     if (_isTogglingOnline) return;
     HapticFeedback.mediumImpact();
-    setState(() => _isTogglingOnline = true);
+
     final newStatus = !_isOnline;
+
+    // Block going online if subscription is not valid
+    if (newStatus && !_canGoOnline) {
+      Navigator.pushNamed(context, '/driver_subscription');
+      return;
+    }
+
+    setState(() => _isTogglingOnline = true);
     try {
       await DriverService.setAvailability(newStatus);
       // Rebuild map marker with new color
@@ -217,6 +232,10 @@ class _DriverDashboardState extends State<DriverDashboard>
           ),
         );
       }
+    } on ForbiddenException {
+      // Safety net: subscription expired between the local check and the API call.
+      await _subService.fetchStatus();
+      if (mounted) Navigator.pushNamed(context, '/driver_subscription');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -269,10 +288,12 @@ class _DriverDashboardState extends State<DriverDashboard>
             child: AnimatedBuilder(
               animation: _subService,
               builder: (_, __) {
-                if (_subService.subscription?.isPastDue != true) {
-                  return const SizedBox.shrink();
-                }
-                return _buildPastDueBanner();
+                final sub = _subService.subscription;
+                if (sub == null) return const SizedBox.shrink();
+                if (sub.isPastDue) return _buildPastDueBanner();
+                if (sub.isCanceled || (!sub.isValid && !sub.isPastDue)) return _buildInactiveBanner();
+                if (sub.isTrial) return _buildTrialBanner();
+                return const SizedBox.shrink();
               },
             ),
           ),
@@ -779,6 +800,94 @@ class _DriverDashboardState extends State<DriverDashboard>
               child: Text(
                 'Abonnement impayé — Régularisez pour accéder aux courses',
                 style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrialBanner() {
+    final sub = _subService.subscription;
+    if (sub == null || !sub.isTrial) return const SizedBox.shrink();
+    final days = sub.daysRemaining;
+    final isUrgent = days <= 7;
+    final bg = isUrgent ? const Color(0xFFEA580C) : const Color(0xFF1E40AF);
+    final icon = isUrgent ? Icons.timer_rounded : Icons.card_membership_rounded;
+    final message = days == 0
+        ? 'Période d\'essai expirée — Abonnez-vous pour continuer'
+        : isUrgent
+            ? 'Période d\'essai : encore $days jour${days > 1 ? 's' : ''} — Abonnez-vous'
+            : 'Essai gratuit actif · encore $days jours restants';
+
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: bg.withValues(alpha: 0.35),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInactiveBanner() {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF374151),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.lock_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Compte inactif — Abonnez-vous pour recevoir des courses',
+                style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
                   fontSize: 12,

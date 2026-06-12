@@ -340,6 +340,8 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                 _buildRewardsSection(_data!.rewards),
                 const SizedBox(height: 24),
                 _buildFinancials(_data!.financials),
+                const SizedBox(height: 24),
+                _buildAnnualRevenueSection(_data!.financials),
               ],
             ),
           ),
@@ -595,13 +597,16 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
   // ── Rewards ────────────────────────────────────────────────────────────────
 
   Widget _buildRewardsSection(List<PrivilegeReward> rewards) {
-    if (rewards.isEmpty) return const SizedBox();
+    final driverRewards = rewards
+        .where((r) => r.id != 'cashback_100_usd_mock' && r.type != 'travel')
+        .toList();
+    if (driverRewards.isEmpty) return const SizedBox();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionLabel('privilege.rewards'.tr()),
         const SizedBox(height: 12),
-        ...rewards.map(_buildRewardCard),
+        ...driverRewards.map(_buildRewardCard),
       ],
     );
   }
@@ -818,6 +823,188 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
             color: _navy,
             fontSize: 13,
             fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Annual Revenue Share ───────────────────────────────────────────────────
+
+  Widget _buildAnnualRevenueSection(PrivilegeFinancials f) {
+    final annualShare = f.totalDriverEarnings * 0.03;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionLabel('3% Chiffre d\'Affaires Annuel'),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF064E3B), Color(0xFF065F46)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF10B981).withOpacity(0.2),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.trending_up_rounded,
+                        color: Color(0xFF10B981), size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '3% de votre CA annuel',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Calculé sur vos courses complétées',
+                          style: TextStyle(
+                            color: Color(0xFFA7F3D0),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    child: const Text(
+                      'Annuel',
+                      style: TextStyle(
+                        color: Color(0xFFA7F3D0),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Chiffre d\'affaires',
+                            style: TextStyle(
+                              color: Color(0xFFA7F3D0),
+                              fontSize: 10,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${f.totalDriverEarnings.toStringAsFixed(2)} ${f.currency}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        '× 3%',
+                        style: TextStyle(
+                          color: Color(0xFF10B981),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text(
+                            'Part annuelle',
+                            style: TextStyle(
+                              color: Color(0xFFA7F3D0),
+                              fontSize: 10,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${annualShare.toStringAsFixed(2)} ${f.currency}',
+                            style: const TextStyle(
+                              color: Color(0xFF10B981),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline_rounded,
+                      color: Color(0xFFA7F3D0), size: 13),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Ce montant est calculé sur votre chiffre d\'affaires annuel total et versé une fois par an.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 11,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],

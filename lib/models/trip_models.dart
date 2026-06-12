@@ -53,15 +53,15 @@ class TripData {
   factory TripData.fromJson(Map<String, dynamic> json) {
     // Utiliser directement offered_fare ou estimated_fare de la réponse API
     double estimatedFare = double.tryParse((json['offered_fare'] ?? json['offeredFare'] ?? json['estimated_fare'] ?? json['estimatedFare'])?.toString() ?? '0') ?? 0.0;
-    String currency = json['currency']?.toString() ?? 'MAD';
-    
+    String currency = json['currency']?.toString() ?? 'TND';
+
     // Fallback: utiliser les données du service si estimated_fare n'est pas disponible
     if (estimatedFare == 0.0 && json['service'] != null) {
       final service = json['service'];
       final basePrice = double.tryParse(service['base_price']?.toString() ?? '0') ?? 0.0;
       final pricePerKm = double.tryParse(service['price_per_km']?.toString() ?? '0') ?? 0.0;
       final minimumFare = double.tryParse(service['minimum_fare']?.toString() ?? '0') ?? 0.0;
-      currency = service['currency']?.toString() ?? 'MAD';
+      currency = service['currency']?.toString() ?? 'TND';
       
       // Calcul du tarif: base + prix au km (avec minimum)
       final calculatedFare = basePrice + (pricePerKm * 1.67); // distance moyenne de 1.67km
@@ -230,7 +230,7 @@ class TripHistoryItem {
       destinationAddress: json['destination_address']?.toString() ?? 'Adresse inconnue',
       serviceName: serviceName,
       estimatedFare: double.tryParse((json['offered_fare'] ?? json['offeredFare'] ?? json['estimated_fare'] ?? json['estimatedFare'])?.toString() ?? '0') ?? 0.0,
-      currency: json['currency']?.toString() ?? 'MAD',
+      currency: json['currency']?.toString() ?? 'TND',
       createdAt: json['created_at'] != null 
           ? DateTime.parse(json['created_at'].toString()) 
           : DateTime.now(),

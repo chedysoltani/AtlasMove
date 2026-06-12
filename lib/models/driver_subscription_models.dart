@@ -46,9 +46,9 @@ class PrivilegeMonthlyObjective {
       targetTrips: int.tryParse(json['targetTrips']?.toString() ?? '0') ?? 0,
       completedTrips: int.tryParse(json['completedTrips']?.toString() ?? '0') ?? 0,
       remainingTrips: int.tryParse(json['remainingTrips']?.toString() ?? '0') ?? 0,
-      targetHours: int.tryParse(json['targetHours']?.toString() ?? '0') ?? 0,
-      completedHours: int.tryParse(json['completedHours']?.toString() ?? '0') ?? 0,
-      remainingHours: int.tryParse(json['remainingHours']?.toString() ?? '0') ?? 0,
+      targetHours: (double.tryParse(json['targetHours']?.toString() ?? '0') ?? 0.0).round(),
+      completedHours: (double.tryParse(json['completedHours']?.toString() ?? '0') ?? 0.0).round(),
+      remainingHours: (double.tryParse(json['remainingHours']?.toString() ?? '0') ?? 0.0).round(),
       completionPercentage: double.tryParse(json['completionPercentage']?.toString() ?? '0') ?? 0.0,
       helperMessage: json['helperMessage']?.toString() ?? '',
     );
@@ -367,13 +367,15 @@ class DriverSubscriptionStatus {
   });
 
   factory DriverSubscriptionStatus.fromJson(Map<String, dynamic> json) {
+    // Dépaqueter l'enveloppe data si présente (format standard API)
+    final data = (json['data'] is Map ? json['data'] as Map<String, dynamic> : null) ?? json;
     return DriverSubscriptionStatus(
-      hasActiveSubscription: json['has_active_subscription'] ?? false,
-      subscription: json['subscription'] != null
-          ? DriverSubscription.fromJson(json['subscription'] as Map<String, dynamic>)
+      hasActiveSubscription: data['has_active_subscription'] ?? false,
+      subscription: data['subscription'] != null
+          ? DriverSubscription.fromJson(data['subscription'] as Map<String, dynamic>)
           : null,
-      loyaltyProgram: json['loyalty_program'] != null
-          ? LoyaltyProgram.fromJson(json['loyalty_program'] as Map<String, dynamic>)
+      loyaltyProgram: data['loyalty_program'] != null
+          ? LoyaltyProgram.fromJson(data['loyalty_program'] as Map<String, dynamic>)
           : null,
     );
   }

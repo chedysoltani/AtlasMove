@@ -45,8 +45,8 @@ class AuthResponse {
 
       return AuthResponse(
         user: User.fromMap(userMap),
-        token: data['accessToken'] ?? data['token'] ?? data['sessionToken'] ?? '',
-        refreshToken: data['refreshToken'],
+        token: data['accessToken'] ?? data['access_token'] ?? data['token'] ?? data['sessionToken'] ?? '',
+        refreshToken: data['refreshToken'] ?? data['refresh_token'],
         message: data['message'] ?? '',
         success: data['success'] ?? true,
         authStep: data['authStep'],
@@ -57,8 +57,8 @@ class AuthResponse {
 
     return AuthResponse(
       user: User.fromMap(json['user'] ?? {}),
-      token: json['accessToken'] ?? json['token'] ?? '',
-      refreshToken: json['refreshToken'],
+      token: json['accessToken'] ?? json['access_token'] ?? json['token'] ?? '',
+      refreshToken: json['refreshToken'] ?? json['refresh_token'],
       message: json['message'] ?? '',
       success: json['success'] ?? false,
       authStep: json['authStep'],

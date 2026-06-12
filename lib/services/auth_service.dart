@@ -130,12 +130,15 @@ class AuthService {
         throw ServiceValidationException(['Le mot de passe est requis']);
       }
 
+      final deviceId = await TokenStorage.getOrCreateDeviceId();
+
       // Envoi de la requête vers le bon endpoint
       final response = await HttpClient.post(
         '/m/auth/login',
         body: {
           'email': email.trim(),
           'password': password,
+          'deviceId': deviceId,
         },
       );
 
@@ -215,7 +218,7 @@ class AuthService {
   /// Rafraîchir le token d'accès
   static Future<AuthResponse> refreshToken() async {
     try {
-      final response = await HttpClient.post('/auth/refresh');
+      final response = await HttpClient.post('/m/auth/refresh');
       
       final responseData = response.json;
       
@@ -339,13 +342,16 @@ class AuthService {
         throw ServiceValidationException(['Le token de session est requis']);
       }
 
+      final deviceId = await TokenStorage.getOrCreateDeviceId();
+
       // Envoi de la requête
       final response = await HttpClient.post(
         '/m/auth/verify-otp',
         body: {
           'email': email.trim(),
-          'otpCode': otp.trim(), // Changé de 'otp' à 'otpCode'
+          'otpCode': otp.trim(),
           'sessionToken': sessionToken,
+          'deviceId': deviceId,
         },
       );
 
@@ -429,12 +435,15 @@ class AuthService {
         throw ServiceValidationException(['Le token de session est requis']);
       }
 
+      final deviceId = await TokenStorage.getOrCreateDeviceId();
+
       // Envoi de la requête
       final response = await HttpClient.post(
         '/m/auth/resend-otp',
         body: {
           'email': email.trim(),
           'sessionToken': sessionToken,
+          'deviceId': deviceId,
         },
       );
 

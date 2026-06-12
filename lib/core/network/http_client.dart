@@ -274,7 +274,8 @@ class HttpClient {
       }
       debugPrint('🔄 Tentative de refresh du token...');
 
-      final uri = Uri.parse('$baseUrl/auth/refresh');
+      final uri = Uri.parse('$baseUrl/m/auth/refresh');
+      final deviceId = await TokenStorage.getOrCreateDeviceId();
       final response = await http.post(
         uri,
         headers: {
@@ -282,27 +283,35 @@ class HttpClient {
           'Accept': 'application/json',
           'Authorization': 'Bearer $refreshToken',
         },
+        body: jsonEncode({
+          'refreshToken': refreshToken,
+          'deviceId': deviceId,
+        }),
       ).timeout(_timeout);
 
       debugPrint('🔄 Refresh status: ${response.statusCode}');
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final payload = data['data'] ?? data;
-        final newAccess = payload['accessToken'] ?? payload['token'];
-        final newRefresh = payload['refreshToken'];
-
-        if (newAccess != null && (newAccess as String).isNotEmpty) {
-          await TokenStorage.saveAuthTokens(
-            accessToken: newAccess,
-            refreshToken: newRefresh as String?,
-          );
-          debugPrint('✅ Token rafraîchi avec succès');
-          onTokenRefreshed?.call();
-          return newAccess;
-        }
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        debugPrint('❌ Refresh échoué (${response.statusCode}): ${response.body}');
+        return null;
       }
-      debugPrint('❌ Refresh échoué (${response.statusCode})');
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final payload = (data['data'] is Map ? data['data'] : null) ?? data;
+      // Accepte camelCase et snake_case selon la config du backend
+      final newAccess = payload['accessToken'] ?? payload['access_token'] ?? payload['token'];
+      final newRefresh = payload['refreshToken'] ?? payload['refresh_token'];
+
+      if (newAccess != null && (newAccess as String).isNotEmpty) {
+        await TokenStorage.saveAuthTokens(
+          accessToken: newAccess,
+          refreshToken: newRefresh as String?,
+        );
+        debugPrint('✅ Token rafraîchi avec succès');
+        onTokenRefreshed?.call();
+        return newAccess;
+      }
+
+      debugPrint('❌ Refresh: nouveau token absent dans la réponse: ${response.body}');
       return null;
     } catch (e) {
       debugPrint('❌ Refresh exception: $e');

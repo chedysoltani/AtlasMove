@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -8,6 +9,8 @@ class TokenStorage {
   static const _userIdKey = 'user_id';
   static const _userRoleKey = 'user_role';
   static const _tokenSavedAtKey = 'token_saved_at';
+  // Identifiant stable de l'appareil — généré une seule fois, jamais effacé au logout.
+  static const _deviceIdKey = 'device_id';
 
   // Access token TTL 15 min — rafraîchir à 13 min pour laisser une marge
   static const int _refreshBeforeExpirySeconds = 780;
@@ -78,6 +81,23 @@ class TokenStorage {
       _storage.delete(key: _userRoleKey),
       _storage.delete(key: _tokenSavedAtKey),
     ]);
+  }
+
+  /// Retourne le deviceId stable de cet appareil.
+  /// Généré une fois via Random.secure() au format UUID v4, persisté en stockage sécurisé.
+  /// Jamais effacé par clearTokens() — représente l'appareil, pas la session utilisateur.
+  static Future<String> getOrCreateDeviceId() async {
+    final existing = await _storage.read(key: _deviceIdKey);
+    if (existing != null && existing.isNotEmpty) return existing;
+    final rng = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rng.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant RFC 4122
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    final id = '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+    await _storage.write(key: _deviceIdKey, value: id);
+    debugPrint('📱 TokenStorage: deviceId généré → $id');
+    return id;
   }
 
   static Future<bool> isAuthenticated() async {

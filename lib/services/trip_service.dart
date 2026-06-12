@@ -33,7 +33,7 @@ class FareEstimate {
 class TripService {
 
   /// Spec backend : POST /trips/estimate-fare
-  /// Retourne le tarif estimé + les bornes min/max pour la négociation InDrive.
+  /// Retourne le tarif estimé dans la devise du marché du client connecté (détecté via JWT).
   static Future<FareEstimate> estimateFare({
     required String serviceId,
     required double distanceKm,
@@ -219,13 +219,15 @@ class TripService {
       final response = await HttpClient.patch('/l/trips/$tripId/accept');
 
       debugPrint('📊 Response Status: ${response.statusCode}');
-      
+
       if (response.isSuccess) {
         debugPrint('✅ Trip accepted successfully');
       } else {
         debugPrint('❌ Failed to accept trip. Status: ${response.statusCode}');
         throw Exception('Failed to accept trip: ${response.body}');
       }
+    } on ApiException {
+      rethrow;
     } catch (e) {
       debugPrint('❌ Erreur lors de l\'acceptation de la course: $e');
       throw Exception('Erreur de connexion lors de l\'acceptation');

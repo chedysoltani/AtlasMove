@@ -8,6 +8,7 @@ import '../widgets/custom_button.dart';
 import '../services/location_service.dart';
 import '../services/trip_service.dart';
 import '../services/driver_service.dart';
+import '../core/network/http_client.dart';
 import '../models/trip_models.dart';
 import 'driver_active_ride.dart';
 
@@ -944,6 +945,22 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
             context,
             MaterialPageRoute(
               builder: (context) => DriverActiveRideScreen(trip: trip),
+            ),
+          );
+        }
+      } on ForbiddenException {
+        if (mounted) {
+          setState(() => _acceptingTripId = null);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Abonnement requis pour accepter des courses'),
+              backgroundColor: const Color(0xFFEA580C),
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'S\'abonner',
+                textColor: Colors.white,
+                onPressed: () => Navigator.pushNamed(context, '/driver_subscription'),
+              ),
             ),
           );
         }

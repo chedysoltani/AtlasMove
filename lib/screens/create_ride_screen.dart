@@ -145,7 +145,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   final TextEditingController _destinationController = TextEditingController();
   final FocusNode _destinationFocusNode = FocusNode();
   LatLng? _destinationCoordinates;
-  LatLng? _pickupCoordinates; // captured at trip-creation time for live map
+  LatLng? _pickupCoordinates;          // captured at trip-creation time for live map
+  LatLng? _estimatedPickupCoords;      // captured at route-calculation time for fare estimate
   List<String> _addressSuggestions = [];
   bool _isSearching = false;
   double? _estimatedDistance;
@@ -354,6 +355,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           _showRouteEstimation = true;
         });
       }
+      _estimatedPickupCoords = start;
       _addRouteElements(start, end);
       // Récupérer le tarif réel depuis l'API (spec: POST /trips/estimate-fare)
       await _fetchFareEstimate();
@@ -597,7 +599,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         destinationAddress: 'booking.destination'.tr(),
         serviceName: 'Moto standard',
         estimatedFare: offers.isNotEmpty ? offers.first.proposedFare : 4.50,
-        currency: 'TND',
+        currency: _fareEstimate?.currency ?? _tripResponse?.data?.currency ?? 'TND',
         createdAt: DateTime.now(),
         estimatedDistanceKm: 0.0,
         estimatedDurationMin: 0,
@@ -1579,7 +1581,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${offer.proposedFare.toStringAsFixed(2)} ${_selectedService?.currency ?? "TND"}',
+                '${offer.proposedFare.toStringAsFixed(2)} ${_fareEstimate?.currency ?? _tripResponse?.data?.currency ?? "TND"}',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
