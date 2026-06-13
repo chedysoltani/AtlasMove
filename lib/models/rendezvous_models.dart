@@ -17,6 +17,17 @@ class Rendezvous {
   final String? livreurPhone;
   final DateTime createdAt;
 
+  // Delivery-specific fields (null for standard RDV services)
+  final String? destinationAddress;
+  final double? destinationLatitude;
+  final double? destinationLongitude;
+  final String? cargoDescription;
+  final double? cargoWeightKg;
+  final String? cargoSize; // 'small' | 'medium' | 'large' | 'extra_large'
+  final bool? isFragile;
+  final double? estimatedDistanceKm;
+  final double? estimatedFare;
+
   const Rendezvous({
     required this.id,
     required this.serviceId,
@@ -35,7 +46,18 @@ class Rendezvous {
     this.livreurName,
     this.livreurPhone,
     required this.createdAt,
+    this.destinationAddress,
+    this.destinationLatitude,
+    this.destinationLongitude,
+    this.cargoDescription,
+    this.cargoWeightKg,
+    this.cargoSize,
+    this.isFragile,
+    this.estimatedDistanceKm,
+    this.estimatedFare,
   });
+
+  bool get isDelivery => destinationAddress != null && destinationAddress!.isNotEmpty;
 
   bool get isCancellable => status == 'pending' || status == 'accepted';
   bool get isUpcoming =>
@@ -83,11 +105,13 @@ class Rendezvous {
       durationMinutes:
           int.tryParse(json['duration_minutes']?.toString() ?? '60') ?? 60,
       details: json['details']?.toString(),
-      address: json['address']?.toString() ?? '',
-      latitude:
-          double.tryParse(json['latitude']?.toString() ?? '0') ?? 0.0,
-      longitude:
-          double.tryParse(json['longitude']?.toString() ?? '0') ?? 0.0,
+      address: (json['pickup_address'] ?? json['address'])?.toString() ?? '',
+      latitude: double.tryParse(
+              (json['pickup_latitude'] ?? json['latitude'])?.toString() ?? '0') ??
+          0.0,
+      longitude: double.tryParse(
+              (json['pickup_longitude'] ?? json['longitude'])?.toString() ?? '0') ??
+          0.0,
       status: json['status']?.toString() ?? 'pending',
       clientId: (json['client_id'] ?? json['clientId'])?.toString(),
       clientName: clientName,
@@ -98,6 +122,20 @@ class Rendezvous {
       createdAt:
           DateTime.tryParse(json['created_at']?.toString() ?? '') ??
               DateTime.now(),
+      destinationAddress: json['destination_address']?.toString(),
+      destinationLatitude: double.tryParse(
+          json['destination_latitude']?.toString() ?? ''),
+      destinationLongitude: double.tryParse(
+          json['destination_longitude']?.toString() ?? ''),
+      cargoDescription: json['cargo_description']?.toString(),
+      cargoWeightKg: double.tryParse(
+          json['cargo_weight_kg']?.toString() ?? ''),
+      cargoSize: json['cargo_size']?.toString(),
+      isFragile: json['is_fragile'] as bool?,
+      estimatedDistanceKm: double.tryParse(
+          json['estimated_distance_km']?.toString() ?? ''),
+      estimatedFare: double.tryParse(
+          json['estimated_fare']?.toString() ?? ''),
     );
   }
 }

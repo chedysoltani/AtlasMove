@@ -130,15 +130,13 @@ class AuthService {
         throw ServiceValidationException(['Le mot de passe est requis']);
       }
 
-      final deviceId = await TokenStorage.getOrCreateDeviceId();
-
       // Envoi de la requête vers le bon endpoint
+      // deviceId transmis via header X-Device-Id (ajouté automatiquement par _defaultHeaders)
       final response = await HttpClient.post(
         '/m/auth/login',
         body: {
           'email': email.trim(),
           'password': password,
-          'deviceId': deviceId,
         },
       );
 
@@ -342,16 +340,14 @@ class AuthService {
         throw ServiceValidationException(['Le token de session est requis']);
       }
 
-      final deviceId = await TokenStorage.getOrCreateDeviceId();
-
       // Envoi de la requête
+      // deviceId transmis via header X-Device-Id (ajouté automatiquement par _defaultHeaders)
       final response = await HttpClient.post(
         '/m/auth/verify-otp',
         body: {
           'email': email.trim(),
           'otpCode': otp.trim(),
           'sessionToken': sessionToken,
-          'deviceId': deviceId,
         },
       );
 
@@ -435,15 +431,13 @@ class AuthService {
         throw ServiceValidationException(['Le token de session est requis']);
       }
 
-      final deviceId = await TokenStorage.getOrCreateDeviceId();
-
       // Envoi de la requête
+      // deviceId transmis via header X-Device-Id (ajouté automatiquement par _defaultHeaders)
       final response = await HttpClient.post(
         '/m/auth/resend-otp',
         body: {
           'email': email.trim(),
           'sessionToken': sessionToken,
-          'deviceId': deviceId,
         },
       );
 

@@ -344,23 +344,81 @@ class _ServicesCatalogueScreenState extends ConsumerState<ServicesCatalogueScree
     );
   }
 
+  // Icon mapping uses transportType slug (backend-driven, language-independent)
   IconData _getCategoryIcon(String categoryName) {
     final name = categoryName.toLowerCase();
-    
-    if (name.contains('taxi') || name.contains('transport')) {
-      return Icons.local_taxi;
-    } else if (name.contains('livraison') || name.contains('delivery')) {
-      return Icons.delivery_dining;
-    } else if (name.contains('moto') || name.contains('moto')) {
-      return Icons.motorcycle;
-    } else if (name.contains('van') || name.contains('camion')) {
+
+    // Heavy transport & freight
+    if (name.contains('benne') || name.contains('grue') || name.contains('plateau')) {
+      return Icons.construction;
+    } else if (name.contains('frigo') || name.contains('frigorif')) {
+      return Icons.ac_unit;
+    } else if (name.contains('demenag') || name.contains('moving')) {
+      return Icons.move_to_inbox;
+    } else if (name.contains('semi') || name.contains('remorque') ||
+        name.contains('tracteur') || name.contains('tractor')) {
       return Icons.local_shipping;
-    } else if (name.contains('course') || name.contains('ride')) {
-      return Icons.directions_car;
+    } else if (name.contains('citerne') || name.contains('tanker')) {
+      return Icons.water_drop;
+    } else if (name.contains('toupie') || name.contains('malaxeur')) {
+      return Icons.rotate_right;
+    } else if (name.contains('camion') || name.contains('truck') ||
+        name.contains('porteur') || name.contains('fourgon')) {
+      return Icons.local_shipping;
+    }
+    // Maritime
+    else if (name.contains('ferry')) {
+      return Icons.directions_ferry;
+    } else if (name.contains('yacht') || name.contains('vedette') ||
+        name.contains('nautique') || name.contains('bateau')) {
+      return Icons.directions_boat;
+    }
+    // Special vehicles
+    else if (name.contains('ambulance') || name.contains('medical')) {
+      return Icons.emergency;
+    } else if (name.contains('helicop')) {
+      return Icons.flight;
+    } else if (name.contains('aeroport') || name.contains('airport')) {
+      return Icons.flight_land;
+    } else if (name.contains('scolaire') || name.contains('school')) {
+      return Icons.school;
+    } else if (name.contains('chariot') || name.contains('forklift') ||
+        name.contains('elevateur')) {
+      return Icons.warehouse;
+    } else if (name.contains('agricol') || name.contains('farm')) {
+      return Icons.agriculture;
+    } else if (name.contains('engin') || name.contains('equipment')) {
+      return Icons.precision_manufacturing;
+    }
+    // Light delivery
+    else if (name.contains('velo') || name.contains('bicycle') ||
+        name.contains('tricycle')) {
+      return Icons.pedal_bike;
+    } else if (name.contains('coursier') || name.contains('livraison') ||
+        name.contains('delivery')) {
+      return Icons.delivery_dining;
+    } else if (name.contains('camionnette') || name.contains('van')) {
+      return Icons.airport_shuttle;
+    }
+    // Passenger transport
+    else if (name.contains('moto') || name.contains('motorcycle')) {
+      return Icons.motorcycle;
+    } else if (name.contains('bus') || name.contains('minibus') ||
+        name.contains('collectif') || name.contains('louage')) {
+      return Icons.directions_bus;
+    } else if (name.contains('covoiturage') || name.contains('carpooling')) {
+      return Icons.people;
+    } else if (name.contains('tuk') || name.contains('bajaj') ||
+        name.contains('rickshaw')) {
+      return Icons.electric_rickshaw;
+    } else if (name.contains('luxe') || name.contains('luxury') ||
+        name.contains('premium') || name.contains('vip')) {
+      return Icons.star;
     } else if (name.contains('urgence') || name.contains('emergency')) {
       return Icons.emergency;
-    } else if (name.contains('premium') || name.contains('luxury')) {
-      return Icons.star;
+    } else if (name.contains('taxi') || name.contains('transport') ||
+        name.contains('vtc') || name.contains('course')) {
+      return Icons.local_taxi;
     } else {
       return Icons.category;
     }

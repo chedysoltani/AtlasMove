@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/service_models.dart';
 import '../services/service_api.dart';
+import '../core/network/http_client.dart';
 
 // Provider pour récupérer le token depuis SharedPreferences
 final tokenProvider = AsyncNotifierProvider<TokenNotifier, String?>(() {
@@ -54,42 +55,47 @@ class CatalogueNotifier extends AsyncNotifier<ServiceCatalogue> {
     return ServiceCatalogue(data: [], total: 0);
   }
 
-  Future<void> fetchCatalogue() async {
-    // Éviter les appels multiples
-    if (_isLoading) {
-      print('DEBUG: fetchCatalogue - déjà en cours, ignore');
-      return;
-    }
-
+  Future<void> fetchCatalogue({double? latitude, double? longitude}) async {
+    if (_isLoading) return;
     _isLoading = true;
-    
-    // Ne pas effacer les données existantes pendant le chargement
+
     if (state.value == null || state.value!.data.isEmpty) {
       state = const AsyncValue.loading();
     }
-    
+
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token') ?? '';
-      print('DEBUG: fetchCatalogue - token: ${token.isEmpty ? 'vide' : 'présent'}');
-      
-      final catalogue = await ServiceApi.getCatalogue(token: token);
-      print('DEBUG: Catalogue récupéré - categories count: ${catalogue.data.length}');
-      print('DEBUG: Catalogue récupéré - total: ${catalogue.total}');
-      
+      final catalogue = await _fetchWithFallback(latitude: latitude, longitude: longitude);
       state = AsyncValue.data(catalogue);
     } catch (e, stack) {
-      print('DEBUG: Erreur fetchCatalogue: $e');
-      // Ne pas effacer les données existantes en cas d'erreur
-      if (state.value != null && state.value!.data.isNotEmpty) {
-        print('DEBUG: Conservation des données existantes malgré l\'erreur');
-        // Garder les données existantes mais marquer l'erreur
-        return;
-      }
+      if (state.value != null && state.value!.data.isNotEmpty) return;
       state = AsyncValue.error(e, stack);
     } finally {
       _isLoading = false;
     }
+  }
+
+  Future<ServiceCatalogue> _fetchWithFallback({double? latitude, double? longitude}) async {
+    final params = <String, dynamic>{};
+    if (latitude != null) params['latitude'] = latitude.toString();
+    if (longitude != null) params['longitude'] = longitude.toString();
+    final q = params.isEmpty ? null : params;
+
+    // Try zone-aware endpoints first, fall back to the known-working /services/catalogue
+    for (final path in ['/m/services', '/m/services/catalogue', '/services/catalogue', '/services']) {
+      try {
+        final response = await HttpClient.get(path, queryParams: q);
+        if (response.isSuccess) {
+          return ServiceCatalogue.fromJson(response.json);
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+
+    // Last resort: original ServiceApi (uses its own http client)
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token') ?? '';
+    return ServiceApi.getCatalogue(token: token);
   }
 }
 

@@ -6,6 +6,7 @@ import '../core/network/http_client.dart';
 class FareEstimate {
   final double estimatedFare;
   final String currency;
+  final String? zoneName;
   final double minBid;   // estimatedFare * 0.8
   final double maxBid;   // estimatedFare * 1.5
   final Map<String, dynamic> breakdown;
@@ -13,6 +14,7 @@ class FareEstimate {
   FareEstimate({
     required this.estimatedFare,
     required this.currency,
+    this.zoneName,
     required this.breakdown,
   })  : minBid = double.parse((estimatedFare * 0.8).toStringAsFixed(3)),
         maxBid = double.parse((estimatedFare * 1.5).toStringAsFixed(3));
@@ -23,8 +25,9 @@ class FareEstimate {
     return FareEstimate(
       estimatedFare: fare,
       currency: json['currency'] as String? ?? 'TND',
-      breakdown: (json['breakdown'] as Map<String, dynamic>?)
-          ?? (json['pricing_breakdown'] as Map<String, dynamic>?)
+      zoneName: json['zone_name'] as String?,
+      breakdown: (json['pricing_breakdown'] as Map<String, dynamic>?)
+          ?? (json['breakdown'] as Map<String, dynamic>?)
           ?? {},
     );
   }
@@ -32,18 +35,31 @@ class FareEstimate {
 
 class TripService {
 
-  /// Spec backend : POST /trips/estimate-fare
-  /// Retourne le tarif estimé dans la devise du marché du client connecté (détecté via JWT).
+  /// POST /m/trips/estimate
+  /// Retourne le tarif estimé dans la devise de la zone détectée via les coordonnées GPS.
   static Future<FareEstimate> estimateFare({
     required String serviceId,
     required double distanceKm,
     required double durationMinutes,
+    double? latitude,
+    double? longitude,
   }) async {
-    final response = await HttpClient.post('/trips/estimate-fare', body: {
+    final body = <String, dynamic>{
       'service_id': serviceId,
       'distance_km': double.parse(distanceKm.toStringAsFixed(2)),
       'duration_minutes': double.parse(durationMinutes.toStringAsFixed(1)),
-    });
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+    };
+
+    // Per backend spec: POST /m/trips/estimate — fallback to old endpoint if not yet deployed
+    HttpResponse response = await HttpClient.post('/m/trips/estimate', body: body);
+    if (response.statusCode == 404) {
+      response = await HttpClient.post('/m/trips/estimate-fare', body: body);
+    }
+    if (response.statusCode == 404) {
+      response = await HttpClient.post('/trips/estimate-fare', body: body);
+    }
 
     if (!response.isSuccess) {
       throw TripException(
@@ -52,7 +68,7 @@ class TripService {
       );
     }
 
-    // Réponse backend : { data: { data: { message, data: { estimatedFare, ... } } } }
+    // Réponse : { data: { data: { estimated_fare, currency, zone_name, pricing_breakdown } } }
     final l1 = response.json['data'];
     final l2 = (l1 is Map && l1['data'] is Map) ? l1['data'] as Map : l1 as Map? ?? {};
     final payload = (l2['data'] is Map)

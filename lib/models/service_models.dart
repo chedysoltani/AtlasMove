@@ -510,6 +510,109 @@ class ServiceCategoryWithServices {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Transport type constants — slugs returned by the backend (Phase 2 catalogue)
+// ─────────────────────────────────────────────────────────────────────────────
+class TransportTypeConstants {
+  // Passenger transport
+  static const taxiStandard = 'taxi_standard';
+  static const taxi = 'taxi'; // legacy slug kept for backwards compat
+  static const vtc = 'vtc';
+  static const voiture = 'voiture'; // legacy
+  static const motoTaxi = 'moto_taxi';
+  static const moto = 'moto'; // legacy
+  static const tukTuk = 'tuk_tuk';
+  static const minibusCollectif = 'minibus_collectif';
+  static const busCharter = 'bus_charter';
+  static const bus = 'bus'; // legacy
+  static const transfertAeroport = 'transfert_aeroport';
+  static const transportScolaire = 'transport_scolaire';
+  static const voitureLuxe = 'voiture_luxe';
+  static const ambulance = 'ambulance';
+  static const covoiturage = 'covoiturage';
+  static const helicoptere = 'helicoptere';
+
+  // Light delivery < 500 kg
+  static const coursierMoto = 'coursier_moto';
+  static const livraison = 'livraison'; // legacy
+  static const delivery = 'delivery'; // legacy
+  static const coursierVelo = 'coursier_velo';
+  static const livraisonVoiture = 'livraison_voiture';
+  static const camionnette15t = 'camionnette_15t';
+  static const van = 'van'; // legacy
+  static const tricycleCargo = 'tricycle_cargo';
+
+  // Heavy transport / freight
+  static const pickupTruck = 'pickup_truck';
+  static const camion35t = 'camion_35t';
+  static const camion10t = 'camion_10t';
+  static const camion20t = 'camion_20t';
+  static const camion = 'camion'; // legacy
+  static const semiRemorque = 'semi_remorque';
+  static const camionPlateau = 'camion_plateau';
+  static const camionBenne = 'camion_benne';
+  static const camionFrigo = 'camion_frigo';
+  static const camionCiterne = 'camion_citerne';
+  static const camionGrue = 'camion_grue';
+  static const camionFourgon = 'camion_fourgon';
+  static const camionDemenagement = 'camion_demenagement';
+  static const camionToupie = 'camion_toupie';
+
+  // Maritime
+  static const taxiNautique = 'taxi_nautique';
+  static const ferry = 'ferry';
+  static const vedetteYacht = 'vedette_yacht';
+  static const yacht = 'yacht'; // legacy
+
+  // Agricultural / industrial
+  static const tracteurAgricole = 'tracteur_agricole';
+  static const tracteur = 'tracteur'; // legacy
+  static const chariotElevateur = 'chariot_elevateur';
+  static const transportEngins = 'transport_engins';
+
+  // All delivery-type slugs (need pickup + destination address)
+  static const Set<String> deliverySlugs = {
+    coursierMoto, livraison, delivery, coursierVelo, livraisonVoiture,
+    camionnette15t, van, tricycleCargo,
+    pickupTruck, camion35t, camion10t, camion20t, camion,
+    semiRemorque, camionPlateau, camionBenne, camionFrigo,
+    camionCiterne, camionGrue, camionFourgon, camionDemenagement,
+    camionToupie, transportEngins,
+  };
+
+  // Slugs that do NOT require real-time GPS tracking
+  static const Set<String> noTrackingSlugs = {
+    minibusCollectif, busCharter, bus, covoiturage,
+    ferry, tracteurAgricole, tracteur, chariotElevateur, camionToupie,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper extension on Service
+// ─────────────────────────────────────────────────────────────────────────────
+extension ServiceHelpers on Service {
+  // True when this service is a delivery/transport type (needs pickup + destination)
+  bool get isDeliveryService =>
+      TransportTypeConstants.deliverySlugs.contains(transportType);
+
+  // True when billing is per hour (uses pricePerMinute field)
+  bool get isHourlyService => pricingModel == 'hourly';
+
+  // True when price is fixed regardless of distance
+  bool get isFixedPrice => pricingModel == 'fixed';
+
+  // True when the client can negotiate the fare (not fixed or hourly)
+  bool get isNegotiable =>
+      pricingModel != 'fixed' && pricingModel != 'hourly';
+
+  // True when real-time GPS tracking is needed
+  bool get requiresGpsTracking =>
+      !TransportTypeConstants.noTrackingSlugs.contains(transportType);
+
+  // Display currency — returned by the backend per zone (EUR, TND, MAD, DZD…)
+  String get displayCurrency => currency ?? 'TND';
+}
+
 class AssignmentRequest {
   final String serviceId;
   final String? documentUrl;

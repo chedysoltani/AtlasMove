@@ -13,17 +13,33 @@ class RendezvousService {
     required String address,
     required double latitude,
     required double longitude,
+    String? destinationAddress,
+    double? destinationLatitude,
+    double? destinationLongitude,
+    String? cargoDescription,
+    double? cargoWeightKg,
+    String? cargoSize,
+    bool? isFragile,
   }) async {
     debugPrint('=== RendezvousService.bookRendezvous() START ===');
     try {
-      final body = {
+      final body = <String, dynamic>{
         'service_id': serviceId,
         'scheduled_at': scheduledAt.toUtc().toIso8601String(),
         'duration_minutes': durationMinutes,
-        'address': address,
-        'latitude': latitude,
-        'longitude': longitude,
+        'pickup_address': address,
+        'pickup_latitude': latitude,
+        'pickup_longitude': longitude,
         if (details != null && details.isNotEmpty) 'details': details,
+        if (destinationAddress != null && destinationAddress.isNotEmpty)
+          'destination_address': destinationAddress,
+        if (destinationLatitude != null) 'destination_latitude': destinationLatitude,
+        if (destinationLongitude != null) 'destination_longitude': destinationLongitude,
+        if (cargoDescription != null && cargoDescription.isNotEmpty)
+          'cargo_description': cargoDescription,
+        if (cargoWeightKg != null) 'cargo_weight_kg': cargoWeightKg,
+        if (cargoSize != null) 'cargo_size': cargoSize,
+        if (isFragile != null) 'is_fragile': isFragile,
       };
       debugPrint('Body: $body');
       final response = await HttpClient.post('/m/rendezvous', body: body);

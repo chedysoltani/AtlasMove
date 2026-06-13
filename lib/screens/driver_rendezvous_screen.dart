@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/rendezvous_models.dart';
 import '../services/rendezvous_service.dart';
+import '../utils/fare_calculator.dart';
 
 class DriverRendezvousScreen extends StatefulWidget {
   const DriverRendezvousScreen({super.key});
@@ -597,11 +598,72 @@ class _AvailableCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
             child: Column(
               children: [
-                _infoRow(Icons.local_taxi_rounded, rdv.serviceName, bold: true),
+                _infoRow(
+                  rdv.isDelivery
+                      ? Icons.local_shipping_rounded
+                      : Icons.local_taxi_rounded,
+                  rdv.serviceName,
+                  bold: true,
+                ),
                 const SizedBox(height: 8),
-                _infoRow(Icons.location_on_rounded, rdv.address),
-                const SizedBox(height: 8),
-                _infoRow(Icons.timer_rounded, '${rdv.durationMinutes} minutes'),
+                // Delivery: show route pickup → destination
+                if (rdv.isDelivery) ...[
+                  _infoRow(Icons.location_on_rounded, rdv.address,
+                      iconColor: _orange),
+                  if (rdv.destinationAddress != null) ...[
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 2,
+                            height: 16,
+                            margin: const EdgeInsets.only(left: 12),
+                            color: _border,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _infoRow(Icons.flag_rounded, rdv.destinationAddress!,
+                        iconColor: const Color(0xFF22C55E)),
+                  ],
+                  if (rdv.estimatedDistanceKm != null) ...[
+                    const SizedBox(height: 8),
+                    _infoRow(Icons.route_rounded,
+                        '${rdv.estimatedDistanceKm!.toStringAsFixed(1)} km estimés'),
+                  ],
+                ] else ...[
+                  _infoRow(Icons.location_on_rounded, rdv.address),
+                  const SizedBox(height: 8),
+                  _infoRow(Icons.timer_rounded, '${rdv.durationMinutes} minutes'),
+                ],
+                // Cargo info
+                if (rdv.cargoDescription != null &&
+                    rdv.cargoDescription!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _infoRow(Icons.inventory_2_rounded, rdv.cargoDescription!),
+                ],
+                if (rdv.cargoWeightKg != null) ...[
+                  const SizedBox(height: 8),
+                  _infoRow(Icons.scale_rounded,
+                      '${rdv.cargoWeightKg!.toStringAsFixed(0)} kg'),
+                ],
+                if (rdv.isFragile == true) ...[
+                  const SizedBox(height: 8),
+                  _infoRow(Icons.warning_amber_rounded, 'Colis FRAGILE',
+                      iconColor: const Color(0xFFEF4444)),
+                ],
+                // Estimated fare
+                if (rdv.estimatedFare != null) ...[
+                  const SizedBox(height: 8),
+                  _infoRow(
+                    Icons.payments_rounded,
+                    'Tarif estimé : ${FareCalculator.formatFare(rdv.estimatedFare!, 'TND')}',
+                    bold: true,
+                  ),
+                ],
                 if (rdv.clientName != null) ...[
                   const SizedBox(height: 8),
                   _infoRow(Icons.person_rounded, rdv.clientName!),
@@ -885,6 +947,7 @@ class _PlanningCard extends StatelessWidget {
   });
 
   static const _green = Color(0xFF22C55E);
+  static const _orange = Color(0xFFFF6B35);
 
   @override
   Widget build(BuildContext context) {
@@ -949,9 +1012,40 @@ class _PlanningCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
             child: Column(children: [
-              _infoRow(Icons.local_taxi_rounded, rdv.serviceName, bold: true),
+              _infoRow(
+                rdv.isDelivery
+                    ? Icons.local_shipping_rounded
+                    : Icons.local_taxi_rounded,
+                rdv.serviceName,
+                bold: true,
+              ),
               const SizedBox(height: 8),
-              _infoRow(Icons.location_on_rounded, rdv.address),
+              _infoRow(Icons.location_on_rounded, rdv.address,
+                  iconColor: rdv.isDelivery ? _orange : null),
+              if (rdv.isDelivery && rdv.destinationAddress != null) ...[
+                const SizedBox(height: 8),
+                _infoRow(Icons.flag_rounded, rdv.destinationAddress!,
+                    iconColor: _green),
+              ],
+              if (rdv.estimatedDistanceKm != null) ...[
+                const SizedBox(height: 8),
+                _infoRow(Icons.route_rounded,
+                    '${rdv.estimatedDistanceKm!.toStringAsFixed(1)} km estimés'),
+              ],
+              if (rdv.cargoDescription != null &&
+                  rdv.cargoDescription!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _infoRow(Icons.inventory_2_rounded, rdv.cargoDescription!),
+              ],
+              if (rdv.isFragile == true) ...[
+                const SizedBox(height: 8),
+                _infoRow(Icons.warning_amber_rounded, 'Colis FRAGILE',
+                    iconColor: const Color(0xFFEF4444)),
+              ],
+              if (!rdv.isDelivery) ...[
+                const SizedBox(height: 8),
+                _infoRow(Icons.timer_rounded, '${rdv.durationMinutes} min'),
+              ],
               if (rdv.clientName != null) ...[
                 const SizedBox(height: 8),
                 _infoRow(Icons.person_rounded, 'rdv.client_name'.tr(namedArgs: {'name': rdv.clientName!})),

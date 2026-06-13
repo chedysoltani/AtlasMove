@@ -25,10 +25,16 @@ class HttpClient {
   
   /// Headers par défaut pour toutes les requêtes
   static Future<Map<String, String>> _defaultHeaders() async {
+    final deviceId = await TokenStorage.getOrCreateDeviceId();
+    final platform = Platform.isIOS ? 'ios' : 'android';
+
     final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'User-Agent': 'AtlasMove/1.0 (Flutter)',
+      'X-Device-Id': deviceId,
+      'X-Platform': platform,
+      'X-App-Version': '1.0.0',
     };
 
     // Ajouter le bearer token si disponible
@@ -276,12 +282,16 @@ class HttpClient {
 
       final uri = Uri.parse('$baseUrl/m/auth/refresh');
       final deviceId = await TokenStorage.getOrCreateDeviceId();
+      final platform = Platform.isIOS ? 'ios' : 'android';
       final response = await http.post(
         uri,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': 'Bearer $refreshToken',
+          'X-Device-Id': deviceId,
+          'X-Platform': platform,
+          'X-App-Version': '1.0.0',
         },
         body: jsonEncode({
           'refreshToken': refreshToken,

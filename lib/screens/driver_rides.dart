@@ -991,19 +991,45 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
   }
 
   Color _getTypeColor(String type) {
-    switch (type.toLowerCase()) {
-      case 'taxi':
-        return Colors.blue;
-      case 'livraison':
-        return Colors.orange;
-      case 'camion':
-        return Colors.purple;
-      case 'moto':
-        return Colors.green;
-      case 'yacht':
-        return Colors.cyan;
-      default:
-        return AppTheme.primaryColor;
+    final t = type.toLowerCase();
+    // Passenger
+    if (t.contains('taxi') || t.contains('vtc') || t.contains('voiture')) {
+      return Colors.blue;
     }
+    // Light delivery
+    if (t.contains('coursier') || t.contains('livraison') ||
+        t.contains('delivery') || t.contains('colis') ||
+        t.contains('camionnette') || t.contains('velo')) {
+      return Colors.orange;
+    }
+    // Heavy transport
+    if (t.contains('camion') || t.contains('truck') || t.contains('semi') ||
+        t.contains('remorque') || t.contains('tracteur') ||
+        t.contains('benne') || t.contains('grue') || t.contains('frigo')) {
+      return Colors.purple;
+    }
+    // Moto
+    if (t.contains('moto') || t.contains('motorcycle')) {
+      return Colors.green;
+    }
+    // Maritime
+    if (t.contains('yacht') || t.contains('vedette') ||
+        t.contains('ferry') || t.contains('nautique')) {
+      return Colors.cyan;
+    }
+    // Bus / collectif
+    if (t.contains('bus') || t.contains('minibus') || t.contains('collectif')) {
+      return Colors.indigo;
+    }
+    // Ambulance / urgent
+    if (t.contains('ambulance') || t.contains('urgence')) {
+      return Colors.red;
+    }
+    // Agricultural / industrial
+    if (t.contains('agricol') || t.contains('tracteur') ||
+        t.contains('chariot') || t.contains('engin')) {
+      return Colors.brown;
+    }
+    return AppTheme.primaryColor;
   }
 }

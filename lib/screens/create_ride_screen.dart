@@ -163,7 +163,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
   bool _isDestinationFocused = false;
 
-  // Estimation tarifaire depuis l'API (spec: POST /trips/estimate-fare)
+  // Estimation tarifaire depuis l'API
   FareEstimate? _fareEstimate;
   bool _isFetchingEstimate = false;
 
@@ -321,10 +321,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     setState(() => _isFetchingEstimate = true);
     try {
       final durationMin = _parseDurationToMinutes(_estimatedDuration!).toDouble();
+      final pickupCoords = _estimatedPickupCoords;
       final estimate = await TripService.estimateFare(
         serviceId: _selectedService!.id,
         distanceKm: _estimatedDistance!,
         durationMinutes: durationMin,
+        latitude: pickupCoords?.latitude,
+        longitude: pickupCoords?.longitude,
       );
       if (mounted) {
         setState(() {
@@ -357,7 +360,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       }
       _estimatedPickupCoords = start;
       _addRouteElements(start, end);
-      // Récupérer le tarif réel depuis l'API (spec: POST /trips/estimate-fare)
+      // Récupérer le tarif réel depuis l'API
       await _fetchFareEstimate();
       await _fitMapToBounds(start, end);
     } catch (e) {
