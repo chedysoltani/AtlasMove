@@ -1,7 +1,9 @@
 import '../core/network/http_client.dart';
+import '../core/storage/token_storage.dart';
 import '../models/requests/update_profile_request.dart';
 import '../models/responses/update_profile_response.dart';
 import '../models/responses/auth_response.dart';
+import 'location_tracking_service.dart';
 
 /// Service pour gérer les opérations de profil utilisateur
 class ProfileService {
@@ -148,13 +150,17 @@ class ProfileService {
     }
   }
 
-  /// Déconnecter l'utilisateur (supprimer le token)
+  /// Déconnecter l'utilisateur — arrêt des services + nettoyage complet du storage
   static Future<void> logout() async {
+    // 1. Stopper le tracking de position immédiatement
+    LocationTrackingService().stopLocationTracking();
+
+    // 2. Appel API (best-effort)
     try {
       await HttpClient.post('/auth/logout');
-    } catch (e) {
-      // La déconnexion peut échouer côté serveur mais l'utilisateur peut quand même être déconnecté localement
-      print('Erreur lors de la déconnexion: $e');
-    }
+    } catch (_) {}
+
+    // 3. Effacer tous les tokens ET poser le flag explicit_logout
+    await TokenStorage.clearTokens();
   }
 }

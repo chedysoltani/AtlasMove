@@ -45,10 +45,10 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
-  image_path: "assets/images/atlasmove_logo.png"
+  image_path: "assets/images/new_logo_mobile.png"
   min_sdk_android: 21
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/atlasmove_logo.png"
+  adaptive_icon_foreground: "assets/images/new_logo_mobile.png"
 
 
 flutter:

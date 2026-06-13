@@ -184,10 +184,13 @@ class _LandingScreenState extends State<LandingScreen>
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.directions_car_rounded,
-                            color: Colors.white,
-                            size: 42,
+                          child: ClipOval(
+                            child: Image.asset(
+                              'assets/images/new_logo_mobile.png',
+                              width: 86,
+                              height: 86,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                       );

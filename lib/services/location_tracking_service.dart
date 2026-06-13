@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/network/http_client.dart';
+import '../core/storage/token_storage.dart';
 import 'location_service.dart';
 
 // Callback déclenché quand le backend détecte une vitesse anormale (anti-spoofing)
@@ -73,6 +74,13 @@ class LocationTrackingService {
   }
 
   Future<bool> _sendLocation(Position position) async {
+    // Pas de token → arrêt silencieux, pas de requête
+    final token = await TokenStorage.getAccessToken();
+    if (token == null || token.isEmpty) {
+      stopLocationTracking();
+      return false;
+    }
+
     try {
       final response = await HttpClient.post('/trips/location', body: {
         'latitude': position.latitude,
@@ -85,6 +93,12 @@ class LocationTrackingService {
         return true;
       }
 
+      // 401 = session expirée → arrêt silencieux (onSessionExpired géré ailleurs)
+      if (response.statusCode == 401) {
+        stopLocationTracking();
+        return false;
+      }
+
       // 400 = anti-spoofing détecté par le backend
       if (response.statusCode == 400) {
         onGpsSpoofingDetected?.call();
@@ -92,6 +106,8 @@ class LocationTrackingService {
 
       return false;
     } catch (e) {
+      // SessionExpiredException → arrêt silencieux sans re-naviguer
+      stopLocationTracking();
       debugPrint('LocationTrackingService: $e');
       return false;
     }

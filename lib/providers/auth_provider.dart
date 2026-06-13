@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../models/auth_request.dart';
+import '../services/profile_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   User? _currentUser;
@@ -73,16 +74,14 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _setLoading(true);
     _clearError();
-
     try {
-      // Simuler un appel API
-      await Future.delayed(const Duration(milliseconds: 500));
-
+      // Arrêt des services + suppression du token + flag explicit_logout
+      await ProfileService.logout();
       _currentUser = null;
       _token = null;
-      _setLoading(false);
     } catch (e) {
-      _setError('Erreur de déconnexion: ${e.toString()}');
+      debugPrint('Erreur de déconnexion: $e');
+    } finally {
       _setLoading(false);
     }
   }

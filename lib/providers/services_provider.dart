@@ -1,10 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/service_models.dart';
 import '../services/service_api.dart';
 import '../core/network/http_client.dart';
+import '../core/storage/token_storage.dart';
 
-// Provider pour récupérer le token depuis SharedPreferences
+// Provider pour récupérer le token depuis le stockage sécurisé
 final tokenProvider = AsyncNotifierProvider<TokenNotifier, String?>(() {
   return TokenNotifier();
 });
@@ -15,10 +15,7 @@ class TokenNotifier extends AsyncNotifier<String?> {
     return null;
   }
 
-  Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('access_token');
-  }
+  Future<String?> getToken() => TokenStorage.getAccessToken();
 
   Future<void> refreshToken() async {
     state = const AsyncValue.loading();
@@ -33,12 +30,7 @@ class TokenNotifier extends AsyncNotifier<String?> {
 
 // Provider pour les services
 final servicesProvider = StateNotifierProvider<ServicesNotifier, ServicesState>((ref) {
-  final prefs = SharedPreferences.getInstance();
-  prefs.then((prefs) {
-    final token = prefs.getString('access_token') ?? '';
-    return ServicesNotifier(token);
-  });
-  return ServicesNotifier('');
+  return ServicesNotifier();
 });
 
 
@@ -80,7 +72,6 @@ class CatalogueNotifier extends AsyncNotifier<ServiceCatalogue> {
     if (longitude != null) params['longitude'] = longitude.toString();
     final q = params.isEmpty ? null : params;
 
-    // Try zone-aware endpoints first, fall back to the known-working /services/catalogue
     for (final path in ['/m/services', '/m/services/catalogue', '/services/catalogue', '/services']) {
       try {
         final response = await HttpClient.get(path, queryParams: q);
@@ -92,21 +83,14 @@ class CatalogueNotifier extends AsyncNotifier<ServiceCatalogue> {
       }
     }
 
-    // Last resort: original ServiceApi (uses its own http client)
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token') ?? '';
+    final token = await TokenStorage.getAccessToken() ?? '';
     return ServiceApi.getCatalogue(token: token);
   }
 }
 
 // Provider pour les affectations
 final assignmentsProvider = StateNotifierProvider<AssignmentsNotifier, AssignmentsState>((ref) {
-  final prefs = SharedPreferences.getInstance();
-  prefs.then((prefs) {
-    final token = prefs.getString('access_token') ?? '';
-    return AssignmentsNotifier(token);
-  });
-  return AssignmentsNotifier('');
+  return AssignmentsNotifier();
 });
 
 // Provider pour l'affectation actuelle
@@ -123,8 +107,7 @@ class CurrentAssignmentNotifier extends AsyncNotifier<ServiceAssignment?> {
   Future<void> fetchCurrentAssignment() async {
     state = const AsyncValue.loading();
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token') ?? '';
+      final token = await TokenStorage.getAccessToken() ?? '';
       final assignment = await ServiceApi.getCurrentAssignment(token: token);
       state = AsyncValue.data(assignment);
     } catch (e, stack) {
@@ -182,16 +165,11 @@ class ServicesState {
 }
 
 class ServicesNotifier extends StateNotifier<ServicesState> {
-  final String _token;
   final List<String> _transportTypes = ['taxi', 'moto', 'livraison', 'van', 'voiture'];
   final List<String> _pricingModels = ['fixed', 'hourly', 'distance', 'commission'];
-  bool isInitialized = false;
 
-  ServicesNotifier(this._token) : super(ServicesState()) {
-    if (_token.isNotEmpty) {
-      _initialize();
-    }
-    isInitialized = true;
+  ServicesNotifier() : super(ServicesState()) {
+    _initialize();
   }
 
   Future<void> _initialize() async {
@@ -203,7 +181,8 @@ class ServicesNotifier extends StateNotifier<ServicesState> {
 
   Future<void> fetchCategories() async {
     try {
-      final categories = await ServiceApi.getCategories(token: _token);
+      final token = await TokenStorage.getAccessToken() ?? '';
+      final categories = await ServiceApi.getCategories(token: token);
       state = state.copyWith(categories: categories);
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -211,14 +190,11 @@ class ServicesNotifier extends StateNotifier<ServicesState> {
   }
 
   Future<void> fetchServices({bool reset = false}) async {
-    print('DEBUG: fetchServices appelé - token: ${_token.isNotEmpty ? "présent" : "vide"}');
-    print('DEBUG: fetchServices - reset: $reset, isLoading: ${state.isLoading}, hasMore: ${state.hasMore}');
-    
     if (state.isLoading) return;
     if (!state.hasMore && !reset) return;
 
     final page = reset ? 1 : state.currentPage;
-    
+
     state = state.copyWith(
       isLoading: true,
       error: null,
@@ -227,21 +203,18 @@ class ServicesNotifier extends StateNotifier<ServicesState> {
     );
 
     try {
-      print('DEBUG: Appel API ServiceApi.getServices...');
+      final token = await TokenStorage.getAccessToken() ?? '';
       final response = await ServiceApi.getServices(
-        token: _token,
+        token: token,
         page: page,
         limit: 10,
         categoryId: state.selectedCategory,
         transportType: state.selectedTransportType,
         pricingModel: state.selectedPricingModel,
       );
-      
-      print('DEBUG: API réponse reçue - services count: ${response.data.length}');
-      print('DEBUG: API réponse - hasNextPage: ${response.meta.hasNextPage}');
 
-      final newServices = reset 
-          ? response.data 
+      final newServices = reset
+          ? response.data
           : [...state.services, ...response.data];
 
       state = state.copyWith(
@@ -250,10 +223,7 @@ class ServicesNotifier extends StateNotifier<ServicesState> {
         hasMore: response.meta.hasNextPage,
         currentPage: page + 1,
       );
-      
-      print('DEBUG: État mis à jour - services count: ${state.services.length}');
     } catch (e) {
-      print('DEBUG: Erreur API fetchServices: $e');
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),
@@ -332,12 +302,8 @@ class AssignmentsState {
 }
 
 class AssignmentsNotifier extends StateNotifier<AssignmentsState> {
-  final String _token;
-
-  AssignmentsNotifier(this._token) : super(AssignmentsState()) {
-    if (_token.isNotEmpty) {
-      fetchAssignments(reset: true);
-    }
+  AssignmentsNotifier() : super(AssignmentsState()) {
+    fetchAssignments(reset: true);
   }
 
   Future<void> fetchAssignments({bool reset = false}) async {
@@ -345,7 +311,7 @@ class AssignmentsNotifier extends StateNotifier<AssignmentsState> {
     if (!state.hasMore && !reset) return;
 
     final page = reset ? 1 : state.currentPage;
-    
+
     state = state.copyWith(
       isLoading: true,
       error: null,
@@ -354,14 +320,15 @@ class AssignmentsNotifier extends StateNotifier<AssignmentsState> {
     );
 
     try {
+      final token = await TokenStorage.getAccessToken() ?? '';
       final response = await ServiceApi.getMyAssignments(
-        token: _token,
+        token: token,
         page: page,
         limit: 10,
       );
 
-      final newAssignments = reset 
-          ? response.data 
+      final newAssignments = reset
+          ? response.data
           : [...state.assignments, ...response.data];
 
       state = state.copyWith(
@@ -384,8 +351,9 @@ class AssignmentsNotifier extends StateNotifier<AssignmentsState> {
 
   Future<void> cancelAssignment(String assignmentId) async {
     try {
+      final token = await TokenStorage.getAccessToken() ?? '';
       await ServiceApi.cancelAssignment(
-        token: _token,
+        token: token,
         assignmentId: assignmentId,
       );
 

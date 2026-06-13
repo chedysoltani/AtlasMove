@@ -249,18 +249,38 @@ class _SignupScreenState extends State<SignupScreen>
     return FadeTransition(
       opacity: _fade(_heroCtrl),
       child: Stack(children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: [Color(0xFF0F172A), Color(0xFF1A2744)],
+        // Image de fond
+        Positioned.fill(
+          child: Image.asset(
+            'assets/images/image3.png',
+            fit: BoxFit.cover,
+            alignment: Alignment.topCenter,
+          ),
+        ),
+        // Voile sombre général
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0F172A).withOpacity(0.55),
             ),
           ),
         ),
-        Positioned(top: -40, right: -40, child: _ring(170, _orange.withOpacity(0.07))),
-        Positioned(bottom: 0, left: -50, child: _ring(150, Colors.white.withOpacity(0.03))),
-        Positioned(top: 55, left: 28, child: _dot(6, _orange.withOpacity(0.35))),
-        Positioned(bottom: 35, right: 35, child: _dot(4, Colors.white.withOpacity(0.18))),
+        // Dégradé bas pour transition douce vers le formulaire
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  const Color(0xFF0F172A).withOpacity(0.75),
+                ],
+                stops: const [0.4, 1.0],
+              ),
+            ),
+          ),
+        ),
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -268,6 +288,7 @@ class _SignupScreenState extends State<SignupScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 12),
+                // Bouton retour à gauche
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
                   child: Container(
@@ -282,29 +303,35 @@ class _SignupScreenState extends State<SignupScreen>
                   ),
                 ),
                 const Spacer(),
-                Row(children: [
-                  Container(
-                    width: 38, height: 38,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [_orange, _orangeLight]),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.person_add_rounded,
-                        color: Colors.white, size: 20),
+                // Contenu centré
+                Center(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 34, height: 34,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [_orange, _orangeLight]),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: const Icon(Icons.person_add_rounded,
+                            color: Colors.white, size: 18),
+                      ),
+                      const SizedBox(height: 6),
+                      Text('AtlasMove', style: GoogleFonts.poppins(
+                          fontSize: 13, fontWeight: FontWeight.w700,
+                          color: Colors.white.withOpacity(0.9))),
+                      const SizedBox(height: 6),
+                      Text('auth.register_title'.tr(), style: GoogleFonts.poppins(
+                          fontSize: 20, fontWeight: FontWeight.w800,
+                          color: Colors.white, height: 1.1)),
+                      const SizedBox(height: 3),
+                      Text('auth.signup_subtitle'.tr(),
+                          style: GoogleFonts.poppins(
+                              fontSize: 11, color: Colors.white.withOpacity(0.5))),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Text('AtlasMove', style: GoogleFonts.poppins(
-                    fontSize: 15, fontWeight: FontWeight.w700,
-                    color: Colors.white.withOpacity(0.9))),
-                ]),
-                const SizedBox(height: 10),
-                Text('auth.register_title'.tr(), style: GoogleFonts.poppins(
-                  fontSize: 26, fontWeight: FontWeight.w800,
-                  color: Colors.white, height: 1.1)),
-                const SizedBox(height: 4),
-                Text('auth.signup_subtitle'.tr(),
-                  style: GoogleFonts.poppins(
-                    fontSize: 13, color: Colors.white.withOpacity(0.5))),
+                ),
                 const SizedBox(height: 20),
               ],
             ),

@@ -4,20 +4,23 @@ import 'package:easy_localization/easy_localization.dart';
 import '../models/service_models.dart';
 import '../providers/assignments_provider.dart';
 import '../utils/app_theme.dart';
-import '../widgets/custom_button.dart';
 
 class ServicesAssignmentsScreen extends ConsumerStatefulWidget {
   const ServicesAssignmentsScreen({super.key});
 
   @override
-  ConsumerState<ServicesAssignmentsScreen> createState() => _ServicesAssignmentsScreenState();
+  ConsumerState<ServicesAssignmentsScreen> createState() =>
+      _ServicesAssignmentsScreenState();
 }
 
-class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsScreen> {
+class _ServicesAssignmentsScreenState
+    extends ConsumerState<ServicesAssignmentsScreen> {
+  static const _orange = Color(0xFFFF6B35);
+  static const _bg = Color(0xFFF8F8F8);
+
   @override
   void initState() {
     super.initState();
-    // Charger les données au démarrage
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(assignmentsProvider.notifier).refreshAll();
     });
@@ -25,327 +28,26 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
 
   @override
   Widget build(BuildContext context) {
-    final assignmentsState = ref.watch(assignmentsProvider);
+    final state = ref.watch(assignmentsProvider);
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          'services.assignments'.tr(),
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: AppTheme.primaryColor),
-            onPressed: () {
-              ref.read(assignmentsProvider.notifier).refreshAll();
-            },
-          ),
-        ],
-      ),
+      backgroundColor: _bg,
+      appBar: _buildAppBar(state),
       body: RefreshIndicator(
-        onRefresh: () async {
-          await ref.read(assignmentsProvider.notifier).refreshAll();
-        },
-        child: SingleChildScrollView(
+        color: _orange,
+        onRefresh: () async => ref.read(assignmentsProvider.notifier).refreshAll(),
+        child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Section Assignement Actuel
-              _buildCurrentAssignmentSection(assignmentsState),
-              
-              const SizedBox(height: 24),
-              
-              // Section Historique
-              _buildHistorySection(assignmentsState),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCurrentAssignmentSection(AssignmentsState state) {
-    if (state.isLoadingCurrent) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
-
-    if (state.currentAssignment == null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Icon(
-                Icons.assignment_outlined,
-                size: 48,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'services.no_assignment'.tr(),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'common.no_data'.tr(), // TODO: add translation key for "pour le moment"
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final assignment = state.currentAssignment!;
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    _getServiceIcon(assignment.serviceId),
-                    color: AppTheme.primaryColor,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'services.assignments'.tr(),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        assignment.serviceName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(assignment.status).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _getStatusText(assignment.status),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _getStatusColor(assignment.status),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildAssignmentDetails(assignment),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHistorySection(AssignmentsState state) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'services.history'.tr(),
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 16),
-        
-        if (state.isLoading)
-          const Center(child: CircularProgressIndicator())
-        else if (state.error != null)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+          slivers: [
+            SliverToBoxAdapter(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.error_outline, color: Colors.red[400], size: 48),
-                  const SizedBox(height: 8),
-                  Text(
-                    'common.error'.tr(),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.red[700],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    state.error!,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.red[600],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  CustomButton(
-                    text: 'common.retry'.tr(),
-                    onPressed: () {
-                      ref.read(assignmentsProvider.notifier).clearError();
-                      ref.read(assignmentsProvider.notifier).refreshAll();
-                    },
-                    height: 36,
-                  ),
+                  _buildCurrentSection(state),
+                  _buildHistorySection(state),
+                  const SizedBox(height: 32),
                 ],
               ),
-            ),
-          )
-        else if (state.history.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.history_outlined,
-                    size: 48,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'services.no_assignment'.tr(),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'common.no_data'.tr(),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else
-          ...state.history.map((assignment) => _buildAssignmentCard(assignment)).toList(),
-      ],
-    );
-  }
-
-  Widget _buildAssignmentCard(ServiceAssignment assignment) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    _getServiceIcon(assignment.serviceId),
-                    color: AppTheme.primaryColor,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        assignment.serviceName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'services.assigned_on'.tr(namedArgs: {'date': _formatDate(assignment.createdAt)}),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(assignment.status).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _getStatusText(assignment.status),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _getStatusColor(assignment.status),
-                    ),
-                  ),
-                ),
-              ],
             ),
           ],
         ),
@@ -353,43 +55,379 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
     );
   }
 
-  Widget _buildAssignmentDetails(ServiceAssignment assignment) {
-    return Column(
-      children: [
-        _buildDetailRow('Service', assignment.serviceName),
-        _buildDetailRow('Catégorie', _getCategoryName(assignment.serviceId)),
-        _buildDetailRow('Date d\'assignement', _formatDate(assignment.createdAt)),
-        _buildDetailRow('Statut', _getStatusText(assignment.status)),
-        if (assignment.documentUrl != null && assignment.documentUrl!.isNotEmpty)
-          _buildDetailRow('Document', 'Document fourni'),
+  AppBar _buildAppBar(AssignmentsState state) {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      centerTitle: true,
+      leading: GestureDetector(
+        onTap: () => Navigator.of(context).pop(),
+        child: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: Colors.black, size: 20),
+      ),
+      title: const Text(
+        'Mes Missions',
+        style: TextStyle(
+          color: Colors.black,
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      actions: [
+        GestureDetector(
+          onTap: () => ref.read(assignmentsProvider.notifier).refreshAll(),
+          child: Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.refresh_rounded, color: _orange, size: 20),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  // ─── Mission active ──────────────────────────────────────────────────────
+
+  Widget _buildCurrentSection(AssignmentsState state) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+          _sectionLabel('Mission active'),
+          const SizedBox(height: 12),
+          if (state.isLoadingCurrent)
+            _shimmerCard(height: 140)
+          else if (state.currentAssignment == null)
+            _emptyCurrentCard()
+          else
+            _activeAssignmentCard(state.currentAssignment!),
+        ],
+      ),
+    );
+  }
+
+  Widget _activeAssignmentCard(ServiceAssignment assignment) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF6B35), Color(0xFFFF8A65)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: _orange.withOpacity(0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.work_outline_rounded,
+                    color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Mes Missions',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      assignment.serviceName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _statusBadgeWhite(assignment.status),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Container(
+            height: 1,
+            color: Colors.white.withOpacity(0.2),
+          ),
+          const SizedBox(height: 16),
+          _detailRowWhite(
+              Icons.category_outlined, 'Catégorie', 'Service'),
+          const SizedBox(height: 10),
+          _detailRowWhite(
+              Icons.calendar_today_outlined,
+              'Date d\'assignement',
+              _formatDate(assignment.createdAt)),
+          const SizedBox(height: 10),
+          _detailRowWhite(
+              Icons.info_outline_rounded,
+              'Statut',
+              _getStatusLabel(assignment.status)),
+          if (assignment.documentUrl != null &&
+              assignment.documentUrl!.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _detailRowWhite(
+                Icons.description_outlined, 'Document', 'Fourni'),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyCurrentCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _orange.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.assignment_outlined,
+                color: _orange, size: 32),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Aucune mission active',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Explorez le catalogue pour rejoindre une mission',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Historique ──────────────────────────────────────────────────────────
+
+  Widget _buildHistorySection(AssignmentsState state) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 28, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _sectionLabel('Historique des assignements'),
+              if (state.history.isNotEmpty)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${state.history.length}',
+                    style: const TextStyle(
+                      color: _orange,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (state.isLoading)
+            ...List.generate(3, (_) => _shimmerCard(height: 80))
+          else if (state.error != null)
+            _errorCard(state.error!)
+          else if (state.history.isEmpty)
+            _emptyHistoryCard()
+          else
+            ...state.history.map(_historyCard).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _historyCard(ServiceAssignment assignment) {
+    final color = _getStatusColor(assignment.status);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 68,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(14),
+                bottomLeft: Radius.circular(14),
               ),
             ),
           ),
+          const SizedBox(width: 14),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(_getStatusIcon(assignment.status),
+                color: color, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  assignment.serviceName,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Assigné le ${_formatDate(assignment.createdAt)}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _statusBadgeColored(assignment.status),
+          const SizedBox(width: 14),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyHistoryCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade100),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.history_rounded, size: 40, color: Colors.grey.shade300),
+          const SizedBox(height: 10),
+          Text(
+            'Aucun historique',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _errorCard(String error) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.red.shade100),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline_rounded,
+              color: Colors.red.shade400, size: 24),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.black,
-                fontWeight: FontWeight.w600,
+              error,
+              style: TextStyle(
+                  color: Colors.red.shade700,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              ref.read(assignmentsProvider.notifier).clearError();
+              ref.read(assignmentsProvider.notifier).refreshAll();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.red.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Réessayer',
+                style: TextStyle(
+                    color: Colors.red.shade700,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -398,29 +436,104 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
     );
   }
 
-  IconData _getServiceIcon(String serviceId) {
-    // Icon basé sur le type de service
-    if (serviceId.contains('taxi')) return Icons.local_taxi;
-    if (serviceId.contains('delivery')) return Icons.delivery_dining;
-    if (serviceId.contains('transport')) return Icons.directions_car;
-    return Icons.assignment;
+  // ─── Helpers UI ──────────────────────────────────────────────────────────
+
+  Widget _sectionLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        color: Colors.black87,
+      ),
+    );
   }
 
-  String _getCategoryName(String serviceId) {
-    // Catégorie basée sur le service
-    if (serviceId.contains('taxi')) return 'Transport';
-    if (serviceId.contains('delivery')) return 'Livraison';
-    return 'Service';
+  Widget _detailRowWhite(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white70, size: 15),
+        const SizedBox(width: 8),
+        Text(
+          '$label  ',
+          style: const TextStyle(
+              color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w400),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
+
+  Widget _statusBadgeWhite(String status) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.4)),
+      ),
+      child: Text(
+        _getStatusLabel(status),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  Widget _statusBadgeColored(String status) {
+    final color = _getStatusColor(status);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        _getStatusLabel(status),
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _shimmerCard({required double height}) {
+    return Container(
+      height: height,
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(16),
+      ),
+    );
+  }
+
+  // ─── Data helpers ────────────────────────────────────────────────────────
 
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return Colors.orange;
+        return const Color(0xFFFF9800);
       case 'approved':
-        return Colors.green;
+      case 'active':
+        return const Color(0xFF4CAF50);
       case 'rejected':
-        return Colors.red;
+        return const Color(0xFFD32F2F);
       case 'cancelled':
         return Colors.grey;
       default:
@@ -428,16 +541,34 @@ class _ServicesAssignmentsScreenState extends ConsumerState<ServicesAssignmentsS
     }
   }
 
-  String _getStatusText(String status) {
+  IconData _getStatusIcon(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return 'common.pending'.tr();
+        return Icons.hourglass_top_rounded;
       case 'approved':
-        return 'common.approved'.tr();
+      case 'active':
+        return Icons.check_circle_outline_rounded;
       case 'rejected':
-        return 'common.rejected'.tr();
+        return Icons.cancel_outlined;
       case 'cancelled':
-        return 'common.cancelled'.tr();
+        return Icons.remove_circle_outline_rounded;
+      default:
+        return Icons.help_outline_rounded;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'En attente';
+      case 'approved':
+        return 'Approuvé';
+      case 'active':
+        return 'Active';
+      case 'rejected':
+        return 'Rejeté';
+      case 'cancelled':
+        return 'Annulé';
       default:
         return status;
     }

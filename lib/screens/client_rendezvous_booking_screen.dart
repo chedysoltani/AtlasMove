@@ -396,6 +396,26 @@ class _ClientRendezvousBookingScreenState
     });
 
     try {
+      // Recalculate one last time to ensure estimates are up to date
+      _recalculateFare();
+
+      // Determine the fare to send: hourly → computed from hours, delivery → from distance estimate
+      double? fareToSend;
+      if (_isHourly && _selectedService != null) {
+        final f = FareCalculator.calculateFare(
+          pricingModel: _selectedService!.pricingModel,
+          distanceKm: 0,
+          durationMin: _durationHours * 60.0,
+          basePrice: _selectedService!.basePrice ?? 0,
+          pricePerKm: _selectedService!.pricePerKm ?? 0,
+          pricePerMinute: _selectedService!.pricePerMinute ?? 0,
+          minimumFare: _selectedService!.minimumFare ?? 0,
+        );
+        fareToSend = f > 0 ? f : null;
+      } else if (_estimatedFare != null && _estimatedFare! > 0) {
+        fareToSend = _estimatedFare;
+      }
+
       final rdv = await RendezvousService.bookRendezvous(
         serviceId: _selectedService!.id,
         scheduledAt: scheduledAt,
@@ -421,6 +441,10 @@ class _ClientRendezvousBookingScreenState
         cargoWeightKg: _isDelivery ? _selectedCargoWeightKg : null,
         cargoSize: _isDelivery ? _selectedCargoSize : null,
         isFragile: _isDelivery ? _isFragile : null,
+        estimatedFare: fareToSend,
+        estimatedDistanceKm: _estimatedDistanceKm != null && _estimatedDistanceKm! > 0
+            ? _estimatedDistanceKm
+            : null,
       );
       if (mounted) _showSuccessDialog(rdv);
     } catch (e) {

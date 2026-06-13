@@ -1,544 +1,777 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:provider/provider.dart' as provider_pkg;
 import 'package:easy_localization/easy_localization.dart';
 import '../models/service_models.dart';
 import '../services/service_api.dart';
 import '../providers/services_provider.dart';
-import '../providers/auth_provider.dart';
+import '../core/storage/token_storage.dart';
 import '../utils/app_theme.dart';
-import '../widgets/custom_button.dart';
 
 class ServicesCatalogueScreen extends ConsumerStatefulWidget {
   const ServicesCatalogueScreen({super.key});
 
   @override
-  ConsumerState<ServicesCatalogueScreen> createState() => _ServicesCatalogueScreenState();
+  ConsumerState<ServicesCatalogueScreen> createState() =>
+      _ServicesCatalogueScreenState();
 }
 
-class _ServicesCatalogueScreenState extends ConsumerState<ServicesCatalogueScreen> {
+class _ServicesCatalogueScreenState
+    extends ConsumerState<ServicesCatalogueScreen> {
+  static const _orange = Color(0xFFFF6B35);
+  static const _bg = Color(0xFFF8F8F8);
   bool _initialized = false;
+  final Set<int> _expanded = {};
 
   @override
   Widget build(BuildContext context) {
     final catalogueAsync = ref.watch(catalogueProvider);
-    final catalogueNotifier = ref.read(catalogueProvider.notifier);
+    final notifier = ref.read(catalogueProvider.notifier);
 
-    // Rafraîchir les données une seule fois au chargement
     if (!_initialized) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        catalogueNotifier.fetchCatalogue();
-      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => notifier.fetchCatalogue());
       _initialized = true;
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          'services.catalogue'.tr(),
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black),
-            onPressed: () => catalogueNotifier.fetchCatalogue(),
-          ),
-        ],
-      ),
+      backgroundColor: _bg,
+      appBar: _buildAppBar(notifier),
       body: catalogueAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
-        ),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.grey.shade400),
-              const SizedBox(height: 16),
-              Text(
-                'common.error'.tr(),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                error.toString(),
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 16),
-              CustomButton(
-                text: 'common.retry'.tr(),
-                onPressed: () => catalogueNotifier.fetchCatalogue(),
-              ),
-            ],
-          ),
-        ),
+        loading: _loadingState,
+        error: (e, _) => _errorState(e.toString(), notifier),
         data: (catalogue) => _buildCatalogue(context, catalogue),
       ),
     );
   }
 
+  // ─── AppBar ───────────────────────────────────────────────────────────────
+
+  AppBar _buildAppBar(CatalogueNotifier notifier) {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      centerTitle: true,
+      leading: GestureDetector(
+        onTap: () => Navigator.pop(context),
+        child: const Icon(Icons.arrow_back_ios_new_rounded,
+            color: Colors.black, size: 20),
+      ),
+      title: const Text(
+        'Catalogue',
+        style: TextStyle(
+          color: Colors.black,
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      actions: [
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            notifier.fetchCatalogue();
+          },
+          child: Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.refresh_rounded, color: _orange, size: 20),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Catalogue list ───────────────────────────────────────────────────────
+
   Widget _buildCatalogue(BuildContext context, ServiceCatalogue catalogue) {
     final categories = catalogue.data;
-    
+
     if (categories.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.category_outlined, size: 64, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            Text(
-              'services.no_services'.tr(),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
-              ),
+      return _emptyState();
+    }
+
+    return RefreshIndicator(
+      color: _orange,
+      onRefresh: () => ref.read(catalogueProvider.notifier).fetchCatalogue(),
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        itemCount: categories.length,
+        itemBuilder: (context, index) =>
+            _categoryCard(context, categories[index], index),
+      ),
+    );
+  }
+
+  Widget _categoryCard(
+    BuildContext context,
+    ServiceCategoryWithServices category,
+    int index,
+  ) {
+    final isOpen = _expanded.contains(index);
+    final services = category.services;
+    final icon = _categoryIcon(category.name);
+
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        setState(() {
+          if (isOpen) {
+            _expanded.remove(index);
+          } else {
+            _expanded.add(index);
+          }
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: categories.length,
-      itemBuilder: (context, index) {
-        final category = categories[index];
-        final services = category.services;
-        
-        return _buildCategorySection(context, category, services);
-      },
-    );
-  }
-
-  Widget _buildCategorySection(
-    BuildContext context,
-    ServiceCategoryWithServices category,
-    List<Service> services,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-        ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.all(16),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              _getCategoryIcon(category.name),
-              color: AppTheme.primaryColor,
-              size: 20,
-            ),
-          ),
-          title: Text(
-            category.name,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-          subtitle: services.isEmpty
-              ? null
-              : Text(
-                  '${services.length} service${services.length > 1 ? 's' : ''}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
+        child: Column(
+          children: [
+            // ─ Header row ─
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: _orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: _orange, size: 22),
                   ),
-                ),
-          trailing: Icon(
-            Icons.expand_more,
-            color: Colors.grey.shade600,
-          ),
-          children: services.isEmpty
-              ? [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'services.no_services'.tr(),
-                      style: TextStyle(
-                        color: Colors.grey.shade500,
-                        fontStyle: FontStyle.italic,
-                      ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          category.name,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${services.length} service${services.length > 1 ? 's' : ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ]
-              : services.map((service) => _buildServiceItem(context, service)).toList(),
+                  AnimatedRotation(
+                    turns: isOpen ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: isOpen ? _orange : Colors.grey.shade400,
+                      size: 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ─ Services list ─
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 250),
+              crossFadeState: isOpen
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              firstChild: const SizedBox.shrink(),
+              secondChild: services.isEmpty
+                  ? _emptyCategory()
+                  : Column(
+                      children: [
+                        Container(height: 1, color: Colors.grey.shade50),
+                        ...services.asMap().entries.map((e) =>
+                            _serviceItem(context, e.value, e.key, services.length)),
+                      ],
+                    ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildServiceItem(BuildContext context, Service service) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+  Widget _serviceItem(
+      BuildContext context, Service service, int index, int total) {
+    final isLast = index == total - 1;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Column(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: service.isActive
+                          ? const Color(0xFF22C55E).withOpacity(0.1)
+                          : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      service.isActive
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.block_rounded,
+                      size: 16,
+                      color: service.isActive
+                          ? const Color(0xFF22C55E)
+                          : Colors.grey.shade400,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      service.name,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            service.name,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                        _smallBadge(service.transportType, _orange),
+                      ],
                     ),
                     if (service.description != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
                         service.description!,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade600,
+                          color: Colors.grey.shade500,
+                          height: 1.4,
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _smallBadge(service.pricingModel, const Color(0xFF3B82F6)),
+                        if (service.requiresDocument) ...[
+                          const SizedBox(width: 5),
+                          _smallBadge('Doc', Colors.orange.shade700),
+                        ],
+                        const Spacer(),
+                        if (service.basePrice != null)
+                          Text(
+                            '${service.basePrice!.toStringAsFixed(2)} ${service.currency}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.black,
+                            ),
+                          ),
+                        const SizedBox(width: 10),
+                        _miniAcceptBtn(
+                          active: service.isActive,
+                          onTap: () =>
+                              _showAssignmentBottomSheet(context, service),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      service.transportType.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      service.pricingModel.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.blue.shade700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
-          
-          const SizedBox(height: 8),
-          
-          Row(
-            children: [
-              if (service.requiresDocument) ...[
-                Icon(Icons.description, size: 12, color: Colors.orange.shade700),
-                const SizedBox(width: 4),
-                Text(
-                  'services.accept_mission'.tr(), // TODO: add translation key for "Document requis"
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.orange.shade700,
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              
-              if (!service.isActive) ...[
-                Icon(Icons.warning, size: 12, color: Colors.red.shade700),
-                const SizedBox(width: 4),
-                Text(
-                  'common.no_data'.tr(), // TODO: add translation key for "Indisponible"
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.red.shade700,
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              
-              if (service.basePrice != null) ...[
-                const Spacer(),
-                Text(
-                  '${service.basePrice!.toStringAsFixed(2)} ${service.currency}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              
-              CustomButton(
-                text: 'services.accept_mission'.tr(),
-                onPressed: service.isActive
-                    ? () => _showAssignmentDialog(context, service)
-                    : null,
-                height: 28,
-              ),
-            ],
+        ),
+        if (!isLast)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(height: 1, color: Colors.grey.shade50),
+          ),
+      ],
+    );
+  }
+
+  Widget _smallBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        text.toUpperCase(),
+        style: TextStyle(
+          fontSize: 8,
+          fontWeight: FontWeight.w700,
+          color: color,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+
+  Widget _miniAcceptBtn({required bool active, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: active
+          ? () {
+              HapticFeedback.lightImpact();
+              onTap();
+            }
+          : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFF22C55E) : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          'Rejoindre',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: active ? Colors.white : Colors.grey.shade400,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyCategory() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+      child: Text(
+        'Aucun service dans cette catégorie',
+        style: TextStyle(
+          fontSize: 13,
+          color: Colors.grey.shade400,
+          fontStyle: FontStyle.italic,
+        ),
+      ),
+    );
+  }
+
+  // ─── States ───────────────────────────────────────────────────────────────
+
+  Widget _loadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(color: _orange),
+          const SizedBox(height: 16),
+          Text(
+            'Chargement du catalogue...',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
           ),
         ],
       ),
     );
   }
 
-  // Icon mapping uses transportType slug (backend-driven, language-independent)
-  IconData _getCategoryIcon(String categoryName) {
-    final name = categoryName.toLowerCase();
-
-    // Heavy transport & freight
-    if (name.contains('benne') || name.contains('grue') || name.contains('plateau')) {
-      return Icons.construction;
-    } else if (name.contains('frigo') || name.contains('frigorif')) {
-      return Icons.ac_unit;
-    } else if (name.contains('demenag') || name.contains('moving')) {
-      return Icons.move_to_inbox;
-    } else if (name.contains('semi') || name.contains('remorque') ||
-        name.contains('tracteur') || name.contains('tractor')) {
-      return Icons.local_shipping;
-    } else if (name.contains('citerne') || name.contains('tanker')) {
-      return Icons.water_drop;
-    } else if (name.contains('toupie') || name.contains('malaxeur')) {
-      return Icons.rotate_right;
-    } else if (name.contains('camion') || name.contains('truck') ||
-        name.contains('porteur') || name.contains('fourgon')) {
-      return Icons.local_shipping;
-    }
-    // Maritime
-    else if (name.contains('ferry')) {
-      return Icons.directions_ferry;
-    } else if (name.contains('yacht') || name.contains('vedette') ||
-        name.contains('nautique') || name.contains('bateau')) {
-      return Icons.directions_boat;
-    }
-    // Special vehicles
-    else if (name.contains('ambulance') || name.contains('medical')) {
-      return Icons.emergency;
-    } else if (name.contains('helicop')) {
-      return Icons.flight;
-    } else if (name.contains('aeroport') || name.contains('airport')) {
-      return Icons.flight_land;
-    } else if (name.contains('scolaire') || name.contains('school')) {
-      return Icons.school;
-    } else if (name.contains('chariot') || name.contains('forklift') ||
-        name.contains('elevateur')) {
-      return Icons.warehouse;
-    } else if (name.contains('agricol') || name.contains('farm')) {
-      return Icons.agriculture;
-    } else if (name.contains('engin') || name.contains('equipment')) {
-      return Icons.precision_manufacturing;
-    }
-    // Light delivery
-    else if (name.contains('velo') || name.contains('bicycle') ||
-        name.contains('tricycle')) {
-      return Icons.pedal_bike;
-    } else if (name.contains('coursier') || name.contains('livraison') ||
-        name.contains('delivery')) {
-      return Icons.delivery_dining;
-    } else if (name.contains('camionnette') || name.contains('van')) {
-      return Icons.airport_shuttle;
-    }
-    // Passenger transport
-    else if (name.contains('moto') || name.contains('motorcycle')) {
-      return Icons.motorcycle;
-    } else if (name.contains('bus') || name.contains('minibus') ||
-        name.contains('collectif') || name.contains('louage')) {
-      return Icons.directions_bus;
-    } else if (name.contains('covoiturage') || name.contains('carpooling')) {
-      return Icons.people;
-    } else if (name.contains('tuk') || name.contains('bajaj') ||
-        name.contains('rickshaw')) {
-      return Icons.electric_rickshaw;
-    } else if (name.contains('luxe') || name.contains('luxury') ||
-        name.contains('premium') || name.contains('vip')) {
-      return Icons.star;
-    } else if (name.contains('urgence') || name.contains('emergency')) {
-      return Icons.emergency;
-    } else if (name.contains('taxi') || name.contains('transport') ||
-        name.contains('vtc') || name.contains('course')) {
-      return Icons.local_taxi;
-    } else {
-      return Icons.category;
-    }
+  Widget _emptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: _orange.withOpacity(0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.category_outlined, size: 40, color: _orange),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Catalogue vide',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Aucune catégorie disponible pour le moment',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _showAssignmentDialog(BuildContext context, Service service) {
-    showDialog(
+  Widget _errorState(String error, CatalogueNotifier notifier) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                  color: Colors.red.shade50, shape: BoxShape.circle),
+              child: Icon(Icons.error_outline_rounded,
+                  size: 36, color: Colors.red.shade400),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Erreur de chargement',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: () => notifier.fetchCatalogue(),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _orange,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Text(
+                  'Réessayer',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Icon mapping ─────────────────────────────────────────────────────────
+
+  IconData _categoryIcon(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('taxi') || n.contains('course')) return Icons.local_taxi_rounded;
+    if (n.contains('vtc') || n.contains('chauffeur') || n.contains('premium')) return Icons.star_rounded;
+    if (n.contains('moto')) return Icons.motorcycle_rounded;
+    if (n.contains('livraison') || n.contains('coursier') || n.contains('delivery')) return Icons.delivery_dining_rounded;
+    if (n.contains('van') || n.contains('camionnette')) return Icons.airport_shuttle_rounded;
+    if (n.contains('bus') || n.contains('minibus') || n.contains('louage')) return Icons.directions_bus_rounded;
+    if (n.contains('camion') || n.contains('truck') || n.contains('fourgon')) return Icons.local_shipping_rounded;
+    if (n.contains('velo') || n.contains('bicycle')) return Icons.pedal_bike_rounded;
+    if (n.contains('luxe') || n.contains('luxury') || n.contains('vip')) return Icons.star_rounded;
+    if (n.contains('aeroport') || n.contains('airport')) return Icons.flight_land_rounded;
+    if (n.contains('scolaire') || n.contains('school')) return Icons.school_rounded;
+    if (n.contains('ambulance') || n.contains('medical')) return Icons.emergency_rounded;
+    if (n.contains('demenag') || n.contains('moving')) return Icons.move_to_inbox_rounded;
+    if (n.contains('frigo') || n.contains('frigorif')) return Icons.ac_unit_rounded;
+    return Icons.category_rounded;
+  }
+
+  // ─── Bottom Sheet ─────────────────────────────────────────────────────────
+
+  void _showAssignmentBottomSheet(BuildContext context, Service service) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
       context: context,
-      builder: (context) => _AssignmentDialog(service: service),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AssignmentSheet(service: service),
     );
   }
 }
 
-class _AssignmentDialog extends ConsumerStatefulWidget {
-  final Service service;
+// ─── Assignment Bottom Sheet ──────────────────────────────────────────────────
 
-  const _AssignmentDialog({required this.service});
+class _AssignmentSheet extends ConsumerStatefulWidget {
+  final Service service;
+  const _AssignmentSheet({required this.service});
 
   @override
-  ConsumerState<_AssignmentDialog> createState() => _AssignmentDialogState();
+  ConsumerState<_AssignmentSheet> createState() => _AssignmentSheetState();
 }
 
-class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
+class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
+  static const _orange = Color(0xFFFF6B35);
+  static const _green = Color(0xFF22C55E);
   bool _isLoading = false;
   String? _documentUrl;
 
+  bool get _canConfirm =>
+      widget.service.isActive &&
+      (!widget.service.requiresDocument || _documentUrl != null);
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('services.assign_to'.tr(namedArgs: {'name': widget.service.name})),
-      content: Column(
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+      ),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            widget.service.description ?? 'Service de ${widget.service.category?.name ?? ''}',
-            style: TextStyle(color: Colors.grey.shade700),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          if (widget.service.requiresDocument) ...[
-            Text(
-              'services.accept_mission'.tr(), // TODO: add translation key for "Document requis"
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(4),
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _documentUrl != null
-                          ? 'common.completed'.tr() // TODO: add translation key for "Document téléchargé"
-                          : 'common.no_data'.tr(), // TODO: add translation key for "Aucun document sélectionné"
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.work_outline_rounded,
+                    color: _orange, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Rejoindre la mission',
                       style: TextStyle(
-                        color: _documentUrl != null 
-                            ? Colors.green.shade700 
-                            : Colors.grey.shade600,
+                          fontSize: 11,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500),
+                    ),
+                    Text(
+                      widget.service.name,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black,
                       ),
+                    ),
+                  ],
+                ),
+              ),
+              if (widget.service.basePrice != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${widget.service.basePrice!.toStringAsFixed(2)} ${widget.service.currency}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _pickDocument,
-                  icon: const Icon(Icons.upload_file),
-                ),
-              ],
+            ],
+          ),
+          if (widget.service.description != null) ...[
+            const SizedBox(height: 14),
+            Text(
+              widget.service.description!,
+              style: TextStyle(
+                  fontSize: 13, color: Colors.grey.shade600, height: 1.5),
             ),
-            const SizedBox(height: 16),
           ],
-          
+          if (widget.service.requiresDocument) ...[
+            const SizedBox(height: 20),
+            const Text(
+              'Document requis',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87),
+            ),
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: _pickDocument,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  color: _documentUrl != null
+                      ? _green.withOpacity(0.07)
+                      : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _documentUrl != null
+                        ? _green.withOpacity(0.4)
+                        : Colors.grey.shade200,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _documentUrl != null
+                          ? Icons.check_circle_rounded
+                          : Icons.upload_file_rounded,
+                      color: _documentUrl != null
+                          ? _green
+                          : Colors.grey.shade400,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _documentUrl != null
+                          ? 'Document téléchargé'
+                          : 'Appuyez pour télécharger',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _documentUrl != null
+                            ? _green
+                            : Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           if (!widget.service.isActive) ...[
+            const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.red.shade700, size: 20),
+                  Icon(Icons.info_outline_rounded,
+                      color: Colors.red.shade600, size: 18),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'common.no_data'.tr(), // TODO: add translation key for "Ce service est actuellement indisponible"
-                      style: TextStyle(color: Colors.red.shade700),
-                    ),
+                  Text(
+                    'Ce service est actuellement indisponible',
+                    style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500),
                   ),
                 ],
               ),
             ),
           ],
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'Annuler',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black54),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: GestureDetector(
+                  onTap: (_isLoading || !_canConfirm) ? null : _assignToService,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: _canConfirm
+                          ? const LinearGradient(
+                              colors: [Color(0xFFFF6B35), Color(0xFFFF8A65)],
+                            )
+                          : null,
+                      color: _canConfirm ? null : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    alignment: Alignment.center,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text(
+                            'Confirmer la mission',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('common.cancel'.tr()),
-        ),
-        ElevatedButton(
-          onPressed: (_isLoading || (!widget.service.isActive)) ? null : _assignToService,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text('common.confirm'.tr()),
-        ),
-      ],
     );
   }
 
@@ -547,105 +780,47 @@ class _AssignmentDialogState extends ConsumerState<_AssignmentDialog> {
       final file = await ServiceApi.pickDocument();
       if (file != null) {
         setState(() => _isLoading = true);
-        
-        final token = provider_pkg.Provider.of<AuthProvider>(context, listen: false).token ?? '';
+        final token = await TokenStorage.getAccessToken() ?? '';
         final url = await ServiceApi.uploadDocument(token: token, file: file);
-        
         setState(() {
           _documentUrl = url;
           _isLoading = false;
         });
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('common.completed'.tr()), // TODO: add translation key for "Document téléchargé avec succès"
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
       }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${'common.error'.tr()}: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+            SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red));
       }
     }
   }
 
   Future<void> _assignToService() async {
-    print('DEBUG: CATALOGUE - Début de l\'affectation');
-    print('DEBUG: CATALOGUE - Service: ${widget.service.name} (ID: ${widget.service.id})');
-    print('DEBUG: CATALOGUE - Requires document: ${widget.service.requiresDocument}');
-    print('DEBUG: CATALOGUE - Document URL: $_documentUrl');
-    
-    if (widget.service.requiresDocument && _documentUrl == null) {
-      print('DEBUG: CATALOGUE - Document requis mais non fourni');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('common.no_data'.tr()), // TODO: add translation key for "Veuillez télécharger un document"
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
     setState(() => _isLoading = true);
-
     try {
-      print('DEBUG: CATALOGUE - Récupération du token...');
-      final token = provider_pkg.Provider.of<AuthProvider>(context, listen: false).token ?? '';
-      print('DEBUG: CATALOGUE - Token récupéré: ${token.isNotEmpty ? "présent (${token.length} chars)" : "vide"}');
-      
-      print('DEBUG: CATALOGUE - Appel de ServiceApi.assignToService...');
+      final token = await TokenStorage.getAccessToken() ?? '';
       await ServiceApi.assignToService(
         token: token,
         serviceId: widget.service.id,
         documentUrl: _documentUrl,
       );
-      print('DEBUG: CATALOGUE - Affectation réussie');
-
       if (mounted) {
-        Navigator.of(context).pop(); // Fermer le dialogue
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('services.accept_mission'.tr()), // TODO: add translation key for "Assignement enregistré avec succès"
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-        
-        // Rediriger vers le dashboard après un court délai
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            Navigator.of(context).pushNamedAndRemoveUntil(
-              '/driver_dashboard',
-              (route) => false,
-            );
-          }
-        });
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Mission acceptée avec succès !'),
+          backgroundColor: Color(0xFF22C55E),
+        ));
       }
     } catch (e) {
-      print('DEBUG: CATALOGUE - Erreur lors de l\'affectation: $e');
-      print('DEBUG: CATALOGUE - Type d\'erreur: ${e.runtimeType}');
-      print('DEBUG: CATALOGUE - Stack trace: ${StackTrace.current}');
-      
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${'common.error'.tr()}: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: Colors.red,
+        ));
       }
     } finally {
-      setState(() => _isLoading = false);
-      print('DEBUG: CATALOGUE - Fin de l\'affectation (isLoading = false)');
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 }

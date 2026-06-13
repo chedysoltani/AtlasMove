@@ -82,6 +82,11 @@ class Rendezvous {
       final full = '$fn $ln'.trim();
       clientName = full.isEmpty ? null : full;
       clientPhone = c['phone']?.toString();
+    } else {
+      // List endpoints return flat fields instead of nested object
+      final flat = json['client_name']?.toString();
+      clientName = (flat != null && flat.isNotEmpty) ? flat : null;
+      clientPhone = json['client_phone']?.toString();
     }
 
     String? livreurName;

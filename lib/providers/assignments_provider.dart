@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/service_models.dart';
 import '../services/service_api.dart';
+import '../core/storage/token_storage.dart';
 
 class AssignmentsState {
   final List<ServiceAssignment> history;
@@ -36,56 +36,27 @@ class AssignmentsState {
 }
 
 class AssignmentsNotifier extends StateNotifier<AssignmentsState> {
-  String _token = '';
-
   AssignmentsNotifier() : super(AssignmentsState());
 
-  Future<void> _initializeToken() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _token = prefs.getString('access_token') ?? '';
-      print('DEBUG: ASSIGNMENTS - Token initialisé: ${_token.isNotEmpty ? "présent" : "vide"}');
-    } catch (e) {
-      print('DEBUG: ASSIGNMENTS - Erreur initialisation token: $e');
-      _token = '';
-    }
-  }
-
   Future<void> loadAssignmentsHistory() async {
-    if (_token.isEmpty) await _initializeToken();
-    
     state = state.copyWith(isLoading: true, error: null);
-    
     try {
-      final history = await ServiceApi.getAssignmentsHistory(token: _token);
-      state = state.copyWith(
-        history: history,
-        isLoading: false,
-      );
+      final token = await TokenStorage.getAccessToken() ?? '';
+      final history = await ServiceApi.getAssignmentsHistory(token: token);
+      state = state.copyWith(history: history, isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   Future<void> loadCurrentAssignment() async {
-    if (_token.isEmpty) await _initializeToken();
-    
     state = state.copyWith(isLoadingCurrent: true, error: null);
-    
     try {
-      final currentAssignment = await ServiceApi.getCurrentAssignment(token: _token);
-      state = state.copyWith(
-        currentAssignment: currentAssignment,
-        isLoadingCurrent: false,
-      );
+      final token = await TokenStorage.getAccessToken() ?? '';
+      final currentAssignment = await ServiceApi.getCurrentAssignment(token: token);
+      state = state.copyWith(currentAssignment: currentAssignment, isLoadingCurrent: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoadingCurrent: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoadingCurrent: false, error: e.toString());
     }
   }
 

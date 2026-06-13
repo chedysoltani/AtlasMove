@@ -7,6 +7,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'providers/locale_provider.dart';
+import 'services/location_tracking_service.dart';
 
 import 'utils/app_theme.dart';
 import 'screens/landing_screen.dart';
@@ -81,11 +82,16 @@ void main() async {
   Stripe.publishableKey = dotenv.env['STRIPE_PUBLISHABLE_KEY'] ?? '';
   await Stripe.instance.applySettings();
 
-  // Session expirée → naviguer vers /login et déconnecter les sockets
+  // Session expirée → déconnecter les services et naviguer vers /login
+  bool _sessionExpiredNavigating = false;
   HttpClient.onSessionExpired = () {
+    if (_sessionExpiredNavigating) return;
+    _sessionExpiredNavigating = true;
     NotificationService().disconnect();
     CallService().disconnect();
+    LocationTrackingService().stopLocationTracking();
     navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+    Future.delayed(const Duration(seconds: 3), () => _sessionExpiredNavigating = false);
   };
 
   // Token rafraîchi → reconnecter les sockets avec le nouveau token

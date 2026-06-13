@@ -9,6 +9,8 @@ class TokenStorage {
   static const _userIdKey = 'user_id';
   static const _userRoleKey = 'user_role';
   static const _tokenSavedAtKey = 'token_saved_at';
+  // Posé à 'true' lors d'un logout explicite — bloque l'auto-login au redémarrage.
+  static const _explicitLogoutKey = 'explicit_logout';
   // Identifiant stable de l'appareil — généré une seule fois, jamais effacé au logout.
   static const _deviceIdKey = 'device_id';
 
@@ -57,6 +59,8 @@ class TokenStorage {
       _storage.write(
           key: _tokenSavedAtKey,
           value: DateTime.now().millisecondsSinceEpoch.toString()),
+      // Nouvelle connexion réussie → lever le flag de logout explicite
+      _storage.delete(key: _explicitLogoutKey),
       if (refreshToken != null)
         _storage.write(key: _refreshTokenKey, value: refreshToken),
       if (userId != null) _storage.write(key: _userIdKey, value: userId),
@@ -80,7 +84,20 @@ class TokenStorage {
       _storage.delete(key: _userIdKey),
       _storage.delete(key: _userRoleKey),
       _storage.delete(key: _tokenSavedAtKey),
+      // Marquer que l'utilisateur a explicitement demandé la déconnexion
+      _storage.write(key: _explicitLogoutKey, value: 'true'),
     ]);
+  }
+
+  /// Vérifie si l'utilisateur s'est déconnecté explicitement (bloque l'auto-login)
+  static Future<bool> wasExplicitlyLoggedOut() async {
+    final val = await _storage.read(key: _explicitLogoutKey);
+    return val == 'true';
+  }
+
+  /// Effacer le flag logout lors d'une nouvelle connexion réussie
+  static Future<void> clearLogoutFlag() async {
+    await _storage.delete(key: _explicitLogoutKey);
   }
 
   /// Retourne le deviceId stable de cet appareil.

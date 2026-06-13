@@ -75,12 +75,13 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigateToLanding() async {
+    final explicitlyLoggedOut = await TokenStorage.wasExplicitlyLoggedOut();
     final token = await TokenStorage.getAccessToken();
     final role = await TokenStorage.getUserRole();
 
     if (!mounted) return;
 
-    if (token != null && token.isNotEmpty && role != null) {
+    if (!explicitlyLoggedOut && token != null && token.isNotEmpty && role != null) {
       // Utilisateur déjà connecté → aller directement au bon dashboard
       final route = role == 'delivery' ? '/driver_main' : '/client_dashboard';
       Navigator.of(context).pushReplacementNamed(route);
@@ -103,7 +104,17 @@ class _SplashScreenState extends State<SplashScreen>
         decoration: const BoxDecoration(
           gradient: AppTheme.primaryGradient,
         ),
-        child: Center(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              'assets/images/image1.png',
+              fit: BoxFit.cover,
+            ),
+            Container(
+              color: Colors.black.withOpacity(0.45),
+            ),
+            Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -130,7 +141,7 @@ class _SplashScreenState extends State<SplashScreen>
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
                         child: Image.asset(
-                          'assets/images/atlasmove_logo.png',
+                          'assets/images/new_logo_mobile.png',
                           width: 90,
                           height: 90,
                           fit: BoxFit.contain,
@@ -197,6 +208,8 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ],
           ),
+        ),
+          ],
         ),
       ),
     );

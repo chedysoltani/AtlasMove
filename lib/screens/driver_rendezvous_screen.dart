@@ -666,12 +666,47 @@ class _AvailableCard extends StatelessWidget {
                 ],
                 if (rdv.clientName != null) ...[
                   const SizedBox(height: 8),
-                  _infoRow(Icons.person_rounded, rdv.clientName!),
+                  _infoRow(Icons.person_rounded,
+                      'rdv.client_name'.tr(namedArgs: {'name': rdv.clientName!})),
+                ],
+                if (rdv.clientPhone != null) ...[
+                  const SizedBox(height: 8),
+                  _infoRow(Icons.phone_rounded, rdv.clientPhone!,
+                      iconColor: const Color(0xFF3B82F6)),
                 ],
                 if (rdv.details != null && rdv.details!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   _infoRow(Icons.notes_rounded, rdv.details!),
                 ],
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: const Color(0xFF6366F1).withOpacity(0.22)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('🤝', style: TextStyle(fontSize: 20)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Contactez le client pour plus d\'informations '
+                          'et négociez les détails avant d\'accepter la mission.',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: const Color(0xFF4F46E5),
+                            height: 1.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,

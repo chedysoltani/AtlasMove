@@ -9,6 +9,9 @@ class DriverRegisterRequest {
   final String password;
   final String confirmPassword;
   final String vehicleType;
+  final String cinNumber;
+  final String drivingLicenseNumber;
+  final String vehiclePlateNumber;
   final File? idCard;
   final File? drivingLicense;
   final File? vehicleRegistration;
@@ -22,6 +25,9 @@ class DriverRegisterRequest {
     required this.password,
     required this.confirmPassword,
     required this.vehicleType,
+    required this.cinNumber,
+    required this.drivingLicenseNumber,
+    required this.vehiclePlateNumber,
     this.idCard,
     this.drivingLicense,
     this.vehicleRegistration,
@@ -96,12 +102,23 @@ class DriverRegisterRequest {
     if (vehicleType.trim().isEmpty) {
       return 'Le type de véhicule est obligatoire';
     }
-    final validVehicles = [
-      'voiture', 'moto', 'camion', 'fourgonnette',
-      'bus', 'semi_remorque', 'poids_lourd', 'tracteur',
-    ];
-    if (!validVehicles.contains(vehicleType.toLowerCase())) {
-      return 'Type de véhicule invalide';
+
+    // Validation CIN
+    if (cinNumber.trim().isEmpty) {
+      return 'Le numéro CIN est obligatoire';
+    }
+    if (!RegExp(r'^\d{8}$').hasMatch(cinNumber.trim())) {
+      return 'Le CIN doit contenir exactement 8 chiffres';
+    }
+
+    // Validation numéro permis
+    if (drivingLicenseNumber.trim().isEmpty) {
+      return 'Le numéro de permis est obligatoire';
+    }
+
+    // Validation immatriculation
+    if (vehiclePlateNumber.trim().isEmpty) {
+      return 'Le numéro d\'immatriculation est obligatoire';
     }
 
     // Validation des fichiers (optionnelle en mode test)
@@ -130,6 +147,9 @@ class DriverRegisterRequest {
       'password': password,
       'confirm_password': confirmPassword,
       'vehicle_type': vehicleType.trim(),
+      'cin_number': cinNumber.trim(),
+      'driving_license_number': drivingLicenseNumber.trim(),
+      'vehicle_plate_number': vehiclePlateNumber.trim(),
     };
     if (referralCode != null && referralCode!.isNotEmpty) {
       fields['referral_code'] = referralCode!;

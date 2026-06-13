@@ -10,6 +10,7 @@ import '../models/responses/auth_response.dart';
 import '../models/responses/login_response.dart';
 import '../models/responses/driver_register_response.dart';
 import 'device_token_service.dart';
+import 'location_tracking_service.dart';
 
 /// Exception de validation personnalisée pour le service
 class ServiceValidationException implements Exception {
@@ -121,17 +122,13 @@ class AuthService {
     required String password,
   }) async {
     try {
-      // Validation des données
       if (email.trim().isEmpty) {
         throw ServiceValidationException(['L\'email est requis']);
       }
-      
       if (password.trim().isEmpty) {
         throw ServiceValidationException(['Le mot de passe est requis']);
       }
 
-      // Envoi de la requête vers le bon endpoint
-      // deviceId transmis via header X-Device-Id (ajouté automatiquement par _defaultHeaders)
       final response = await HttpClient.post(
         '/m/auth/login',
         body: {
@@ -202,13 +199,14 @@ class AuthService {
 
   /// Déconnexion d'un utilisateur
   static Future<void> logout() async {
+    // Arrêter tous les services de fond AVANT de supprimer le token
+    LocationTrackingService().stopLocationTracking();
+
     try {
       await HttpClient.post('/auth/logout');
     } catch (e) {
-      // La déconnexion peut échouer côté serveur mais l'utilisateur peut quand même être déconnecté localement
-      print('Erreur lors de la déconnexion: $e');
+      debugPrint('Erreur lors de la déconnexion: $e');
     } finally {
-      // Toujours supprimer les tokens localement
       await TokenStorage.clearTokens();
     }
   }

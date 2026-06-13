@@ -7,6 +7,7 @@ import '../services/trip_service.dart';
 import '../models/trip_models.dart';
 import '../services/notification_service.dart';
 import '../services/call_service.dart';
+import '../services/profile_service.dart';
 import '../widgets/notification_sheet.dart';
 
 class ClientDashboard extends StatefulWidget {
@@ -294,10 +295,13 @@ class _ClientDashboardState extends State<ClientDashboard>
                   const SizedBox(width: 8),
                   // Logout
                   GestureDetector(
-                    onTap: () {
+                    onTap: () async {
                       NotificationService().disconnect();
-                      Navigator.of(context)
-                          .pushNamedAndRemoveUntil('/login', (_) => false);
+                      await ProfileService.logout();
+                      if (context.mounted) {
+                        Navigator.of(context)
+                            .pushNamedAndRemoveUntil('/login', (_) => false);
+                      }
                     },
                     child: Container(
                       width: 40, height: 40,

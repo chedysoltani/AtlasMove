@@ -674,9 +674,12 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
               onPressed: () => Navigator.pop(ctx),
               child: Text('common.cancel'.tr())),
           TextButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(ctx);
-                Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
+                await ProfileService.logout();
+                if (context.mounted) {
+                  Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
+                }
               },
               child: Text('auth.logout'.tr(),
                   style: const TextStyle(color: Color(0xFFEF4444)))),

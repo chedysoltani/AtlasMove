@@ -207,26 +207,47 @@ class _LoginScreenState extends State<LoginScreen>
       opacity: _fade(_heroCtrl),
       child: Stack(
         children: [
-          // Background
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF0F172A), Color(0xFF1A2744)],
+          // Background image
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/image4.png',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+            ),
+          ),
+
+          // Dark overlay for readability
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0xFF0F172A).withOpacity(0.55),
+                    const Color(0xFF0F172A).withOpacity(0.70),
+                  ],
+                ),
               ),
             ),
           ),
 
-          // Decorative elements
-          Positioned(top: -40, right: -40,
-            child: _ring(180, _orange.withOpacity(0.07))),
-          Positioned(bottom: 10, left: -50,
-            child: _ring(160, Colors.white.withOpacity(0.03))),
-          Positioned(top: 50, left: 24,
-            child: _dot(6, _orange.withOpacity(0.35))),
-          Positioned(bottom: 40, right: 30,
-            child: _dot(4, Colors.white.withOpacity(0.18))),
+          // Bottom fade to blend with white card
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    const Color(0xFF0F172A).withOpacity(0.70),
+                  ],
+                  stops: const [0.45, 1.0],
+                ),
+              ),
+            ),
+          ),
 
           // Content
           SafeArea(
@@ -569,16 +590,34 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildSignupRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
       children: [
-        Text('auth.no_account'.tr(), style: GoogleFonts.poppins(
-          fontSize: 13, color: const Color(0xFF9BA3B4))),
-        const SizedBox(width: 4),
-        GestureDetector(
-          onTap: () => Navigator.pushNamed(context, '/signup'),
-          child: Text('auth.register_btn'.tr(), style: GoogleFonts.poppins(
-            fontSize: 13, fontWeight: FontWeight.w600, color: _orange)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('auth.no_account'.tr(), style: GoogleFonts.poppins(
+              fontSize: 13, color: const Color(0xFF9BA3B4))),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => Navigator.pushNamed(context, '/signup'),
+              child: Text('auth.register_btn'.tr(), style: GoogleFonts.poppins(
+                fontSize: 13, fontWeight: FontWeight.w600, color: _orange)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Livreur / Chauffeur ?', style: GoogleFonts.poppins(
+              fontSize: 13, color: const Color(0xFF9BA3B4))),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => Navigator.pushNamed(context, '/driver_register'),
+              child: Text('Inscription livreur', style: GoogleFonts.poppins(
+                fontSize: 13, fontWeight: FontWeight.w600, color: _orange)),
+            ),
+          ],
         ),
       ],
     );

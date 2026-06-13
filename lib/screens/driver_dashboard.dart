@@ -982,7 +982,9 @@ class _DriverDashboardState extends State<DriverDashboard>
               Navigator.pop(context);
               NotificationService().disconnect();
               await Provider.of<AuthProvider>(context, listen: false).logout();
-              if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+              if (mounted) {
+                Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+              }
             }, isDestructive: true),
 
             const SizedBox(height: 6),

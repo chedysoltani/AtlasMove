@@ -1,9 +1,13 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/requests/driver_register_request.dart';
+import '../models/service_models.dart';
 import '../services/auth_service.dart';
+import '../services/service_api.dart';
 import '../utils/app_theme.dart';
 
 class DriverRegisterScreen extends StatefulWidget {
@@ -28,6 +32,9 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   final _vehicleTypeCtrl = TextEditingController();
+  final _cinCtrl = TextEditingController();
+  final _drivingLicenseNumberCtrl = TextEditingController();
+  final _vehiclePlateCtrl = TextEditingController();
   final _referralCtrl = TextEditingController();
 
   File? _idCard;
@@ -38,6 +45,11 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
   bool _obscureConfirm = true;
   bool _isLoading = false;
   String? _errorMessage;
+
+  // Sélecteur de type de véhicule via services
+  List<ServiceCategory> _serviceCategories = [];
+  ServiceCategory? _selectedCategory;
+  bool _loadingCategories = false;
 
   final _imagePicker = ImagePicker();
 
@@ -57,6 +69,44 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
           () { if (mounted) c.forward(); });
       return c;
     });
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    setState(() => _loadingCategories = true);
+    try {
+      // Tente sans token (inscription = pas encore connecté)
+      final cats = await ServiceApi.getCategories(token: '');
+      if (mounted) setState(() => _serviceCategories = cats);
+    } catch (_) {
+      // Fallback liste statique
+      if (mounted) {
+        setState(() => _serviceCategories = _fallbackCategories());
+      }
+    } finally {
+      if (mounted) setState(() => _loadingCategories = false);
+    }
+  }
+
+  List<ServiceCategory> _fallbackCategories() {
+    final data = [
+      {'id': 'taxi',      'name': 'Taxi Standard',    'transport_type': 'taxi'},
+      {'id': 'vtc',       'name': 'VTC / Chauffeur',  'transport_type': 'vtc'},
+      {'id': 'moto',      'name': 'Moto-taxi',        'transport_type': 'moto'},
+      {'id': 'livraison', 'name': 'Livraison Moto',   'transport_type': 'livraison'},
+      {'id': 'van',       'name': 'Van / Camionnette','transport_type': 'van'},
+      {'id': 'camion',    'name': 'Camion / Poids lourd','transport_type': 'camion'},
+    ];
+    return data.map((d) => ServiceCategory(
+      id: d['id']!,
+      name: d['name']!,
+      transportType: d['transport_type']!,
+      status: 'active',
+      isActive: true,
+      sortOrder: 0,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    )).toList();
   }
 
   @override
@@ -66,7 +116,9 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
     _firstNameCtrl.dispose(); _lastNameCtrl.dispose();
     _emailCtrl.dispose(); _phoneCtrl.dispose();
     _passwordCtrl.dispose(); _confirmPasswordCtrl.dispose();
-    _vehicleTypeCtrl.dispose(); _referralCtrl.dispose();
+    _vehicleTypeCtrl.dispose();
+    _cinCtrl.dispose(); _drivingLicenseNumberCtrl.dispose();
+    _vehiclePlateCtrl.dispose(); _referralCtrl.dispose();
     super.dispose();
   }
 
@@ -88,6 +140,27 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
       if (img != null) { setState(() { onPicked(File(img.path)); }); }
     } catch (e) {
       setState(() => _errorMessage = 'Erreur sélection image: $e');
+    }
+  }
+
+  Future<void> _fillTestImages() async {
+    try {
+      final byteData = await rootBundle.load('assets/images/image1.png');
+      final bytes = byteData.buffer.asUint8List();
+      final tmpDir = Directory.systemTemp;
+      final idFile    = File('${tmpDir.path}/test_id_card.png');
+      final licFile   = File('${tmpDir.path}/test_driving_license.png');
+      final regFile   = File('${tmpDir.path}/test_vehicle_registration.png');
+      await idFile.writeAsBytes(bytes);
+      await licFile.writeAsBytes(bytes);
+      await regFile.writeAsBytes(bytes);
+      setState(() {
+        _idCard = idFile;
+        _drivingLicense = licFile;
+        _vehicleRegistration = regFile;
+      });
+    } catch (e) {
+      setState(() => _errorMessage = 'Erreur images test: $e');
     }
   }
 
@@ -118,25 +191,97 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
         password: _passwordCtrl.text,
         confirmPassword: _confirmPasswordCtrl.text,
         vehicleType: _vehicleTypeCtrl.text.trim(),
+        cinNumber: _cinCtrl.text.trim(),
+        drivingLicenseNumber: _drivingLicenseNumberCtrl.text.trim(),
+        vehiclePlateNumber: _vehiclePlateCtrl.text.trim(),
         idCard: _idCard,
         drivingLicense: _drivingLicense,
         vehicleRegistration: _vehicleRegistration,
         referralCode: refCode.isNotEmpty ? refCode : null,
       );
-      final response = await AuthService.registerDriver(request);
+      await AuthService.registerDriver(request);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(response.message),
-          backgroundColor: AppTheme.successColor,
-          duration: const Duration(seconds: 5),
-        ));
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+        await _showPendingApprovalDialog(context);
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+        }
       }
     } catch (e) {
       setState(() => _errorMessage = e.toString());
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _showPendingApprovalDialog(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.hourglass_top_rounded,
+                    color: Color(0xFFF59E0B), size: 36),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Inscription réussie !',
+                style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1A1F36)),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Votre compte a été créé avec succès.\n\n'
+                'L\'administrateur doit approuver votre compte '
+                'avant que vous puissiez vous connecter et utiliser '
+                'l\'application.\n\n'
+                'Vous serez notifié dès l\'activation de votre compte.',
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: const Color(0xFF6B7280),
+                    height: 1.6),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF59E0B),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'Compris, aller à la connexion',
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -241,17 +386,42 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                             return null;
                           })),
                       const SizedBox(height: 11),
-                      _a(5, _field(ctrl: _vehicleTypeCtrl,
-                          hint: 'Type de véhicule',
-                          icon: Icons.directions_car_rounded,
-                          action: TextInputAction.done,
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) return 'Obligatoire';
-                            final valid = ['voiture', 'moto', 'camion', 'fourgonnette'];
-                            if (!valid.contains(v.toLowerCase()))
-                              return 'voiture, moto, camion ou fourgonnette';
-                            return null;
-                          })),
+                      _a(5, _vehicleSelector()),
+
+                      const SizedBox(height: 20),
+
+                      // ── Informations véhicule ──────────────────────
+                      _a(5, _sectionLabel('Informations véhicule',
+                          Icons.directions_car_rounded)),
+                      const SizedBox(height: 12),
+                      _a(5, _field(
+                        ctrl: _cinCtrl,
+                        hint: 'Numéro CIN (8 chiffres)',
+                        icon: Icons.credit_card_rounded,
+                        keyboard: TextInputType.number,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Obligatoire';
+                          if (!RegExp(r'^\d{8}$').hasMatch(v.trim()))
+                            return 'Exactement 8 chiffres';
+                          return null;
+                        },
+                      )),
+                      const SizedBox(height: 11),
+                      _a(5, _field(
+                        ctrl: _drivingLicenseNumberCtrl,
+                        hint: 'Numéro de permis de conduire',
+                        icon: Icons.badge_rounded,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Obligatoire' : null,
+                      )),
+                      const SizedBox(height: 11),
+                      _a(5, _field(
+                        ctrl: _vehiclePlateCtrl,
+                        hint: 'Immatriculation du véhicule',
+                        icon: Icons.local_shipping_rounded,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Obligatoire' : null,
+                      )),
 
                       const SizedBox(height: 20),
 
@@ -259,6 +429,10 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                       _a(6, _sectionLabel('Documents requis',
                           Icons.folder_rounded)),
                       const SizedBox(height: 12),
+                      if (kDebugMode) ...[
+                        _a(6, _devFillButton()),
+                        const SizedBox(height: 10),
+                      ],
                       _a(6, _docCard(
                         icon: Icons.credit_card_rounded,
                         title: 'Carte d\'identité',
@@ -312,28 +486,134 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
     );
   }
 
+  // ── Vehicle selector ─────────────────────────────────────────────────────
+
+  Widget _vehicleSelector() {
+    final hasValue = _selectedCategory != null;
+    return GestureDetector(
+      onTap: _showVehiclePicker,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: hasValue ? _orange.withOpacity(0.4) : const Color(0xFFE2E6EF),
+            width: hasValue ? 1.5 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.04),
+                blurRadius: 8, offset: const Offset(0, 3)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              hasValue ? _iconForType(_selectedCategory!.transportType) : Icons.directions_car_rounded,
+              color: hasValue ? _orange : const Color(0xFF9BA3B4),
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                hasValue ? _selectedCategory!.name : 'Type de véhicule / Service',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: hasValue ? _dark : const Color(0xFF9BA3B4),
+                  fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+            if (_loadingCategories)
+              const SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: _orange))
+            else
+              Icon(Icons.keyboard_arrow_down_rounded,
+                  color: hasValue ? _orange : const Color(0xFF9BA3B4), size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showVehiclePicker() {
+    if (_loadingCategories) return;
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _VehiclePickerSheet(
+        categories: _serviceCategories,
+        selected: _selectedCategory,
+        onSelect: (cat) {
+          setState(() {
+            _selectedCategory = cat;
+            _vehicleTypeCtrl.text = cat.transportType;
+          });
+        },
+      ),
+    );
+  }
+
+  IconData _iconForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'taxi': return Icons.local_taxi_rounded;
+      case 'vtc': return Icons.directions_car_rounded;
+      case 'moto': return Icons.motorcycle_rounded;
+      case 'livraison': return Icons.delivery_dining_rounded;
+      case 'van': return Icons.airport_shuttle_rounded;
+      case 'camion': return Icons.local_shipping_rounded;
+      case 'bus': return Icons.directions_bus_rounded;
+      default: return Icons.work_outline_rounded;
+    }
+  }
+
   // ── Hero ──────────────────────────────────────────────────────────────────
 
   Widget _buildHero() {
     return FadeTransition(
       opacity: _fade(_heroCtrl),
       child: Stack(children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: [Color(0xFF0F172A), Color(0xFF1A2744)],
+        // Image de fond
+        Positioned.fill(
+          child: Image.asset(
+            'assets/images/image2.png',
+            fit: BoxFit.cover,
+            alignment: Alignment.centerRight,
+          ),
+        ),
+        // Dégradé sombre sur la gauche pour lisibilité du texte
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [
+                  const Color(0xFF0F172A).withOpacity(0.92),
+                  const Color(0xFF0F172A).withOpacity(0.55),
+                ],
+              ),
             ),
           ),
         ),
-        Positioned(top: -40, right: -40,
-            child: _ring(170, _orange.withOpacity(0.07))),
-        Positioned(bottom: 0, left: -50,
-            child: _ring(150, Colors.white.withOpacity(0.03))),
-        Positioned(top: 55, left: 28,
-            child: _dot(6, _orange.withOpacity(0.35))),
-        Positioned(bottom: 35, right: 35,
-            child: _dot(4, Colors.white.withOpacity(0.18))),
+        // Dégradé sombre en bas pour transition douce vers le formulaire
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  const Color(0xFF0F172A).withOpacity(0.7),
+                ],
+                stops: const [0.5, 1.0],
+              ),
+            ),
+          ),
+        ),
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -355,30 +635,35 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                   ),
                 ),
                 const Spacer(),
-                Row(children: [
-                  Container(
-                    width: 38, height: 38,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                          colors: [_orange, _orangeLight]),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.local_shipping_rounded,
-                        color: Colors.white, size: 20),
+                Center(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 34, height: 34,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                              colors: [_orange, _orangeLight]),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: const Icon(Icons.local_shipping_rounded,
+                            color: Colors.white, size: 18),
+                      ),
+                      const SizedBox(height: 6),
+                      Text('AtlasMove', style: GoogleFonts.poppins(
+                          fontSize: 13, fontWeight: FontWeight.w700,
+                          color: Colors.white.withOpacity(0.9))),
+                      const SizedBox(height: 6),
+                      Text('Inscription Livreur', style: GoogleFonts.poppins(
+                          fontSize: 20, fontWeight: FontWeight.w800,
+                          color: Colors.white, height: 1.1)),
+                      const SizedBox(height: 3),
+                      Text('Rejoignez notre réseau de livreurs',
+                          style: GoogleFonts.poppins(
+                              fontSize: 11, color: Colors.white.withOpacity(0.5))),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  Text('AtlasMove', style: GoogleFonts.poppins(
-                    fontSize: 15, fontWeight: FontWeight.w700,
-                    color: Colors.white.withOpacity(0.9))),
-                ]),
-                const SizedBox(height: 10),
-                Text('Inscription Livreur', style: GoogleFonts.poppins(
-                  fontSize: 26, fontWeight: FontWeight.w800,
-                  color: Colors.white, height: 1.1)),
-                const SizedBox(height: 4),
-                Text('Rejoignez notre réseau de livreurs',
-                  style: GoogleFonts.poppins(
-                    fontSize: 13, color: Colors.white.withOpacity(0.5))),
+                ),
                 const SizedBox(height: 20),
               ],
             ),
@@ -405,6 +690,21 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
         fontSize: 13, fontWeight: FontWeight.w700, color: _dark)),
     ]);
   }
+
+  Widget _devFillButton() => SizedBox(
+    width: double.infinity,
+    child: OutlinedButton.icon(
+      onPressed: _fillTestImages,
+      icon: const Icon(Icons.bug_report_rounded, size: 16),
+      label: const Text('DEV — Remplir avec images de test'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: const Color(0xFF7C3AED),
+        side: const BorderSide(color: Color(0xFF7C3AED)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+      ),
+    ),
+  );
 
   Widget _docCard({
     required IconData icon,
@@ -581,4 +881,173 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
           border: Border.all(color: c, width: 1)));
   Widget _dot(double s, Color c) => Container(width: s, height: s,
       decoration: BoxDecoration(shape: BoxShape.circle, color: c));
+}
+
+// ── Vehicle Picker Bottom Sheet ───────────────────────────────────────────────
+
+class _VehiclePickerSheet extends StatelessWidget {
+  final List<ServiceCategory> categories;
+  final ServiceCategory? selected;
+  final ValueChanged<ServiceCategory> onSelect;
+
+  const _VehiclePickerSheet({
+    required this.categories,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  static const _orange = Color(0xFFFF6B35);
+  static const _dark = Color(0xFF0F172A);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.directions_car_rounded, color: _orange, size: 18),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Type de véhicule',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: _dark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'Choisissez le service qui correspond à votre véhicule',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (categories.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text('Aucun service disponible',
+                  style: TextStyle(color: Colors.grey.shade400)),
+            )
+          else
+            ...categories.map((cat) => _categoryTile(context, cat)),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _categoryTile(BuildContext context, ServiceCategory cat) {
+    final isSelected = selected?.id == cat.id;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onSelect(cat);
+        Navigator.of(context).pop();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? _orange.withOpacity(0.06) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? _orange.withOpacity(0.4) : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: isSelected ? _orange.withOpacity(0.12) : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isSelected ? _orange.withOpacity(0.3) : Colors.grey.shade200,
+                ),
+              ),
+              child: Icon(_iconForType(cat.transportType),
+                  color: isSelected ? _orange : Colors.grey.shade500, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(cat.name,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? _dark : Colors.black87,
+                      )),
+                  const SizedBox(height: 2),
+                  Text(cat.transportType,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w400,
+                      )),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: _orange,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_rounded, color: Colors.white, size: 12),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _iconForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'taxi': return Icons.local_taxi_rounded;
+      case 'vtc': return Icons.directions_car_rounded;
+      case 'moto': return Icons.motorcycle_rounded;
+      case 'livraison': return Icons.delivery_dining_rounded;
+      case 'van': return Icons.airport_shuttle_rounded;
+      case 'camion': return Icons.local_shipping_rounded;
+      case 'bus': return Icons.directions_bus_rounded;
+      default: return Icons.work_outline_rounded;
+    }
+  }
 }
