@@ -72,7 +72,7 @@ class CatalogueNotifier extends AsyncNotifier<ServiceCatalogue> {
     if (longitude != null) params['longitude'] = longitude.toString();
     final q = params.isEmpty ? null : params;
 
-    for (final path in ['/m/services', '/m/services/catalogue', '/services/catalogue', '/services']) {
+    for (final path in ['/services/catalogue', '/services']) {
       try {
         final response = await HttpClient.get(path, queryParams: q);
         if (response.isSuccess) {

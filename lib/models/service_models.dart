@@ -585,6 +585,13 @@ class TransportTypeConstants {
     minibusCollectif, busCharter, bus, covoiturage,
     ferry, tracteurAgricole, tracteur, chariotElevateur, camionToupie,
   };
+
+  // Taxi-type slugs: EXCLUDED from 10% commission (passenger transport)
+  static const Set<String> taxiSlugs = {
+    taxiStandard, taxi, vtc, voiture, motoTaxi, moto,
+    tukTuk, minibusCollectif, busCharter, bus, transfertAeroport,
+    transportScolaire, voitureLuxe, covoiturage, taxiNautique,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

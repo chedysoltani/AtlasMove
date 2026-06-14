@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../models/rendezvous_models.dart';
 import '../services/rendezvous_service.dart';
 import 'client_rendezvous_booking_screen.dart';
+import 'rendezvous_negotiation_screen.dart';
 
 class ClientRendezvousHistoryScreen extends StatefulWidget {
   const ClientRendezvousHistoryScreen({super.key});
@@ -898,6 +899,49 @@ class _RdvCard extends StatelessWidget {
               ],
             ),
           ),
+
+          // ── Bottom: negotiate button (pending RDV) ────────────
+          if (rdv.status == 'pending') ...[
+            Divider(color: _border, height: 1, thickness: 1),
+            InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RendezvousNegotiationScreen(
+                    rdv: rdv,
+                    isDriver: false,
+                  ),
+                ),
+              ),
+              borderRadius: onCancel != null
+                  ? BorderRadius.zero
+                  : const BorderRadius.vertical(bottom: Radius.circular(18)),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1).withOpacity(0.06),
+                  borderRadius: onCancel != null
+                      ? BorderRadius.zero
+                      : const BorderRadius.vertical(bottom: Radius.circular(18)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('🤝', style: TextStyle(fontSize: 15)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Voir les négociations',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF6366F1),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
 
           // ── Bottom: cancel button ──────────────────────────────
           if (onCancel != null) ...[

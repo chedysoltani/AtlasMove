@@ -7,6 +7,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../models/rendezvous_models.dart';
 import '../services/rendezvous_service.dart';
 import '../utils/fare_calculator.dart';
+import 'rendezvous_negotiation_screen.dart';
 
 class DriverRendezvousScreen extends StatefulWidget {
   const DriverRendezvousScreen({super.key});
@@ -25,6 +26,7 @@ class _DriverRendezvousScreenState extends State<DriverRendezvousScreen>
   int _selectedTab = 0;
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
+  final _planningKey = GlobalKey<_PlanningTabState>();
 
   @override
   void initState() {
@@ -48,6 +50,11 @@ class _DriverRendezvousScreenState extends State<DriverRendezvousScreen>
     setState(() => _selectedTab = index);
   }
 
+  void _onBookingAccepted() {
+    _planningKey.currentState?._load();
+    _switchTab(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -69,10 +76,10 @@ class _DriverRendezvousScreenState extends State<DriverRendezvousScreen>
                       opacity: _fadeAnim,
                       child: IndexedStack(
                         index: _selectedTab,
-                        children: const [
-                          _AvailableTab(),
-                          _PlanningTab(),
-                          _HistoryTab(),
+                        children: [
+                          _AvailableTab(onAccepted: _onBookingAccepted),
+                          _PlanningTab(key: _planningKey),
+                          const _HistoryTab(),
                         ],
                       ),
                     ),
@@ -251,6 +258,7 @@ const _bg = Color(0xFFF8F9FB);
 const _border = Color(0xFFE8ECF0);
 const _textPrimary = Color(0xFF1A1F36);
 const _textSecondary = Color(0xFF9BA3B4);
+const _indigo = Color(0xFF6366F1);
 
 Widget _infoRow(IconData icon, String text,
     {bool bold = false, Color? iconColor}) {
@@ -297,7 +305,8 @@ void _showSnack(BuildContext context, String msg, {bool success = true}) {
 // ─── Tab 1: Available bookings ────────────────────────────────────────────────
 
 class _AvailableTab extends StatefulWidget {
-  const _AvailableTab();
+  final VoidCallback? onAccepted;
+  const _AvailableTab({this.onAccepted});
 
   @override
   State<_AvailableTab> createState() => _AvailableTabState();
@@ -402,16 +411,100 @@ class _AvailableTabState extends State<_AvailableTab>
     HapticFeedback.lightImpact();
     setState(() => _acceptingIds.add(rdv.id));
     try {
-      await RendezvousService.acceptBooking(rdv.id);
+      await RendezvousService.acceptBooking(
+        rdv.id,
+        finalFare: rdv.estimatedFare,
+        currency: rdv.currency ?? 'TND',
+      );
       if (mounted) {
         _showSnack(context,
             '${'rdv.accept'.tr()} ${DateFormat('dd/MM/yyyy à HH:mm', 'fr').format(rdv.scheduledAt)}');
         _refresh();
+        widget.onAccepted?.call();
       }
     } catch (e) {
       if (mounted) _showSnack(context, '${'common.error'.tr()} : $e', success: false);
     } finally {
       if (mounted) setState(() => _acceptingIds.remove(rdv.id));
+    }
+  }
+
+  Future<void> _propose(Rendezvous rdv) async {
+    final currency = rdv.currency ?? 'TND';
+    final decimals = const {'EUR', 'GBP', 'USD'}.contains(currency) ? 2 : 3;
+    final ctrl = TextEditingController(
+      text: rdv.estimatedFare != null
+          ? rdv.estimatedFare!.toStringAsFixed(decimals)
+          : '',
+    );
+    final confirmed = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(children: [
+          const Text('💬', style: TextStyle(fontSize: 22)),
+          const SizedBox(width: 8),
+          Text('Proposer un prix',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 16)),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (rdv.estimatedFare != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'Prix client : ${FareCalculator.formatFare(rdv.estimatedFare!, currency)}',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13, color: const Color(0xFF64748B)),
+                ),
+              ),
+            TextField(
+              controller: ctrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Votre prix ($currency)',
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                prefixIcon: const Icon(Icons.payments_rounded),
+              ),
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Annuler',
+                style: GoogleFonts.poppins(color: const Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              final v = double.tryParse(ctrl.text.replaceAll(',', '.'));
+              if (v != null && v > 0) Navigator.pop(ctx, v);
+            },
+            child: Text('Envoyer',
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == null || !mounted) return;
+    try {
+      await RendezvousService.proposeOffer(rdv.id, confirmed, currency: currency);
+      if (mounted) {
+        _showSnack(context,
+            'Offre de ${FareCalculator.formatFare(confirmed, currency)} envoyée');
+      }
+    } catch (e) {
+      if (mounted) _showSnack(context, '${'common.error'.tr()} : $e', success: false);
     }
   }
 
@@ -443,6 +536,7 @@ class _AvailableTabState extends State<_AvailableTab>
             rdv: rdv,
             isAccepting: _acceptingIds.contains(rdv.id),
             onAccept: () => _accept(rdv),
+            onPropose: () => _propose(rdv),
           );
         },
       ),
@@ -518,11 +612,13 @@ class _AvailableCard extends StatelessWidget {
   final Rendezvous rdv;
   final bool isAccepting;
   final VoidCallback onAccept;
+  final VoidCallback onPropose;
 
   const _AvailableCard({
     required this.rdv,
     required this.isAccepting,
     required this.onAccept,
+    required this.onPropose,
   });
 
   @override
@@ -660,7 +756,7 @@ class _AvailableCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   _infoRow(
                     Icons.payments_rounded,
-                    'Tarif estimé : ${FareCalculator.formatFare(rdv.estimatedFare!, 'TND')}',
+                    'Tarif estimé : ${FareCalculator.formatFare(rdv.estimatedFare!, rdv.currency ?? 'TND')}',
                     bold: true,
                   ),
                 ],
@@ -708,57 +804,82 @@ class _AvailableCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: isAccepting
-                          ? null
-                          : const LinearGradient(
-                              colors: [Color(0xFF22C55E), Color(0xFF4ADE80)],
-                            ),
-                      color: isAccepting ? _border : null,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: isAccepting
-                          ? []
-                          : [
-                              BoxShadow(
-                                color:
-                                    const Color(0xFF22C55E).withOpacity(0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                    ),
-                    child: ElevatedButton.icon(
-                      onPressed: isAccepting ? null : onAccept,
-                      icon: isAccepting
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: _textSecondary),
-                            )
-                          : const Icon(Icons.check_circle_rounded,
-                              color: Colors.white, size: 18),
-                      label: Text(
-                        isAccepting ? 'common.loading'.tr() : 'rdv.accept'.tr(),
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          color: isAccepting ? _textSecondary : Colors.white,
+                Row(
+                  children: [
+                    // Propose counter-price
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: isAccepting ? null : onPropose,
+                        icon: const Icon(Icons.edit_rounded,
+                            size: 16, color: _indigo),
+                        label: Text(
+                          'Proposer',
+                          style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: _indigo),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: const BorderSide(color: _indigo),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        disabledBackgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                    ),
+                    const SizedBox(width: 10),
+                    // Accept at client price
+                    Expanded(
+                      flex: 2,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: isAccepting
+                              ? null
+                              : const LinearGradient(
+                                  colors: [Color(0xFF22C55E), Color(0xFF4ADE80)],
+                                ),
+                          color: isAccepting ? _border : null,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: isAccepting
+                              ? []
+                              : [
+                                  BoxShadow(
+                                    color: const Color(0xFF22C55E).withOpacity(0.3),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                        ),
+                        child: ElevatedButton.icon(
+                          onPressed: isAccepting ? null : onAccept,
+                          icon: isAccepting
+                              ? const SizedBox(
+                                  width: 16, height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: _textSecondary),
+                                )
+                              : const Icon(Icons.check_circle_rounded,
+                                  color: Colors.white, size: 18),
+                          label: Text(
+                            isAccepting ? 'common.loading'.tr() : 'rdv.accept'.tr(),
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: isAccepting ? _textSecondary : Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            disabledBackgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -772,7 +893,7 @@ class _AvailableCard extends StatelessWidget {
 // ─── Tab 2: Driver Planning ───────────────────────────────────────────────────
 
 class _PlanningTab extends StatefulWidget {
-  const _PlanningTab();
+  const _PlanningTab({super.key});
 
   @override
   State<_PlanningTab> createState() => _PlanningTabState();
@@ -1099,7 +1220,7 @@ class _PlanningCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onNavigate,
                     icon: const Icon(Icons.navigation_rounded, size: 16, color: _navy),
-                    label: Text('rdv.address'.tr(), // TODO: add translation key for "Naviguer"
+                    label: Text('Naviguer',
                         style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w600, color: _navy, fontSize: 13)),
                     style: OutlinedButton.styleFrom(
@@ -1137,6 +1258,33 @@ class _PlanningCard extends StatelessWidget {
                   ),
                 ),
               ]),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RendezvousNegotiationScreen(
+                        rdv: rdv,
+                        isDriver: true,
+                      ),
+                    ),
+                  ),
+                  icon: const Text('🤝', style: TextStyle(fontSize: 15)),
+                  label: Text('Voir les négociations',
+                      style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          color: _indigo,
+                          fontSize: 13)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    side: const BorderSide(color: _indigo),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
             ]),
           ),
         ],
@@ -1410,6 +1558,20 @@ class _HistoryCard extends StatelessWidget {
               if (rdv.clientName != null) ...[
                 const SizedBox(height: 8),
                 _infoRow(Icons.person_rounded, 'rdv.client_name'.tr(namedArgs: {'name': rdv.clientName!})),
+              ],
+              if (rdv.finalFare != null) ...[
+                const SizedBox(height: 8),
+                _infoRow(
+                  Icons.payments_rounded,
+                  'Montant final : ${FareCalculator.formatFare(rdv.finalFare!, rdv.currency ?? 'TND')}',
+                  bold: true,
+                ),
+              ] else if (rdv.estimatedFare != null) ...[
+                const SizedBox(height: 8),
+                _infoRow(
+                  Icons.payments_rounded,
+                  'Tarif estimé : ${FareCalculator.formatFare(rdv.estimatedFare!, rdv.currency ?? 'TND')}',
+                ),
               ],
             ]),
           ),

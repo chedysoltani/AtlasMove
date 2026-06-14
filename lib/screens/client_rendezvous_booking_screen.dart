@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../core/network/http_client.dart';
 import '../models/rendezvous_models.dart';
 import '../models/service_models.dart';
 import '../services/rendezvous_service.dart';
+import '../services/geocoding_service.dart';
 import '../utils/fare_calculator.dart';
 
 // Full service data needed to show pricing card + detect delivery type
@@ -93,14 +96,26 @@ class _ClientRendezvousBookingScreenState
   bool _isSubmitting = false;
   String? _error;
 
-  // Fare estimate (computed from fields when both addresses are set)
+  // Fare estimate (from backend or local fallback)
   double? _estimatedFare;
   double? _estimatedDistanceKm;
+  String _estimatedCurrency = 'TND';
+  bool _isEstimating = false;
 
   final List<int> _durations = [30, 60, 90, 120];
   final List<int> _hourOptions = [1, 2, 4, 8, 12];
   final List<String> _cargoSizes = ['small', 'medium', 'large', 'extra_large'];
   final List<double> _weightOptions = [5, 20, 100, 500, 1000];
+
+  // ─── Autocomplete state ──────────────────────────────────────────
+  List<String> _pickupSuggestions = [];
+  List<String> _destSuggestions = [];
+  bool _isSearchingPickup = false;
+  bool _isSearchingDest = false;
+  Timer? _pickupDebounce;
+  Timer? _destDebounce;
+  LatLng? _userLocation;
+  bool _loadingCurrentLocation = false;
 
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
@@ -124,10 +139,17 @@ class _ClientRendezvousBookingScreenState
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
 
     _fetchServicesWithLocation();
+    _initUserLocation();
+    _addressCtrl.addListener(_onPickupChanged);
+    _destAddressCtrl.addListener(_onDestChanged);
   }
 
   @override
   void dispose() {
+    _pickupDebounce?.cancel();
+    _destDebounce?.cancel();
+    _addressCtrl.removeListener(_onPickupChanged);
+    _destAddressCtrl.removeListener(_onDestChanged);
     _animCtrl.dispose();
     _addressCtrl.dispose();
     _detailsCtrl.dispose();
@@ -170,7 +192,7 @@ class _ClientRendezvousBookingScreenState
 
       // HttpClient throws on 4xx — use try/catch for each fallback
       HttpResponse? response;
-      for (final path in ['/m/services', '/m/services/catalogue', '/services/catalogue', '/services']) {
+      for (final path in ['/services/catalogue', '/services']) {
         try {
           response = await HttpClient.get(path, queryParams: params);
           break;
@@ -273,8 +295,141 @@ class _ClientRendezvousBookingScreenState
     }
   }
 
+  // ─── Autocomplete & géolocalisation ─────────────────────────────
+
+  Future<void> _initUserLocation() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse) {
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.low,
+          timeLimit: const Duration(seconds: 5),
+        );
+        if (mounted) setState(() => _userLocation = LatLng(pos.latitude, pos.longitude));
+      }
+    } catch (_) {}
+  }
+
+  void _onPickupChanged() {
+    final q = _addressCtrl.text;
+    _pickupDebounce?.cancel();
+    if (q.length >= 2) {
+      if (!_isSearchingPickup) setState(() => _isSearchingPickup = true);
+      _pickupDebounce = Timer(const Duration(milliseconds: 400), () => _searchPickup(q));
+    } else {
+      if (_pickupSuggestions.isNotEmpty || _isSearchingPickup) {
+        setState(() { _pickupSuggestions = []; _isSearchingPickup = false; });
+      }
+    }
+  }
+
+  Future<void> _searchPickup(String q) async {
+    if (!mounted) return;
+    try {
+      final s = await GeocodingService.searchAddressSuggestions(q, userLocation: _userLocation);
+      if (mounted) setState(() { _pickupSuggestions = s; _isSearchingPickup = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isSearchingPickup = false);
+    }
+  }
+
+  Future<void> _selectPickup(String address) async {
+    FocusScope.of(context).unfocus();
+    setState(() { _pickupSuggestions = []; _isSearchingPickup = true; });
+    _addressCtrl.removeListener(_onPickupChanged);
+    _addressCtrl.text = address;
+    _addressCtrl.addListener(_onPickupChanged);
+    try {
+      final coords = await GeocodingService.getAddressCoordinates(address);
+      if (coords != null && mounted) {
+        _latCtrl.text = coords.latitude.toString();
+        _lngCtrl.text = coords.longitude.toString();
+        _recalculateFare();
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _isSearchingPickup = false);
+  }
+
+  Future<void> _useCurrentLocation() async {
+    setState(() => _loadingCurrentLocation = true);
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) setState(() => _loadingCurrentLocation = false);
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.medium);
+      final coords = LatLng(pos.latitude, pos.longitude);
+      if (mounted) setState(() => _userLocation = coords);
+      final addr = await GeocodingService.getAddressFromCoordinates(coords);
+      if (mounted) {
+        _addressCtrl.removeListener(_onPickupChanged);
+        _addressCtrl.text = addr ??
+            '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
+        _addressCtrl.addListener(_onPickupChanged);
+        _latCtrl.text = pos.latitude.toString();
+        _lngCtrl.text = pos.longitude.toString();
+        setState(() { _pickupSuggestions = []; _loadingCurrentLocation = false; });
+        _recalculateFare();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingCurrentLocation = false);
+    }
+  }
+
+  void _onDestChanged() {
+    final q = _destAddressCtrl.text;
+    _destDebounce?.cancel();
+    if (q.length >= 2) {
+      if (!_isSearchingDest) setState(() => _isSearchingDest = true);
+      _destDebounce = Timer(const Duration(milliseconds: 400), () => _searchDest(q));
+    } else {
+      if (_destSuggestions.isNotEmpty || _isSearchingDest) {
+        setState(() { _destSuggestions = []; _isSearchingDest = false; });
+      }
+    }
+  }
+
+  Future<void> _searchDest(String q) async {
+    if (!mounted) return;
+    try {
+      final s = await GeocodingService.searchAddressSuggestions(q, userLocation: _userLocation);
+      if (mounted) setState(() { _destSuggestions = s; _isSearchingDest = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isSearchingDest = false);
+    }
+  }
+
+  Future<void> _selectDest(String address) async {
+    FocusScope.of(context).unfocus();
+    setState(() { _destSuggestions = []; _isSearchingDest = true; });
+    _destAddressCtrl.removeListener(_onDestChanged);
+    _destAddressCtrl.text = address;
+    _destAddressCtrl.addListener(_onDestChanged);
+    try {
+      final coords = await GeocodingService.getAddressCoordinates(address);
+      if (coords != null && mounted) {
+        _destLatCtrl.text = coords.latitude.toString();
+        _destLngCtrl.text = coords.longitude.toString();
+        _recalculateFare();
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _isSearchingDest = false);
+  }
+
   // ─── Fare estimation ─────────────────────────────────────────────
   void _recalculateFare() {
+    // Fire-and-forget: calls backend estimate, falls back to local
+    _recalculateFareAsync();
+  }
+
+  Future<void> _recalculateFareAsync() async {
     final svc = _selectedService;
     if (svc == null) return;
 
@@ -283,9 +438,10 @@ class _ClientRendezvousBookingScreenState
         ? _durationHours * 60.0
         : _durationMinutes.toDouble();
 
+    final lat1 = double.tryParse(_latCtrl.text.trim());
+    final lng1 = double.tryParse(_lngCtrl.text.trim());
+
     if (_isDelivery) {
-      final lat1 = double.tryParse(_latCtrl.text.trim());
-      final lng1 = double.tryParse(_lngCtrl.text.trim());
       final lat2 = double.tryParse(_destLatCtrl.text.trim());
       final lng2 = double.tryParse(_destLngCtrl.text.trim());
       if (lat1 != null && lng1 != null && lat2 != null && lng2 != null) {
@@ -296,7 +452,8 @@ class _ClientRendezvousBookingScreenState
       }
     }
 
-    final fare = FareCalculator.calculateFare(
+    // Local fallback first (instant display)
+    final localFare = FareCalculator.calculateFare(
       pricingModel: svc.pricingModel,
       distanceKm: distKm,
       durationMin: durMin,
@@ -305,11 +462,37 @@ class _ClientRendezvousBookingScreenState
       pricePerMinute: svc.pricePerMinute ?? 0,
       minimumFare: svc.minimumFare ?? 0,
     );
+    if (mounted) {
+      setState(() {
+        _estimatedDistanceKm = distKm > 0 ? distKm : null;
+        _estimatedFare = localFare > 0 ? localFare : null;
+        _estimatedCurrency = svc.currency;
+      });
+    }
 
-    setState(() {
-      _estimatedDistanceKm = distKm > 0 ? distKm : null;
-      _estimatedFare = fare > 0 ? fare : null;
-    });
+    // Then call backend for zone-aware result (if we have coords)
+    if (lat1 != null && lng1 != null && (distKm > 0 || _isHourly)) {
+      if (mounted) setState(() => _isEstimating = true);
+      try {
+        final est = await RendezvousService.estimateRendezvous(
+          serviceId: svc.id,
+          distanceKm: distKm,
+          durationMinutes: durMin,
+          latitude: lat1,
+          longitude: lng1,
+        );
+        if (est != null && mounted) {
+          setState(() {
+            _estimatedFare = est.estimatedFare > 0 ? est.estimatedFare : _estimatedFare;
+            _estimatedCurrency = est.currency;
+          });
+        }
+      } catch (_) {
+        // Keep local fallback result — no crash
+      } finally {
+        if (mounted) setState(() => _isEstimating = false);
+      }
+    }
   }
 
   // ─── Date / Time pickers ─────────────────────────────────────────
@@ -445,6 +628,7 @@ class _ClientRendezvousBookingScreenState
         estimatedDistanceKm: _estimatedDistanceKm != null && _estimatedDistanceKm! > 0
             ? _estimatedDistanceKm
             : null,
+        currency: _estimatedCurrency,
       );
       if (mounted) _showSuccessDialog(rdv);
     } catch (e) {
@@ -673,58 +857,32 @@ class _ClientRendezvousBookingScreenState
                                 Icons.location_on_rounded,
                               ),
                               const SizedBox(height: 10),
-                              _addressField(
-                                _addressCtrl,
-                                _isDelivery ? 'Adresse de collecte (départ)' : 'rdv.address'.tr(),
-                                Icons.location_on_rounded,
-                                required: true,
-                                onChanged: (_) => _recalculateFare(),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(children: [
-                                Expanded(child: _coordField(
-                                  _latCtrl, 'Latitude', '36.8065',
-                                  onChanged: (_) => _recalculateFare(),
-                                )),
-                                const SizedBox(width: 12),
-                                Expanded(child: _coordField(
-                                  _lngCtrl, 'Longitude', '10.1815',
-                                  onChanged: (_) => _recalculateFare(),
-                                )),
-                              ]),
+                              _buildPickupField(),
 
                               // ── Delivery destination ──────────────
                               if (_isDelivery) ...[
                                 const SizedBox(height: 22),
                                 _sectionLabel('Adresse de livraison', Icons.flag_rounded),
                                 const SizedBox(height: 10),
-                                _addressField(
-                                  _destAddressCtrl,
-                                  'Adresse de livraison (destination)',
-                                  Icons.flag_rounded,
-                                  required: true,
-                                  onChanged: (_) => _recalculateFare(),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(children: [
-                                  Expanded(child: _coordField(
-                                    _destLatCtrl, 'Latitude dest.', '36.9',
-                                    onChanged: (_) => _recalculateFare(),
-                                  )),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: _coordField(
-                                    _destLngCtrl, 'Longitude dest.', '10.3',
-                                    onChanged: (_) => _recalculateFare(),
-                                  )),
-                                ]),
+                                _buildDestField(),
 
                                 // ── Fare estimate banner ──────────────
-                                if (_estimatedFare != null) ...[
+                                if (_isEstimating) ...[
+                                  const SizedBox(height: 12),
+                                  const Center(
+                                    child: SizedBox(
+                                      width: 20, height: 20,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: _orange),
+                                    ),
+                                  ),
+                                ] else if (_estimatedFare != null) ...[
                                   const SizedBox(height: 12),
                                   _FareEstimateBanner(
                                     distanceKm: _estimatedDistanceKm,
                                     fare: _estimatedFare!,
-                                    currency: _selectedService?.currency ?? 'TND',
+                                    currency: _estimatedCurrency,
                                   ),
                                 ],
 
@@ -1126,26 +1284,26 @@ class _ClientRendezvousBookingScreenState
     switch (svc.pricingModel) {
       case 'fixed':
         return svc.basePrice != null
-            ? 'Prix fixe : ${svc.basePrice!.toStringAsFixed(3)} $c'
+            ? 'Prix fixe : ${FareCalculator.formatFare(svc.basePrice!, c)}'
             : 'Prix fixe';
       case 'distance':
         final base = (svc.basePrice != null && svc.basePrice! > 0)
-            ? '${svc.basePrice!.toStringAsFixed(3)} $c + '
+            ? '${FareCalculator.formatFare(svc.basePrice!, c)} + '
             : '';
         final km = svc.pricePerKm != null
-            ? '${svc.pricePerKm!.toStringAsFixed(3)} $c/km'
+            ? '${FareCalculator.formatFare(svc.pricePerKm!, c)}/km'
             : '';
         return '$base$km';
       case 'hourly':
         return svc.pricePerMinute != null
-            ? '${(svc.pricePerMinute! * 60).toStringAsFixed(3)} $c / heure'
+            ? '${FareCalculator.formatFare(svc.pricePerMinute! * 60, c)} / heure'
             : 'Prix horaire';
       default:
         final base = svc.basePrice != null
-            ? '${svc.basePrice!.toStringAsFixed(3)} $c'
+            ? FareCalculator.formatFare(svc.basePrice!, c)
             : '';
         final km = svc.pricePerKm != null
-            ? ' + ${svc.pricePerKm!.toStringAsFixed(3)}/km'
+            ? ' + ${FareCalculator.formatFare(svc.pricePerKm!, c)}/km'
             : '';
         return '$base$km';
     }
@@ -1756,6 +1914,160 @@ class _ClientRendezvousBookingScreenState
     );
   }
 
+  // ─── Autocomplete fields ─────────────────────────────────────────
+
+  Widget _buildPickupField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _addressCtrl,
+                style: GoogleFonts.poppins(fontSize: 14, color: _textPrimary),
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? (_isDelivery ? 'Adresse de collecte requise' : 'Adresse requise')
+                    : null,
+                decoration: _inputDeco(
+                  _isDelivery ? 'Adresse de collecte (départ)' : 'rdv.address'.tr(),
+                  Icons.location_on_rounded,
+                ).copyWith(
+                  suffixIcon: _isSearchingPickup
+                      ? const Padding(
+                          padding: EdgeInsets.all(14),
+                          child: SizedBox(
+                            width: 16, height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: _orange),
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: _loadingCurrentLocation ? null : _useCurrentLocation,
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: _orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _orange.withOpacity(0.3)),
+                ),
+                child: _loadingCurrentLocation
+                    ? const Padding(
+                        padding: EdgeInsets.all(13),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: _orange),
+                      )
+                    : const Icon(Icons.my_location_rounded,
+                        color: _orange, size: 22),
+              ),
+            ),
+          ],
+        ),
+        if (_pickupSuggestions.isNotEmpty)
+          _suggestionDropdown(_pickupSuggestions, _selectPickup),
+      ],
+    );
+  }
+
+  Widget _buildDestField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: _destAddressCtrl,
+          style: GoogleFonts.poppins(fontSize: 14, color: _textPrimary),
+          validator: (v) => (v == null || v.trim().isEmpty)
+              ? 'Adresse de livraison requise'
+              : null,
+          decoration: _inputDeco(
+            'Adresse de livraison (destination)',
+            Icons.flag_rounded,
+          ).copyWith(
+            suffixIcon: _isSearchingDest
+                ? const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: _green),
+                    ),
+                  )
+                : null,
+          ),
+        ),
+        if (_destSuggestions.isNotEmpty)
+          _suggestionDropdown(_destSuggestions, _selectDest),
+      ],
+    );
+  }
+
+  Widget _suggestionDropdown(
+      List<String> suggestions, Future<void> Function(String) onSelect) {
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        itemCount: suggestions.length.clamp(0, 5),
+        separatorBuilder: (_, __) =>
+            Divider(color: _border, height: 1, thickness: 1),
+        itemBuilder: (_, i) {
+          final s = suggestions[i];
+          return InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => onSelect(s),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 28, height: 28,
+                    decoration: BoxDecoration(
+                      color: _orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.place_rounded,
+                        color: _orange, size: 14),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      s,
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, color: _textPrimary),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   // ─── Card wrapper ────────────────────────────────────────────────
 
   Widget _card({required Widget child, EdgeInsetsGeometry? padding}) {
@@ -1836,13 +2148,13 @@ class _ServicePricingCard extends StatelessWidget {
           if (service.basePrice != null && service.basePrice! > 0)
             _priceRow(
               'Prix de base',
-              '${service.basePrice!.toStringAsFixed(3)} $currency',
+              FareCalculator.formatFare(service.basePrice!, currency),
             ),
           if (service.pricePerKm != null && service.pricePerKm! > 0) ...[
             const SizedBox(height: 6),
             _priceRow(
               'Par kilomètre',
-              '${service.pricePerKm!.toStringAsFixed(3)} $currency/km',
+              '${FareCalculator.formatFare(service.pricePerKm!, currency)}/km',
               highlight: true,
             ),
           ],
@@ -1851,19 +2163,17 @@ class _ServicePricingCard extends StatelessWidget {
               service.pricingModel != 'distance') ...[
             const SizedBox(height: 6),
             _priceRow(
+              service.pricingModel == 'hourly' ? 'Par heure' : 'Par minute',
               service.pricingModel == 'hourly'
-                  ? 'Par heure'
-                  : 'Par minute',
-              service.pricingModel == 'hourly'
-                  ? '${(service.pricePerMinute! * 60).toStringAsFixed(3)} $currency/h'
-                  : '${service.pricePerMinute!.toStringAsFixed(3)} $currency/min',
+                  ? '${FareCalculator.formatFare(service.pricePerMinute! * 60, currency)}/h'
+                  : '${FareCalculator.formatFare(service.pricePerMinute!, currency)}/min',
             ),
           ],
           if (service.minimumFare != null && service.minimumFare! > 0) ...[
             const SizedBox(height: 6),
             _priceRow(
               'Minimum garanti',
-              '${service.minimumFare!.toStringAsFixed(3)} $currency',
+              FareCalculator.formatFare(service.minimumFare!, currency),
               color: _orange,
             ),
           ],
@@ -2112,26 +2422,26 @@ class _ServicePickerTile extends StatelessWidget {
     switch (service.pricingModel) {
       case 'fixed':
         return service.basePrice != null
-            ? 'Prix fixe · ${service.basePrice!.toStringAsFixed(3)} $c'
+            ? 'Prix fixe · ${FareCalculator.formatFare(service.basePrice!, c)}'
             : 'Prix fixe';
       case 'distance':
         final base = (service.basePrice != null && service.basePrice! > 0)
-            ? '${service.basePrice!.toStringAsFixed(3)} $c + '
+            ? '${FareCalculator.formatFare(service.basePrice!, c)} + '
             : '';
         final km = service.pricePerKm != null
-            ? '${service.pricePerKm!.toStringAsFixed(3)} $c/km'
+            ? '${FareCalculator.formatFare(service.pricePerKm!, c)}/km'
             : '';
         return '$base$km';
       case 'hourly':
         return service.pricePerMinute != null
-            ? '${(service.pricePerMinute! * 60).toStringAsFixed(3)} $c / heure'
+            ? '${FareCalculator.formatFare(service.pricePerMinute! * 60, c)} / heure'
             : 'Prix horaire';
       default:
         final base = service.basePrice != null
-            ? '${service.basePrice!.toStringAsFixed(3)} $c'
+            ? FareCalculator.formatFare(service.basePrice!, c)
             : '';
         final km = service.pricePerKm != null
-            ? ' + ${service.pricePerKm!.toStringAsFixed(3)}/km'
+            ? ' + ${FareCalculator.formatFare(service.pricePerKm!, c)}/km'
             : '';
         return '$base$km';
     }

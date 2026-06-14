@@ -17,6 +17,11 @@ class Rendezvous {
   final String? livreurPhone;
   final DateTime createdAt;
 
+  // Commission & payment fields
+  final double? finalFare;
+  final String? currency;
+  final double? commissionAmount;
+
   // Delivery-specific fields (null for standard RDV services)
   final String? destinationAddress;
   final double? destinationLatitude;
@@ -46,6 +51,9 @@ class Rendezvous {
     this.livreurName,
     this.livreurPhone,
     required this.createdAt,
+    this.finalFare,
+    this.currency,
+    this.commissionAmount,
     this.destinationAddress,
     this.destinationLatitude,
     this.destinationLongitude,
@@ -127,6 +135,10 @@ class Rendezvous {
       createdAt:
           DateTime.tryParse(json['created_at']?.toString() ?? '') ??
               DateTime.now(),
+      finalFare: double.tryParse(json['final_fare']?.toString() ?? ''),
+      currency: json['currency']?.toString(),
+      commissionAmount: double.tryParse(
+          json['commission_amount']?.toString() ?? ''),
       destinationAddress: json['destination_address']?.toString(),
       destinationLatitude: double.tryParse(
           json['destination_latitude']?.toString() ?? ''),
@@ -141,6 +153,64 @@ class Rendezvous {
           json['estimated_distance_km']?.toString() ?? ''),
       estimatedFare: double.tryParse(
           json['estimated_fare']?.toString() ?? ''),
+    );
+  }
+}
+
+class RendezvousEstimate {
+  final double estimatedFare;
+  final String currency;
+  final String? zoneName;
+
+  const RendezvousEstimate({
+    required this.estimatedFare,
+    required this.currency,
+    this.zoneName,
+  });
+
+  factory RendezvousEstimate.fromJson(Map<String, dynamic> json) {
+    return RendezvousEstimate(
+      estimatedFare: double.tryParse(
+              json['estimated_fare']?.toString() ?? '0') ?? 0,
+      currency: json['currency']?.toString() ?? 'TND',
+      zoneName: json['zone_name']?.toString(),
+    );
+  }
+}
+
+class RendezvousOffer {
+  final String id;
+  final String rdvId;
+  final String proposedBy; // 'client' | 'driver'
+  final double proposedFare;
+  final String currency;
+  final String status; // 'pending' | 'accepted' | 'rejected' | 'countered'
+  final DateTime createdAt;
+
+  const RendezvousOffer({
+    required this.id,
+    required this.rdvId,
+    required this.proposedBy,
+    required this.proposedFare,
+    required this.currency,
+    required this.status,
+    required this.createdAt,
+  });
+
+  bool get isPending => status == 'pending';
+  bool get isAccepted => status == 'accepted';
+  bool get isRejected => status == 'rejected';
+  bool get isCountered => status == 'countered';
+
+  factory RendezvousOffer.fromJson(Map<String, dynamic> json) {
+    return RendezvousOffer(
+      id: json['id']?.toString() ?? '',
+      rdvId: (json['rendezvous_id'] ?? json['rdv_id'])?.toString() ?? '',
+      proposedBy: json['proposed_by']?.toString() ?? 'driver',
+      proposedFare: double.tryParse(json['proposed_fare']?.toString() ?? '0') ?? 0,
+      currency: json['currency']?.toString() ?? 'TND',
+      status: json['status']?.toString() ?? 'pending',
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
     );
   }
 }

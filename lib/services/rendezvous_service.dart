@@ -22,6 +22,7 @@ class RendezvousService {
     bool? isFragile,
     double? estimatedFare,
     double? estimatedDistanceKm,
+    String? currency,
   }) async {
     debugPrint('=== RendezvousService.bookRendezvous() START ===');
     try {
@@ -44,6 +45,7 @@ class RendezvousService {
         if (isFragile != null) 'is_fragile': isFragile,
         if (estimatedFare != null) 'estimated_fare': estimatedFare,
         if (estimatedDistanceKm != null) 'estimated_distance_km': estimatedDistanceKm,
+        if (currency != null) 'currency': currency,
       };
       debugPrint('Body: $body');
       final response = await HttpClient.post('/m/rendezvous', body: body);
@@ -212,10 +214,21 @@ class RendezvousService {
     }
   }
 
-  static Future<void> acceptBooking(String id) async {
-    debugPrint('=== RendezvousService.acceptBooking() id=$id ===');
+  static Future<void> acceptBooking(
+    String id, {
+    double? finalFare,
+    String? currency,
+  }) async {
+    debugPrint('=== RendezvousService.acceptBooking() id=$id fare=$finalFare ===');
     try {
-      final response = await HttpClient.patch('/m/rendezvous/$id/accept');
+      final body = <String, dynamic>{
+        if (finalFare != null) 'final_fare': finalFare,
+        if (currency != null) 'currency': currency,
+      };
+      final response = await HttpClient.patch(
+        '/m/rendezvous/$id/accept',
+        body: body.isNotEmpty ? body : null,
+      );
       if (!response.isSuccess) {
         throw RendezvousException(
           message: response.json['message'] ?? 'Erreur acceptation',
@@ -224,6 +237,26 @@ class RendezvousService {
       }
     } catch (e) {
       debugPrint('ERREUR acceptBooking: $e');
+      if (e is RendezvousException) rethrow;
+      throw RendezvousException(message: e.toString());
+    }
+  }
+
+  static Future<void> proposeOffer(String rdvId, double proposedFare, {String currency = 'TND'}) async {
+    debugPrint('=== RendezvousService.proposeOffer() id=$rdvId fare=$proposedFare currency=$currency ===');
+    try {
+      final response = await HttpClient.post(
+        '/m/rendezvous/$rdvId/offers',
+        body: {'proposed_fare': proposedFare, 'currency': currency},
+      );
+      if (!response.isSuccess) {
+        throw RendezvousException(
+          message: response.json['message'] ?? 'Erreur proposition',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      debugPrint('ERREUR proposeOffer: $e');
       if (e is RendezvousException) rethrow;
       throw RendezvousException(message: e.toString());
     }
@@ -244,6 +277,122 @@ class RendezvousService {
       if (e is RendezvousException) rethrow;
       throw RendezvousException(message: e.toString());
     }
+  }
+
+  // ─── Estimation ──────────────────────────────────────────────────────────
+
+  static Future<RendezvousEstimate?> estimateRendezvous({
+    required String serviceId,
+    required double distanceKm,
+    required double durationMinutes,
+    required double latitude,
+    required double longitude,
+  }) async {
+    debugPrint('=== RendezvousService.estimateRendezvous() ===');
+    try {
+      final response = await HttpClient.post('/m/rendezvous/estimate', body: {
+        'service_id': serviceId,
+        'distance_km': double.parse(distanceKm.toStringAsFixed(2)),
+        'duration_minutes': durationMinutes.round(),
+        'latitude': double.parse(latitude.toStringAsFixed(6)),
+        'longitude': double.parse(longitude.toStringAsFixed(6)),
+      });
+      if (response.isSuccess) {
+        final outer = response.json['data'];
+        if (outer is Map<String, dynamic>) {
+          // Handle nested { message, data: {...} } wrapper
+          final inner = outer['data'] ?? outer;
+          if (inner is Map<String, dynamic>) {
+            return RendezvousEstimate.fromJson(inner);
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('ERREUR estimateRendezvous: $e');
+      return null;
+    }
+  }
+
+  // ─── Offers / Negotiation ─────────────────────────────────────────────────
+
+  static Future<List<RendezvousOffer>> getOffers(String rdvId) async {
+    debugPrint('=== RendezvousService.getOffers() id=$rdvId ===');
+    try {
+      final response = await HttpClient.get('/m/rendezvous/$rdvId/offers');
+      if (response.isSuccess) {
+        final raw = _extractList(response.json);
+        return raw.map((j) => RendezvousOffer.fromJson(j as Map<String, dynamic>)).toList();
+      }
+      throw RendezvousException(
+        message: response.json['message'] ?? 'Erreur chargement offres',
+        statusCode: response.statusCode,
+      );
+    } catch (e) {
+      if (e is RendezvousException) rethrow;
+      throw RendezvousException(message: e.toString());
+    }
+  }
+
+  static Future<void> acceptOffer(String offerId) async {
+    debugPrint('=== RendezvousService.acceptOffer() id=$offerId ===');
+    try {
+      final response = await HttpClient.post('/m/rendezvous/offers/$offerId/accept');
+      if (!response.isSuccess) {
+        throw RendezvousException(
+          message: response.json['message'] ?? 'Erreur acceptation offre',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is RendezvousException) rethrow;
+      throw RendezvousException(message: e.toString());
+    }
+  }
+
+  static Future<void> rejectOffer(String offerId) async {
+    debugPrint('=== RendezvousService.rejectOffer() id=$offerId ===');
+    try {
+      final response = await HttpClient.post('/m/rendezvous/offers/$offerId/reject');
+      if (!response.isSuccess) {
+        throw RendezvousException(
+          message: response.json['message'] ?? 'Erreur rejet offre',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is RendezvousException) rethrow;
+      throw RendezvousException(message: e.toString());
+    }
+  }
+
+  static Future<void> counterOffer(String offerId, double proposedFare, {String currency = 'TND'}) async {
+    debugPrint('=== RendezvousService.counterOffer() id=$offerId fare=$proposedFare currency=$currency ===');
+    try {
+      final response = await HttpClient.post(
+        '/m/rendezvous/offers/$offerId/counter',
+        body: {'proposed_fare': proposedFare, 'currency': currency},
+      );
+      if (!response.isSuccess) {
+        throw RendezvousException(
+          message: response.json['message'] ?? 'Erreur contre-offre',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      if (e is RendezvousException) rethrow;
+      throw RendezvousException(message: e.toString());
+    }
+  }
+
+  static List<dynamic> _extractList(Map<String, dynamic> json) {
+    final outer = json['data'];
+    if (outer is List) return outer;
+    if (outer is Map<String, dynamic>) {
+      final inner = outer['data'];
+      if (inner is List) return inner;
+    }
+    return [];
   }
 }
 

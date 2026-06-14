@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
-import '../utils/app_theme.dart';
-import '../widgets/custom_button.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../models/commission_models.dart';
+import '../models/rendezvous_models.dart';
+import '../services/rendezvous_stats_service.dart';
+import '../services/rendezvous_service.dart';
 
-enum EarningsPeriod { daily, weekly, monthly }
+const _orange = Color(0xFFFF6B35);
+const _orangeLight = Color(0xFFFF8C42);
+const _navy = Color(0xFF1E293B);
+const _surface = Color(0xFFF8FAFC);
+const _border = Color(0xFFE2E8F0);
+const _textSecondary = Color(0xFF64748B);
+const _green = Color(0xFF22C55E);
+const _red = Color(0xFFEF4444);
+const _amber = Color(0xFFF59E0B);
+const _indigo = Color(0xFF6366F1);
 
 class DriverEarningsScreen extends StatefulWidget {
   const DriverEarningsScreen({super.key});
@@ -13,235 +24,267 @@ class DriverEarningsScreen extends StatefulWidget {
   State<DriverEarningsScreen> createState() => _DriverEarningsScreenState();
 }
 
-class _DriverEarningsScreenState extends State<DriverEarningsScreen>
-    with TickerProviderStateMixin {
-  EarningsPeriod _selectedPeriod = EarningsPeriod.daily;
-  late AnimationController _chartController;
-  late Animation<double> _chartAnimation;
+class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
+  final _statsService = RendezvousStatsService();
 
-  // Earnings data
-  final Map<EarningsPeriod, List<double>> _earningsData = {
-    EarningsPeriod.daily: [120.0, 85.0, 200.0, 150.0, 180.0, 95.0, 325.0],
-    EarningsPeriod.weekly: [850.0, 1200.0, 950.0, 1400.0, 1100.0, 1300.0, 1600.0],
-    EarningsPeriod.monthly: [3200.0, 3800.0, 3500.0, 4200.0, 3900.0, 4100.0],
-  };
-
-  final Map<EarningsPeriod, List<String>> _labels = {
-    EarningsPeriod.daily: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
-    EarningsPeriod.weekly: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7'],
-    EarningsPeriod.monthly: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'],
-  };
+  DateTime _selectedMonth = DateTime.now();
+  DriverCommissionStats? _stats;
+  bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _initializeAnimations();
+    _load();
   }
 
-  void _initializeAnimations() {
-    _chartController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
+  String get _monthParam =>
+      '${_selectedMonth.year}-${_selectedMonth.month.toString().padLeft(2, '0')}';
 
-    _chartAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _chartController,
-      curve: Curves.easeInOut,
-    ));
-
-    _chartController.forward();
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final stats = await _statsService.fetchCommissionStats(_monthParam);
+      if (stats != null) {
+        setState(() {
+          _stats = stats;
+          _loading = false;
+        });
+        return;
+      }
+      // Fallback: build from local rendezvous list
+      final rdvList = await _fetchCompletedRdv();
+      final localStats = _statsService.buildFromLocal(rdvList, _monthParam, 'TND');
+      setState(() {
+        _stats = localStats;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
   }
 
-  @override
-  void dispose() {
-    _chartController.dispose();
-    super.dispose();
+  Future<List<Rendezvous>> _fetchCompletedRdv() async {
+    try {
+      final resp = await RendezvousService.getDriverHistory(limit: 100);
+      return resp.items.where((r) {
+        return r.status == 'completed' &&
+            r.scheduledAt.year == _selectedMonth.year &&
+            r.scheduledAt.month == _selectedMonth.month;
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  void _prevMonth() {
+    setState(() {
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+    });
+    _load();
+  }
+
+  void _nextMonth() {
+    final now = DateTime.now();
+    if (_selectedMonth.year == now.year && _selectedMonth.month == now.month) {
+      return;
+    }
+    setState(() {
+      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+    });
+    _load();
+  }
+
+  bool get _isCurrentMonth {
+    final now = DateTime.now();
+    return _selectedMonth.year == now.year && _selectedMonth.month == now.month;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _surface,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         title: Text(
           'driver.earnings_title'.tr(),
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
+          style: GoogleFonts.poppins(
+            color: _navy,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
           ),
         ),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_rounded, color: _navy, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         actions: [
           IconButton(
-            onPressed: () {
-              // TODO: Export earnings
-            },
-            icon: const Icon(Icons.download, color: Colors.black),
+            icon: const Icon(Icons.refresh_rounded, color: _navy, size: 22),
+            onPressed: _load,
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: _orange))
+          : _error != null
+              ? _buildError()
+              : RefreshIndicator(
+                  color: _orange,
+                  onRefresh: _load,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildMonthSelector(),
+                        const SizedBox(height: 16),
+                        _buildRevenueCard(),
+                        const SizedBox(height: 16),
+                        _buildCommissionCard(),
+                        const SizedBox(height: 16),
+                        _buildBreakdownSection(),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                ),
+    );
+  }
+
+  Widget _buildError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Period Selector
-            _buildPeriodSelector(),
-            
-            const SizedBox(height: 24),
-            
-            // Total Earnings Card
-            _buildTotalEarningsCard(),
-            
-            const SizedBox(height: 24),
-            
-            // Chart
-            _buildChart(),
-            
-            const SizedBox(height: 24),
-            
-            // Statistics
-            _buildStatistics(),
-            
-            const SizedBox(height: 24),
-            
-            // Recent Earnings
-            _buildRecentEarnings(),
+            const Icon(Icons.error_outline_rounded, color: _red, size: 48),
+            const SizedBox(height: 12),
+            Text(_error!, textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(color: _textSecondary, fontSize: 14)),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded, color: _orange),
+              label: Text('Réessayer',
+                  style: GoogleFonts.poppins(color: _orange, fontWeight: FontWeight.w600)),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPeriodSelector() {
+  Widget _buildMonthSelector() {
+    final label = _stats?.formattedPeriod ?? _monthParam;
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: _buildPeriodButton('driver.earnings_today'.tr(), EarningsPeriod.daily),
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded, color: _navy),
+            onPressed: _prevMonth,
           ),
-          Expanded(
-            child: _buildPeriodButton('driver.earnings_week'.tr(), EarningsPeriod.weekly),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w700, fontSize: 16, color: _navy),
           ),
-          Expanded(
-            child: _buildPeriodButton('driver.earnings_month'.tr(), EarningsPeriod.monthly),
+          IconButton(
+            icon: Icon(Icons.chevron_right_rounded,
+                color: _isCurrentMonth ? _border : _navy),
+            onPressed: _isCurrentMonth ? null : _nextMonth,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPeriodButton(String text, EarningsPeriod period) {
-    final isSelected = _selectedPeriod == period;
-    
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedPeriod = period;
-        });
-        _chartController.reset();
-        _chartController.forward();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black,
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
+  Widget _buildRevenueCard() {
+    final stats = _stats;
+    final revenue = stats?.totalRevenue ?? 0.0;
+    final currency = stats?.currency ?? 'TND';
+    final count = stats?.completedCount ?? 0;
 
-  Widget _buildTotalEarningsCard() {
-    final totalEarnings = _earningsData[_selectedPeriod]!.reduce((a, b) => a + b);
-    final periodText = _getPeriodText();
-    
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primaryColor,
-            AppTheme.primaryColor.withOpacity(0.8),
-          ],
+        gradient: const LinearGradient(
+          colors: [_orange, _orangeLight],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            color: _orange.withOpacity(0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Total $periodText',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-            ),
+          Row(
+            children: [
+              const Icon(Icons.bar_chart_rounded, color: Colors.white70, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Chiffre d\'affaires',
+                style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
-            '${totalEarnings.toStringAsFixed(2)} MAD',
-            style: const TextStyle(
+            '${revenue.toStringAsFixed(2)} $currency',
+            style: GoogleFonts.poppins(
               color: Colors.white,
               fontSize: 32,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withOpacity(0.22),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.trending_up, color: Colors.white, size: 16),
-                    const SizedBox(width: 4),
-                    const Text(
-                      '+12.5%',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    const Icon(Icons.check_circle_rounded,
+                        color: Colors.white, size: 14),
+                    const SizedBox(width: 5),
+                    Text(
+                      '$count rendez-vous terminés',
+                      style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600),
                     ),
                   ],
-                ),
-              ),
-              const Spacer(),
-              Text(
-                'vs période précédente',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
-                  fontSize: 12,
                 ),
               ),
             ],
@@ -251,20 +294,24 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen>
     );
   }
 
-  Widget _buildChart() {
-    final data = _earningsData[_selectedPeriod]!;
-    final labels = _labels[_selectedPeriod]!;
-    final maxValue = data.reduce((a, b) => a > b ? a : b);
+  Widget _buildCommissionCard() {
+    final stats = _stats;
+    final commission = stats?.commissionDue ?? 0.0;
+    final currency = stats?.currency ?? 'TND';
+    final rate = ((stats?.commissionRate ?? 0.10) * 100).toStringAsFixed(0);
+    final isPaid = stats?.commissionPaid ?? false;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: isPaid ? _green.withOpacity(0.3) : _amber.withOpacity(0.4),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -273,232 +320,261 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'driver.earnings_title'.tr(),
-            style: const TextStyle(
-              color: Colors.black,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Chart
-          SizedBox(
-            height: 200,
-            child: AnimatedBuilder(
-              animation: _chartAnimation,
-              builder: (context, child) {
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: List.generate(
-                    data.length,
-                    (index) => _buildChartBar(
-                      data[index],
-                      maxValue,
-                      labels[index],
-                      _chartAnimation.value,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChartBar(double value, double maxValue, String label, double animation) {
-    final barHeight = (value / maxValue) * 150 * animation;
-    
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Container(
-          width: 30,
-          height: barHeight,
-          decoration: BoxDecoration(
-            color: AppTheme.primaryColor,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.grey,
-            fontSize: 10,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${value.toInt()}',
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatistics() {
-    final data = _earningsData[_selectedPeriod]!;
-    final average = data.reduce((a, b) => a + b) / data.length;
-    final max = data.reduce((a, b) => a > b ? a : b);
-    final min = data.reduce((a, b) => a < b ? a : b);
-    
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Statistiques',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
           Row(
             children: [
-              Expanded(
-                child: _buildStatItem('Moyenne', '${average.toStringAsFixed(1)} MAD'),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _indigo.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.percent_rounded, color: _indigo, size: 20),
               ),
-              Expanded(
-                child: _buildStatItem('Maximum', '${max.toStringAsFixed(1)} MAD'),
-              ),
-              Expanded(
-                child: _buildStatItem('Minimum', '${min.toStringAsFixed(1)} MAD'),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Commission AtlasMove ($rate%)',
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700, fontSize: 15, color: _navy),
+                  ),
+                  Text(
+                    'Applicable aux services de livraison uniquement',
+                    style: GoogleFonts.poppins(
+                        fontSize: 11, color: _textSecondary),
+                  ),
+                ],
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Montant dû',
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: _textSecondary)),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${commission.toStringAsFixed(2)} $currency',
+                    style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: isPaid ? _green : _amber,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: (isPaid ? _green : _amber).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: (isPaid ? _green : _amber).withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isPaid
+                          ? Icons.check_circle_rounded
+                          : Icons.schedule_rounded,
+                      color: isPaid ? _green : _amber,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isPaid ? 'Payée' : 'En attente',
+                      style: GoogleFonts.poppins(
+                        color: isPaid ? _green : _amber,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!isPaid && commission > 0) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: _amber.withOpacity(0.07),
+                borderRadius: BorderRadius.circular(10),
+                border:
+                    Border.all(color: _amber.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline_rounded,
+                      color: _amber, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'À régler avant la fin du mois pour maintenir l\'accès à vos services.',
+                      style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: Color(0xFF92400E),
+                          height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppTheme.primaryColor,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.grey,
-            fontSize: 12,
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildBreakdownSection() {
+    final items = _stats?.breakdown ?? [];
 
-  Widget _buildRecentEarnings() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'nav.earnings'.tr(),
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+          'Détail par service',
+          style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w700, fontSize: 16, color: _navy),
         ),
-        
-        const SizedBox(height: 16),
-        
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            children: [
-              _buildEarningItem('Aujourd\'hui', '325.50 MAD', '8 courses', Colors.green),
-              _buildDivider(),
-              _buildEarningItem('Hier', '180.00 MAD', '5 courses', Colors.blue),
-              _buildDivider(),
-              _buildEarningItem('Avant-hier', '150.00 MAD', '4 courses', Colors.orange),
-            ],
-          ),
-        ),
+        const SizedBox(height: 12),
+        if (items.isEmpty)
+          _buildEmptyBreakdown()
+        else
+          ...items.map((item) => _buildBreakdownItem(item)),
       ],
     );
   }
 
-  Widget _buildEarningItem(String date, String amount, String rides, Color color) {
-    return Padding(
+  Widget _buildEmptyBreakdown() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            const Icon(Icons.inbox_rounded, color: _border, size: 44),
+            const SizedBox(height: 10),
+            Text(
+              'Aucun rendez-vous terminé ce mois-ci',
+              style: GoogleFonts.poppins(
+                  color: _textSecondary, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBreakdownItem(CommissionBreakdownItem item) {
+    final isTaxi = item.isTaxiType;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
-      child: Row(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _orange.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isTaxi
+                      ? Icons.local_taxi_rounded
+                      : Icons.delivery_dining_rounded,
+                  color: _orange,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.serviceName,
+                      style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: _navy),
+                    ),
+                    Text(
+                      '${item.completedCount} mission${item.completedCount > 1 ? 's' : ''} terminée${item.completedCount > 1 ? 's' : ''}',
+                      style: GoogleFonts.poppins(
+                          fontSize: 11, color: _textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              if (isTaxi)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _border,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Exempté',
+                    style: GoogleFonts.poppins(
+                        fontSize: 10,
+                        color: _textSecondary,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Container(
-            width: 40,
-            height: 40,
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: _surface,
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              Icons.attach_money,
-              color: color,
-              size: 20,
-            ),
-          ),
-          
-          const SizedBox(width: 12),
-          
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  date,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  rides,
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 12,
-                  ),
-                ),
+                _statPill(
+                    'CA',
+                    '${item.revenue.toStringAsFixed(2)} ${item.currency}',
+                    _navy),
+                if (!isTaxi)
+                  _statPill(
+                      'Commission (10%)',
+                      '${item.commission.toStringAsFixed(2)} ${item.currency}',
+                      _indigo),
               ],
-            ),
-          ),
-          
-          Text(
-            amount,
-            style: TextStyle(
-              color: color,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -506,21 +582,20 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen>
     );
   }
 
-  Widget _buildDivider() {
-    return Divider(
-      height: 1,
-      color: Colors.grey.shade200,
+  Widget _statPill(String label, String value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: GoogleFonts.poppins(
+                fontSize: 10, color: _textSecondary)),
+        const SizedBox(height: 2),
+        Text(value,
+            style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: color)),
+      ],
     );
-  }
-
-  String _getPeriodText() {
-    switch (_selectedPeriod) {
-      case EarningsPeriod.daily:
-        return 'de la semaine';
-      case EarningsPeriod.weekly:
-        return 'du mois';
-      case EarningsPeriod.monthly:
-        return 'de l\'année';
-    }
   }
 }

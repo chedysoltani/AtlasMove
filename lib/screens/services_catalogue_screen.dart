@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/service_models.dart';
 import '../services/service_api.dart';
+import '../services/location_service.dart';
 import '../providers/services_provider.dart';
 import '../core/storage/token_storage.dart';
 import '../utils/app_theme.dart';
@@ -23,13 +24,22 @@ class _ServicesCatalogueScreenState
   bool _initialized = false;
   final Set<int> _expanded = {};
 
+  Future<void> _fetchWithGps(CatalogueNotifier notifier) async {
+    try {
+      final pos = await LocationService().getCurrentPosition();
+      notifier.fetchCatalogue(latitude: pos?.latitude, longitude: pos?.longitude);
+    } catch (_) {
+      notifier.fetchCatalogue();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final catalogueAsync = ref.watch(catalogueProvider);
     final notifier = ref.read(catalogueProvider.notifier);
 
     if (!_initialized) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => notifier.fetchCatalogue());
+      WidgetsBinding.instance.addPostFrameCallback((_) => _fetchWithGps(notifier));
       _initialized = true;
     }
 
@@ -68,7 +78,7 @@ class _ServicesCatalogueScreenState
         GestureDetector(
           onTap: () {
             HapticFeedback.lightImpact();
-            notifier.fetchCatalogue();
+            _fetchWithGps(notifier);
           },
           child: Container(
             margin: const EdgeInsets.only(right: 16),
@@ -95,7 +105,7 @@ class _ServicesCatalogueScreenState
 
     return RefreshIndicator(
       color: _orange,
-      onRefresh: () => ref.read(catalogueProvider.notifier).fetchCatalogue(),
+      onRefresh: () => _fetchWithGps(ref.read(catalogueProvider.notifier)),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         itemCount: categories.length,

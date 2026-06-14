@@ -172,8 +172,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(mapProvider.notifier).initializeMap();
-      ref.read(catalogueProvider.notifier).fetchCatalogue();
       ref.read(cardsProvider.notifier).loadCards();
+      LocationService().getCurrentPosition().then((pos) {
+        ref.read(catalogueProvider.notifier).fetchCatalogue(
+          latitude: pos?.latitude,
+          longitude: pos?.longitude,
+        );
+      });
       
       // Check for tripId argument to resume active matching session
       final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
@@ -2163,7 +2168,12 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                   ),
                   TextButton(
                     onPressed: () =>
-                        ref.read(catalogueProvider.notifier).fetchCatalogue(),
+                        LocationService().getCurrentPosition().then((pos) {
+                          ref.read(catalogueProvider.notifier).fetchCatalogue(
+                            latitude: pos?.latitude,
+                            longitude: pos?.longitude,
+                          );
+                        }),
                     child: Text('common.retry'.tr(),
                         style: const TextStyle(fontSize: 12, color: _AppColors.accent)),
                   ),

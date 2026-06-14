@@ -67,7 +67,8 @@ class FareCalculator {
 
   // Format a fare amount with its currency
   static String formatFare(double amount, String currency) {
-    return '${amount.toStringAsFixed(3)} $currency';
+    final decimals = const {'EUR', 'GBP', 'USD'}.contains(currency) ? 2 : 3;
+    return '${amount.toStringAsFixed(decimals)} $currency';
   }
 
   // Estimated duration for a given distance (30 km/h average for delivery)
