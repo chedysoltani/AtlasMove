@@ -21,6 +21,7 @@ class Rendezvous {
   final double? finalFare;
   final String? currency;
   final double? commissionAmount;
+  final DateTime? completedAt;
 
   // Delivery-specific fields (null for standard RDV services)
   final String? destinationAddress;
@@ -54,6 +55,7 @@ class Rendezvous {
     this.finalFare,
     this.currency,
     this.commissionAmount,
+    this.completedAt,
     this.destinationAddress,
     this.destinationLatitude,
     this.destinationLongitude,
@@ -139,6 +141,9 @@ class Rendezvous {
       currency: json['currency']?.toString(),
       commissionAmount: double.tryParse(
           json['commission_amount']?.toString() ?? ''),
+      completedAt: json['completed_at'] != null
+          ? DateTime.tryParse(json['completed_at'].toString())
+          : null,
       destinationAddress: json['destination_address']?.toString(),
       destinationLatitude: double.tryParse(
           json['destination_latitude']?.toString() ?? ''),

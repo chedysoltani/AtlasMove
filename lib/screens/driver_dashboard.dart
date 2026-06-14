@@ -16,7 +16,11 @@ import '../services/call_service.dart';
 import '../services/trip_service.dart';
 import '../services/subscription_service.dart';
 import '../services/driver_service.dart';
+import '../services/location_service.dart';
+import '../services/service_api.dart';
+import '../models/service_models.dart';
 import '../core/network/http_client.dart';
+import '../core/storage/token_storage.dart';
 import '../widgets/notification_sheet.dart';
 import 'driver_active_ride.dart';
 
@@ -73,10 +77,14 @@ class _DriverDashboardState extends State<DriverDashboard>
   // Animation
   late AnimationController _onlineAnimController;
 
-  // Stats (static for now)
-  final double _todayEarnings = 325.50;
-  final int _todayRides = 8;
-  final double _rating = 4.8;
+  // Stats — loaded from API
+  double _todayEarnings = 0.0;
+  int _todayRides = 0;
+  String _statsCurrency = 'TND';
+  bool _statsLoading = false;
+
+  // Driver service type (null = loading)
+  String? _driverTransportType;
 
   @override
   void initState() {
@@ -94,6 +102,8 @@ class _DriverDashboardState extends State<DriverDashboard>
       _resumeActiveRideIfAny();
       _subService.fetchStatus();
       DriverService.loadAvailability();
+      _loadDriverServiceType();
+      _loadDailyStats();
     });
     NotificationService().initialize();
     CallService().connectSocket();
@@ -545,6 +555,24 @@ class _DriverDashboardState extends State<DriverDashboard>
                         letterSpacing: 0.8,
                       ),
                     ),
+                    const SizedBox(width: 6),
+                    GestureDetector(
+                      onTap: _statsLoading ? null : _loadDailyStats,
+                      child: _statsLoading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.8,
+                                color: Color(0xFF9BA3B4),
+                              ),
+                            )
+                          : const Icon(
+                              Icons.refresh_rounded,
+                              size: 16,
+                              color: Color(0xFF9BA3B4),
+                            ),
+                    ),
                     const Spacer(),
                     Text(
                       _isOnline ? '● ${'driver.status_online'.tr()}' : '● ${'driver.status_offline'.tr()}',
@@ -566,7 +594,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                   children: [
                     _buildStatChip(
                       icon: Icons.account_balance_wallet_rounded,
-                      value: '${_todayEarnings.toStringAsFixed(0)} TND',
+                      value: '${_todayEarnings.toStringAsFixed(2)} $_statsCurrency',
                       label: 'nav.earnings'.tr(),
                       color: const Color(0xFF22C55E),
                     ),
@@ -576,13 +604,6 @@ class _DriverDashboardState extends State<DriverDashboard>
                       value: '$_todayRides',
                       label: 'nav.rides'.tr(),
                       color: const Color(0xFF3B82F6),
-                    ),
-                    const SizedBox(width: 10),
-                    _buildStatChip(
-                      icon: Icons.star_rounded,
-                      value: '$_rating',
-                      label: 'driver.rating'.tr(),
-                      color: const Color(0xFFF59E0B),
                     ),
                   ],
                 ),
@@ -905,6 +926,44 @@ class _DriverDashboardState extends State<DriverDashboard>
   // MENU
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+  Future<void> _loadDailyStats() async {
+    if (!mounted) return;
+    setState(() => _statsLoading = true);
+    double? lat, lng;
+    try {
+      final pos = await LocationService().getCurrentPosition();
+      if (pos != null) {
+        lat = pos.latitude;
+        lng = pos.longitude;
+      }
+    } catch (_) {}
+    final stats = await DriverService.fetchDailyStats(latitude: lat, longitude: lng);
+    if (mounted) {
+      setState(() {
+        _statsLoading = false;
+        if (stats != null) {
+          _todayEarnings = stats['today_earnings'] as double;
+          _todayRides = stats['today_rides'] as int;
+          _statsCurrency = stats['currency'] as String;
+        }
+      });
+    }
+  }
+
+  Future<void> _loadDriverServiceType() async {
+    try {
+      final token = await TokenStorage.getAccessToken() ?? '';
+      final assignment = await ServiceApi.getCurrentAssignment(token: token);
+      if (mounted && assignment != null) {
+        setState(() => _driverTransportType = assignment.transportType);
+      }
+    } catch (_) {}
+  }
+
+  bool get _isTaxiDriver =>
+      _driverTransportType != null &&
+      TransportTypeConstants.taxiSlugs.contains(_driverTransportType);
+
   void _showMenu() {
     showModalBottomSheet(
       context: context,
@@ -956,11 +1015,18 @@ class _DriverDashboardState extends State<DriverDashboard>
               Navigator.pop(context);
               Navigator.pushNamed(context, '/driver_profile');
             }),
-            _buildMenuTile(Icons.card_membership_rounded, 'driver.subscription_menu'.tr(),
-                'driver.subscription_subtitle'.tr(), () {
-              Navigator.pop(context);
-              Navigator.pushNamed(context, '/driver_subscription');
-            }),
+            if (_isTaxiDriver)
+              _buildMenuTile(Icons.card_membership_rounded, 'driver.subscription_menu'.tr(),
+                  'driver.subscription_subtitle'.tr(), () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/driver_subscription');
+              })
+            else
+              _buildMenuTile(Icons.percent_rounded, 'Commission 10%',
+                  'Payable chaque mois — compte désactivé sinon', () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/driver_earnings');
+              }),
             _buildMenuTile(Icons.star_rounded, 'driver.offers_menu'.tr(),
                 'driver.offers_subtitle'.tr(), () {
               Navigator.pop(context);

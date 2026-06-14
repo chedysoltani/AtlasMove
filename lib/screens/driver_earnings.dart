@@ -5,6 +5,8 @@ import '../models/commission_models.dart';
 import '../models/rendezvous_models.dart';
 import '../services/rendezvous_stats_service.dart';
 import '../services/rendezvous_service.dart';
+import '../services/location_service.dart';
+import 'driver_commission_payment_screen.dart';
 
 const _orange = Color(0xFFFF6B35);
 const _orangeLight = Color(0xFFFF8C42);
@@ -47,7 +49,18 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
       _error = null;
     });
     try {
-      final stats = await _statsService.fetchCommissionStats(_monthParam);
+      double? lat;
+      double? lng;
+      final pos = await LocationService().getCurrentPosition();
+      if (pos != null) {
+        lat = pos.latitude;
+        lng = pos.longitude;
+      }
+      final stats = await _statsService.fetchCommissionStats(
+        _monthParam,
+        latitude: lat,
+        longitude: lng,
+      );
       if (stats != null) {
         setState(() {
           _stats = stats;
@@ -401,7 +414,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               ),
             ],
           ),
-          if (!isPaid && commission > 0) ...[
+          if (!isPaid && commission >= 0) ...[
             const SizedBox(height: 14),
             Container(
               padding:
@@ -427,6 +440,40 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CommissionPaymentScreen(
+                        month: _monthParam,
+                        commissionDue: commission,
+                        currency: currency,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.account_balance_wallet_rounded,
+                    size: 18, color: Colors.white),
+                label: Text(
+                  'Payer maintenant — ${commission.toStringAsFixed(2)} $currency',
+                  style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _orange,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
               ),
             ),
           ],

@@ -7,7 +7,7 @@ import 'driver_rides.dart';
 import 'driver_active_ride.dart';
 import 'driver_profile.dart';
 import 'driver_rendezvous_screen.dart';
-import 'services_screen.dart';
+import 'services_catalogue_screen.dart';
 import '../services/trip_service.dart';
 import '../models/trip_models.dart';
 
@@ -38,7 +38,7 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
         },
       ),
       const DriverRendezvousScreen(),
-      const ServicesScreen(),
+      const ServicesCatalogueScreen(),
       const DriverProfileScreen(),
     ];
     WidgetsBinding.instance.addObserver(this);

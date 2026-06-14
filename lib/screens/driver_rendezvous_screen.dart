@@ -905,6 +905,7 @@ class _PlanningTabState extends State<_PlanningTab>
   bool _isLoading = true;
   String? _error;
   final Set<String> _releasingIds = {};
+  final Set<String> _completingIds = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -956,6 +957,33 @@ class _PlanningTabState extends State<_PlanningTab>
     }
   }
 
+  Future<void> _complete(Rendezvous rdv) async {
+    final confirmed = await _confirmDialog(
+      context,
+      icon: Icons.task_alt_rounded,
+      iconColor: const Color(0xFF22C55E),
+      title: 'Terminer le rendez-vous',
+      subtitle: DateFormat('dd/MM/yyyy à HH:mm', 'fr').format(rdv.scheduledAt),
+      confirmLabel: 'Terminer',
+      confirmColor: const Color(0xFF22C55E),
+    );
+    if (confirmed != true) return;
+
+    HapticFeedback.lightImpact();
+    setState(() => _completingIds.add(rdv.id));
+    try {
+      await RendezvousService.completeRendezvous(rdv.id);
+      if (mounted) {
+        _showSnack(context, 'Rendez-vous terminé');
+        _load();
+      }
+    } catch (e) {
+      if (mounted) _showSnack(context, '${'common.error'.tr()} : $e', success: false);
+    } finally {
+      if (mounted) setState(() => _completingIds.remove(rdv.id));
+    }
+  }
+
   void _copyCoords(Rendezvous rdv) {
     Clipboard.setData(ClipboardData(text: '${rdv.latitude}, ${rdv.longitude}'));
     _showSnack(context, 'rdv.address'.tr()); // TODO: add translation key for "Coordonnées copiées"
@@ -985,7 +1013,9 @@ class _PlanningTabState extends State<_PlanningTab>
               _PlanningCard(
                 rdv: rdv,
                 isReleasing: _releasingIds.contains(rdv.id),
+                isCompleting: _completingIds.contains(rdv.id),
                 onRelease: () => _release(rdv),
+                onComplete: () => _complete(rdv),
                 onNavigate: () => _copyCoords(rdv),
               ),
             ],
@@ -1092,13 +1122,17 @@ class _PlanningTabState extends State<_PlanningTab>
 class _PlanningCard extends StatelessWidget {
   final Rendezvous rdv;
   final bool isReleasing;
+  final bool isCompleting;
   final VoidCallback onRelease;
+  final VoidCallback onComplete;
   final VoidCallback onNavigate;
 
   const _PlanningCard({
     required this.rdv,
     required this.isReleasing,
+    required this.isCompleting,
     required this.onRelease,
+    required this.onComplete,
     required this.onNavigate,
   });
 
@@ -1258,6 +1292,34 @@ class _PlanningCard extends StatelessWidget {
                   ),
                 ),
               ]),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: isCompleting ? null : onComplete,
+                  icon: isCompleting
+                      ? const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.task_alt_rounded,
+                          size: 16, color: Colors.white),
+                  label: Text(
+                    isCompleting ? 'common.loading'.tr() : 'Terminer',
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        fontSize: 13),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _green,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,

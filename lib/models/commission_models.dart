@@ -1,5 +1,70 @@
 import '../models/service_models.dart';
 
+class CommissionPaymentInfo {
+  final String walletAddress;
+  final String network;
+  final double amount;
+  final String currency;
+  final String month;
+  final bool commissionPaid;
+
+  const CommissionPaymentInfo({
+    required this.walletAddress,
+    required this.network,
+    required this.amount,
+    required this.currency,
+    required this.month,
+    required this.commissionPaid,
+  });
+
+  factory CommissionPaymentInfo.fromJson(Map<String, dynamic> json) {
+    return CommissionPaymentInfo(
+      walletAddress: json['wallet_address']?.toString() ?? '',
+      network: json['network']?.toString() ?? '',
+      amount: double.tryParse(json['amount']?.toString() ?? '0') ?? 0,
+      currency: json['currency']?.toString() ?? 'TND',
+      month: json['month']?.toString() ?? '',
+      commissionPaid: json['commission_paid'] == true,
+    );
+  }
+}
+
+class CommissionPaymentRecord {
+  final String id;
+  final String month;
+  final double amount;
+  final String currency;
+  final String transactionHash;
+  final String status; // "pending_verification" | "paid" | "rejected"
+  final DateTime? paidAt;
+
+  const CommissionPaymentRecord({
+    required this.id,
+    required this.month,
+    required this.amount,
+    required this.currency,
+    required this.transactionHash,
+    required this.status,
+    this.paidAt,
+  });
+
+  bool get isPaid => status == 'paid';
+  bool get isPending => status == 'pending_verification';
+  bool get isRejected => status == 'rejected';
+
+  factory CommissionPaymentRecord.fromJson(Map<String, dynamic> json) {
+    return CommissionPaymentRecord(
+      id: json['id']?.toString() ?? '',
+      month: json['month']?.toString() ?? '',
+      amount: double.tryParse(json['amount']?.toString() ?? '0') ?? 0,
+      currency: json['currency']?.toString() ?? 'TND',
+      transactionHash: json['transaction_hash']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'pending_verification',
+      paidAt: json['paid_at'] != null ? DateTime.tryParse(json['paid_at'].toString()) : null,
+    );
+  }
+}
+
 class CommissionBreakdownItem {
   final String serviceName;
   final String transportType;

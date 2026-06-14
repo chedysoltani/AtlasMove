@@ -262,6 +262,23 @@ class RendezvousService {
     }
   }
 
+  static Future<void> completeRendezvous(String id) async {
+    debugPrint('=== RendezvousService.completeRendezvous() id=$id ===');
+    try {
+      final response = await HttpClient.patch('/m/rendezvous/$id/complete');
+      if (!response.isSuccess) {
+        throw RendezvousException(
+          message: response.json['message'] ?? 'Erreur complétion',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      debugPrint('ERREUR completeRendezvous: $e');
+      if (e is RendezvousException) rethrow;
+      throw RendezvousException(message: e.toString());
+    }
+  }
+
   static Future<void> rejectBooking(String id) async {
     debugPrint('=== RendezvousService.rejectBooking() id=$id ===');
     try {

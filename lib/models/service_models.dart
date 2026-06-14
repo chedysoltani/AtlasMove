@@ -182,6 +182,7 @@ class ServiceAssignment {
   final String id;
   final String serviceId;
   final String serviceName;
+  final String? transportType;
   final String driverId;
   final String status;
   final String? documentUrl;
@@ -195,6 +196,7 @@ class ServiceAssignment {
     required this.id,
     required this.serviceId,
     required this.serviceName,
+    this.transportType,
     required this.driverId,
     required this.status,
     this.documentUrl,
@@ -242,10 +244,20 @@ class ServiceAssignment {
       
       // Parsing du service avec null safety
       String serviceName = 'Service inconnu';
+      String? transportType;
       final service = assignmentData['service'];
       if (service is Map<String, dynamic>) {
         serviceName = service['name']?.toString() ?? 'Service inconnu';
+        // transport_type peut être direct sur service OU nested dans service.category
+        transportType = service['transport_type']?.toString();
+        if (transportType == null) {
+          final category = service['category'];
+          if (category is Map<String, dynamic>) {
+            transportType = category['transport_type']?.toString();
+          }
+        }
       }
+      print('DEBUG: ServiceAssignment.fromJson - transportType=$transportType');
       
       final driverId = assignmentData['livreur_id']?.toString() ?? '';
       final status = assignmentData['status']?.toString() ?? '';
@@ -291,6 +303,7 @@ class ServiceAssignment {
         id: id,
         serviceId: serviceId,
         serviceName: serviceName,
+        transportType: transportType,
         driverId: driverId,
         status: status,
         documentUrl: documentUrl?.isEmpty ?? true ? null : documentUrl,

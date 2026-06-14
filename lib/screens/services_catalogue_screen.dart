@@ -61,11 +61,7 @@ class _ServicesCatalogueScreenState
       backgroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
-      leading: GestureDetector(
-        onTap: () => Navigator.pop(context),
-        child: const Icon(Icons.arrow_back_ios_new_rounded,
-            color: Colors.black, size: 20),
-      ),
+      automaticallyImplyLeading: false,
       title: const Text(
         'Catalogue',
         style: TextStyle(
@@ -81,13 +77,28 @@ class _ServicesCatalogueScreenState
             _fetchWithGps(notifier);
           },
           child: Container(
-            margin: const EdgeInsets.only(right: 16),
+            margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: _orange.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.refresh_rounded, color: _orange, size: 20),
+          ),
+        ),
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            Navigator.pushNamed(context, '/services_assignments');
+          },
+          child: Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.history_rounded, color: _orange, size: 20),
           ),
         ),
       ],
