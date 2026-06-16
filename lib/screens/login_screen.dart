@@ -185,7 +185,9 @@ class _LoginScreenState extends State<LoginScreen>
                       _animated(1, _buildEmailField()),
                       const SizedBox(height: 12),
                       _animated(2, _buildPasswordField()),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 10),
+                      _animated(2, _buildForgotPassword()),
+                      const SizedBox(height: 18),
                       _animated(3, _buildLoginButton()),
                       const SizedBox(height: 16),
                       _animated(4, _buildSignupRow()),
@@ -544,6 +546,25 @@ class _LoginScreenState extends State<LoginScreen>
           fillColor: Colors.white,
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        ),
+      ),
+    );
+  }
+
+  // ── Forgot password ───────────────────────────────────────────────────────
+
+  Widget _buildForgotPassword() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: GestureDetector(
+        onTap: () => Navigator.pushNamed(context, '/reset_password_request'),
+        child: Text(
+          'Mot de passe oublié ?',
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: _orange,
+          ),
         ),
       ),
     );

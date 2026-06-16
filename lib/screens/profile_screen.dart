@@ -225,6 +225,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                               ]),
                               const SizedBox(height: 16),
                               _languageButton(),
+                              const SizedBox(height: 12),
+                              _supportButton(),
                               const SizedBox(height: 28),
                               _saveButton(),
                             ],
@@ -536,6 +538,20 @@ class _ProfileScreenState extends State<ProfileScreen>
       onPressed: () => Navigator.pushNamed(context, '/language'),
       icon: const Icon(Icons.language_rounded),
       label: Text('profile.language'.tr()),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 50),
+        side: const BorderSide(color: _border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        foregroundColor: _orange,
+      ),
+    );
+  }
+
+  Widget _supportButton() {
+    return OutlinedButton.icon(
+      onPressed: () => Navigator.pushNamed(context, '/support'),
+      icon: const Icon(Icons.support_agent_rounded),
+      label: const Text('Centre d\'aide'),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(double.infinity, 50),
         side: const BorderSide(color: _border),

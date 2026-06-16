@@ -241,6 +241,58 @@ class AuthService {
     }
   }
 
+  /// Demande de réinitialisation par email (envoie un lien avec token)
+  static Future<void> requestPasswordReset({required String email}) async {
+    try {
+      final response = await HttpClient.post(
+        '/m/auth/forgot-password',
+        body: {'email': email.trim()},
+      );
+      if (!response.isSuccess) {
+        final msg = response.json['message']?.toString() ?? 'Erreur lors de la demande';
+        throw NetworkException(msg);
+      }
+    } on NetworkException {
+      rethrow;
+    } catch (e) {
+      throw NetworkException('Erreur lors de la demande de réinitialisation: $e');
+    }
+  }
+
+  /// Réinitialisation du mot de passe avec le token reçu par email
+  static Future<void> verifyPasswordReset({
+    required String token,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    try {
+      if (newPassword.length < 8) {
+        throw ServiceValidationException(['Le mot de passe doit contenir au moins 8 caractères']);
+      }
+      if (newPassword != confirmPassword) {
+        throw ServiceValidationException(['Les mots de passe ne correspondent pas']);
+      }
+      final response = await HttpClient.post(
+        '/m/auth/reset-password',
+        body: {
+          'token': token.trim(),
+          'password': newPassword,
+          'password_confirmation': confirmPassword,
+        },
+      );
+      if (!response.isSuccess) {
+        final msg = response.json['message']?.toString() ?? 'Token invalide ou expiré';
+        throw NetworkException(msg);
+      }
+    } on ServiceValidationException {
+      rethrow;
+    } on NetworkException {
+      rethrow;
+    } catch (e) {
+      throw NetworkException('Erreur lors de la réinitialisation: $e');
+    }
+  }
+
   /// Demande de réinitialisation de mot de passe
   static Future<void> forgotPassword(String email) async {
     try {

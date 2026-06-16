@@ -414,7 +414,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               ),
             ],
           ),
-          if (!isPaid && commission >= 0) ...[
+          if (!isPaid && commission > 0) ...[
             const SizedBox(height: 14),
             Container(
               padding:
