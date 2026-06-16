@@ -2,6 +2,79 @@ import 'package:flutter/foundation.dart';
 import '../core/network/http_client.dart';
 import '../models/driver_subscription_models.dart';
 
+// ── Manual USDT payment service (hash submission flow) ─────────────────────
+
+class SubscriptionPaymentService {
+  static Future<SubscriptionPaymentInfo?> fetchPaymentInfo() async {
+    try {
+      final response = await HttpClient.get('/m/livreur/subscription/payment-info');
+      debugPrint('💳 sub payment-info status=${response.statusCode}');
+      if (!response.isSuccess) return null;
+
+      final raw = response.json;
+      Map<String, dynamic> data;
+      final outer = raw['data'];
+      if (outer is Map<String, dynamic>) {
+        final inner = outer['data'];
+        data = (inner is Map<String, dynamic>) ? inner : outer;
+      } else {
+        data = raw;
+      }
+      debugPrint('💳 sub payment-info parsed: $data');
+      return SubscriptionPaymentInfo.fromJson(data);
+    } catch (e) {
+      debugPrint('⚠️ fetchSubscriptionPaymentInfo: $e');
+      return null;
+    }
+  }
+
+  static Future<List<SubscriptionPaymentRecord>> fetchPaymentHistory() async {
+    try {
+      final response = await HttpClient.get('/m/livreur/subscription/payment-history');
+      debugPrint('💳 sub payment-history status=${response.statusCode}');
+      if (!response.isSuccess) return [];
+
+      final raw = response.json;
+      List list = [];
+      final outer = raw['data'];
+      if (outer is List) {
+        list = outer;
+      } else if (outer is Map<String, dynamic>) {
+        final inner = outer['data'];
+        list = (inner is List) ? inner : [];
+      }
+      return list
+          .map((j) => SubscriptionPaymentRecord.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('⚠️ fetchSubscriptionPaymentHistory: $e');
+      return [];
+    }
+  }
+
+  static Future<void> submitPayment({
+    required String transactionHash,
+    required double amount,
+    required String currency,
+  }) async {
+    final response = await HttpClient.post(
+      '/m/livreur/subscription/submit-payment',
+      body: {
+        'transaction_hash': transactionHash,
+        'amount': amount,
+        'currency': currency,
+      },
+    );
+    debugPrint('💳 sub submit-payment status=${response.statusCode} body=${response.json}');
+    if (!response.isSuccess) {
+      final msg = response.json['message']?.toString() ??
+          response.json['data']?['message']?.toString() ??
+          'Erreur lors de la soumission';
+      throw Exception(msg);
+    }
+  }
+}
+
 class PrivilegeService {
   static Future<PrivilegeDashboard> getDashboard() async {
     final response = await HttpClient.get('/m/livreur/subscription/dashboard');

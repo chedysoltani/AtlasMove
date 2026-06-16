@@ -60,6 +60,7 @@ import 'services/call_service.dart';
 import 'screens/reset_password_request_screen.dart';
 import 'screens/reset_password_verify_screen.dart';
 import 'screens/support_screen.dart';
+import 'screens/driver_subscription_payment_screen.dart';
 import 'services/location_foreground_service.dart';
 import 'core/network/http_client.dart';
 
@@ -258,6 +259,7 @@ class AtlasMoveApp extends StatelessWidget {
             '/landing': (context) => const LandingScreen(),
             '/login': (context) => const LoginScreen(),
             '/support': (context) => const SupportScreen(),
+            '/subscription_payment': (context) => const DriverSubscriptionPaymentScreen(),
             '/reset_password_request': (context) => const ResetPasswordRequestScreen(),
             '/reset_password_verify': (context) {
               final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;

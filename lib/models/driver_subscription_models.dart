@@ -242,6 +242,70 @@ class ClientLoyaltyStatus {
           );
 }
 
+// ─── Subscription Payment (USDT TRC20 — manual hash flow) ───────────────────
+
+class SubscriptionPaymentInfo {
+  final String walletAddress;
+  final String network;
+  final double amount;
+  final String currency;
+  final bool subscriptionActive;
+
+  const SubscriptionPaymentInfo({
+    required this.walletAddress,
+    required this.network,
+    required this.amount,
+    required this.currency,
+    required this.subscriptionActive,
+  });
+
+  factory SubscriptionPaymentInfo.fromJson(Map<String, dynamic> json) {
+    return SubscriptionPaymentInfo(
+      walletAddress: json['wallet_address']?.toString() ?? '',
+      network: json['network']?.toString() ?? 'TRC20',
+      amount: double.tryParse(json['amount']?.toString() ?? '90') ?? 90.0,
+      currency: json['currency']?.toString() ?? 'USDT',
+      subscriptionActive: json['subscription_active'] == true,
+    );
+  }
+}
+
+class SubscriptionPaymentRecord {
+  final String id;
+  final double amount;
+  final String currency;
+  final String transactionHash;
+  final String status; // "pending_verification" | "paid" | "rejected"
+  final DateTime? paidAt;
+  final DateTime? createdAt;
+
+  const SubscriptionPaymentRecord({
+    required this.id,
+    required this.amount,
+    required this.currency,
+    required this.transactionHash,
+    required this.status,
+    this.paidAt,
+    this.createdAt,
+  });
+
+  bool get isPaid => status == 'paid';
+  bool get isPending => status == 'pending_verification';
+  bool get isRejected => status == 'rejected';
+
+  factory SubscriptionPaymentRecord.fromJson(Map<String, dynamic> json) {
+    return SubscriptionPaymentRecord(
+      id: json['id']?.toString() ?? '',
+      amount: double.tryParse(json['amount']?.toString() ?? '90') ?? 90.0,
+      currency: json['currency']?.toString() ?? 'USDT',
+      transactionHash: json['transaction_hash']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'pending_verification',
+      paidAt: json['paid_at'] != null ? DateTime.tryParse(json['paid_at'].toString()) : null,
+      createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
+    );
+  }
+}
+
 // ─── Crypto Subscription Session (USDT TRC20) ────────────────────────────────
 
 class CryptoSubscriptionSession {

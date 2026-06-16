@@ -621,204 +621,345 @@ class _AvailableCard extends StatelessWidget {
     required this.onPropose,
   });
 
+  static const _green = Color(0xFF22C55E);
+  static const _red = Color(0xFFEF4444);
+  static const _amber = Color(0xFFF59E0B);
+  static const _blue = Color(0xFF3B82F6);
+
   @override
   Widget build(BuildContext context) {
+    final hasDestination = rdv.destinationAddress != null && rdv.destinationAddress!.isNotEmpty;
+    final hasFare = rdv.estimatedFare != null;
+    final currency = rdv.currency ?? 'TND';
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         children: [
-          // Date header
+
+          // ── Header: date + badges ──────────────────────────────────
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: _orange.withOpacity(0.06),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 34, height: 34,
                   decoration: BoxDecoration(
-                    color: _orange.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(9),
+                    color: _orange.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.event_available_rounded,
-                      color: _orange, size: 16),
+                      color: _orange, size: 18),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    DateFormat('EEEE dd MMM yyyy • HH:mm', 'fr')
-                        .format(rdv.scheduledAt),
-                    style: GoogleFonts.poppins(
-                      color: _orange,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        DateFormat('EEEE dd MMM yyyy', 'fr').format(rdv.scheduledAt),
+                        style: GoogleFonts.poppins(
+                            color: _orange, fontWeight: FontWeight.w700, fontSize: 13),
+                      ),
+                      Text(
+                        DateFormat('HH:mm', 'fr').format(rdv.scheduledAt),
+                        style: GoogleFonts.poppins(
+                            color: _orange.withOpacity(0.7),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12),
+                      ),
+                    ],
                   ),
                 ),
+                if (rdv.isNegotiable)
+                  Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _indigo.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _indigo.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.handshake_rounded, color: _indigo, size: 12),
+                        const SizedBox(width: 4),
+                        Text('Négociable',
+                            style: GoogleFonts.poppins(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: _indigo)),
+                      ],
+                    ),
+                  ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B).withOpacity(0.12),
+                    color: _amber.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     'rdv.pending'.tr(),
                     style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFFF59E0B),
-                    ),
+                        fontSize: 11, fontWeight: FontWeight.w700, color: _amber),
                   ),
                 ),
               ],
             ),
           ),
-          // Details
+
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _infoRow(
-                  rdv.isDelivery
-                      ? Icons.local_shipping_rounded
-                      : Icons.local_taxi_rounded,
-                  rdv.serviceName,
-                  bold: true,
+
+                // ── Service ──────────────────────────────────────────
+                Row(
+                  children: [
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: _navy.withOpacity(0.07),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        rdv.isDelivery
+                            ? Icons.local_shipping_rounded
+                            : Icons.local_taxi_rounded,
+                        color: _navy,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        rdv.serviceName,
+                        style: GoogleFonts.poppins(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: _textPrimary),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                // Delivery: show route pickup → destination
-                if (rdv.isDelivery) ...[
-                  _infoRow(Icons.location_on_rounded, rdv.address,
-                      iconColor: _orange),
-                  if (rdv.destinationAddress != null) ...[
-                    const SizedBox(height: 4),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 8),
-                      child: Row(
-                        children: [
+
+                const SizedBox(height: 14),
+                Divider(color: _border, height: 1, thickness: 1),
+                const SizedBox(height: 12),
+
+                // ── Route ────────────────────────────────────────────
+                _sectionLabel('Trajet', Icons.route_rounded),
+                const SizedBox(height: 10),
+
+                // Pickup
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Column(
+                      children: [
+                        Container(
+                          width: 10, height: 10,
+                          decoration: BoxDecoration(
+                              color: _orange, shape: BoxShape.circle),
+                        ),
+                        if (hasDestination) ...[
                           Container(
-                            width: 2,
-                            height: 16,
-                            margin: const EdgeInsets.only(left: 12),
-                            color: _border,
+                              width: 2, height: 28, color: _border),
+                          Container(
+                            width: 10, height: 10,
+                            decoration: BoxDecoration(
+                                color: _green, shape: BoxShape.circle),
                           ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            rdv.address,
+                            style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _textPrimary,
+                                height: 1.3),
+                          ),
+                          if (hasDestination) ...[
+                            const SizedBox(height: 22),
+                            Text(
+                              rdv.destinationAddress!,
+                              style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _textPrimary,
+                                  height: 1.3),
+                            ),
+                          ],
                         ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    _infoRow(Icons.flag_rounded, rdv.destinationAddress!,
-                        iconColor: const Color(0xFF22C55E)),
                   ],
-                  if (rdv.estimatedDistanceKm != null) ...[
-                    const SizedBox(height: 8),
-                    _infoRow(Icons.route_rounded,
-                        '${rdv.estimatedDistanceKm!.toStringAsFixed(1)} km estimés'),
+                ),
+
+                // Quick chips: distance, duration, weight
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    if (rdv.estimatedDistanceKm != null)
+                      _chip(Icons.route_rounded,
+                          '${rdv.estimatedDistanceKm!.toStringAsFixed(1)} km',
+                          const Color(0xFF6366F1)),
+                    _chip(Icons.timer_rounded,
+                        '${rdv.durationMinutes} min', _textSecondary),
+                    if (rdv.cargoWeightKg != null)
+                      _chip(Icons.scale_rounded,
+                          '${rdv.cargoWeightKg!.toStringAsFixed(0)} kg',
+                          _textSecondary),
+                    if (rdv.cargoSize != null && rdv.cargoSize!.isNotEmpty)
+                      _chip(Icons.category_rounded,
+                          _cargoSizeLabel(rdv.cargoSize!), _textSecondary),
+                    if (rdv.isFragile == true)
+                      _chip(Icons.warning_amber_rounded, 'FRAGILE', _red),
                   ],
-                ] else ...[
-                  _infoRow(Icons.location_on_rounded, rdv.address),
-                  const SizedBox(height: 8),
-                  _infoRow(Icons.timer_rounded, '${rdv.durationMinutes} minutes'),
-                ],
-                // Cargo info
+                ),
+
+                // ── Cargo details ─────────────────────────────────────
                 if (rdv.cargoDescription != null &&
                     rdv.cargoDescription!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Divider(color: _border, height: 1, thickness: 1),
+                  const SizedBox(height: 10),
+                  _sectionLabel('Marchandise', Icons.inventory_2_rounded),
                   const SizedBox(height: 8),
-                  _infoRow(Icons.inventory_2_rounded, rdv.cargoDescription!),
-                ],
-                if (rdv.cargoWeightKg != null) ...[
-                  const SizedBox(height: 8),
-                  _infoRow(Icons.scale_rounded,
-                      '${rdv.cargoWeightKg!.toStringAsFixed(0)} kg'),
-                ],
-                if (rdv.isFragile == true) ...[
-                  const SizedBox(height: 8),
-                  _infoRow(Icons.warning_amber_rounded, 'Colis FRAGILE',
-                      iconColor: const Color(0xFFEF4444)),
-                ],
-                // Estimated fare
-                if (rdv.estimatedFare != null) ...[
-                  const SizedBox(height: 8),
-                  _infoRow(
-                    Icons.payments_rounded,
-                    'Tarif estimé : ${FareCalculator.formatFare(rdv.estimatedFare!, rdv.currency ?? 'TND')}',
-                    bold: true,
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8F9FB),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _border),
+                    ),
+                    child: Text(
+                      rdv.cargoDescription!,
+                      style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: _textPrimary,
+                          height: 1.4),
+                    ),
                   ),
                 ],
-                if (rdv.clientName != null) ...[
+
+                // ── Client info ────────────────────────────────────────
+                if (rdv.clientName != null || rdv.clientPhone != null) ...[
+                  const SizedBox(height: 12),
+                  Divider(color: _border, height: 1, thickness: 1),
+                  const SizedBox(height: 10),
+                  _sectionLabel('Client', Icons.person_rounded),
                   const SizedBox(height: 8),
-                  _infoRow(Icons.person_rounded,
-                      'rdv.client_name'.tr(namedArgs: {'name': rdv.clientName!})),
+                  if (rdv.clientName != null)
+                    _infoRow(Icons.person_outline_rounded,
+                        rdv.clientName!, bold: true),
+                  if (rdv.clientPhone != null) ...[
+                    const SizedBox(height: 6),
+                    _infoRow(Icons.phone_rounded, rdv.clientPhone!,
+                        iconColor: _blue),
+                  ],
                 ],
-                if (rdv.clientPhone != null) ...[
-                  const SizedBox(height: 8),
-                  _infoRow(Icons.phone_rounded, rdv.clientPhone!,
-                      iconColor: const Color(0xFF3B82F6)),
-                ],
+
+                // ── Notes ─────────────────────────────────────────────
                 if (rdv.details != null && rdv.details!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Divider(color: _border, height: 1, thickness: 1),
+                  const SizedBox(height: 10),
+                  _sectionLabel('Notes', Icons.notes_rounded),
                   const SizedBox(height: 8),
-                  _infoRow(Icons.notes_rounded, rdv.details!),
-                ],
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6366F1).withOpacity(0.07),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: const Color(0xFF6366F1).withOpacity(0.22)),
+                  Text(
+                    rdv.details!,
+                    style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: _textSecondary,
+                        height: 1.5),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('🤝', style: TextStyle(fontSize: 20)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Contactez le client pour plus d\'informations '
-                          'et négociez les détails avant d\'accepter la mission.',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: const Color(0xFF4F46E5),
-                            height: 1.5,
-                            fontWeight: FontWeight.w500,
+                ],
+
+                // ── Tarif estimé ──────────────────────────────────────
+                if (hasFare) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.payments_rounded,
+                            color: Colors.white70, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Tarif estimé',
+                            style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: Colors.white54),
                           ),
                         ),
-                      ),
-                    ],
+                        Text(
+                          FareCalculator.formatFare(
+                              rdv.estimatedFare!, currency),
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: _orange,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
+
+                // ── Action buttons ────────────────────────────────────
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    // Propose counter-price
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: isAccepting ? null : onPropose,
                         icon: const Icon(Icons.edit_rounded,
                             size: 16, color: _indigo),
-                        label: Text(
-                          'Proposer',
-                          style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                              color: _indigo),
-                        ),
+                        label: Text('Proposer',
+                            style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: _indigo)),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           side: const BorderSide(color: _indigo),
@@ -828,7 +969,6 @@ class _AvailableCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    // Accept at client price
                     Expanded(
                       flex: 2,
                       child: DecoratedBox(
@@ -836,15 +976,14 @@ class _AvailableCard extends StatelessWidget {
                           gradient: isAccepting
                               ? null
                               : const LinearGradient(
-                                  colors: [Color(0xFF22C55E), Color(0xFF4ADE80)],
-                                ),
+                                  colors: [Color(0xFF22C55E), Color(0xFF4ADE80)]),
                           color: isAccepting ? _border : null,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: isAccepting
                               ? []
                               : [
                                   BoxShadow(
-                                    color: const Color(0xFF22C55E).withOpacity(0.3),
+                                    color: _green.withOpacity(0.3),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),
@@ -856,16 +995,20 @@ class _AvailableCard extends StatelessWidget {
                               ? const SizedBox(
                                   width: 16, height: 16,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: _textSecondary),
-                                )
+                                      strokeWidth: 2,
+                                      color: _textSecondary))
                               : const Icon(Icons.check_circle_rounded,
                                   color: Colors.white, size: 18),
                           label: Text(
-                            isAccepting ? 'common.loading'.tr() : 'rdv.accept'.tr(),
+                            isAccepting
+                                ? 'common.loading'.tr()
+                                : 'rdv.accept'.tr(),
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
-                              color: isAccepting ? _textSecondary : Colors.white,
+                              color: isAccepting
+                                  ? _textSecondary
+                                  : Colors.white,
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
@@ -887,6 +1030,54 @@ class _AvailableCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _chip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 5),
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String label, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 13, color: _textSecondary),
+        const SizedBox(width: 5),
+        Text(label.toUpperCase(),
+            style: GoogleFonts.poppins(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: _textSecondary,
+                letterSpacing: 0.8)),
+      ],
+    );
+  }
+
+  String _cargoSizeLabel(String size) {
+    switch (size) {
+      case 'small': return 'Petit';
+      case 'medium': return 'Moyen';
+      case 'large': return 'Grand';
+      case 'extra_large': return 'Très grand';
+      default: return size;
+    }
   }
 }
 

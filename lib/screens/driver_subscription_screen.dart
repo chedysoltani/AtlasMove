@@ -535,11 +535,11 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
-            onPressed: () => Navigator.pushNamed(context, '/driver_usdt_payment'),
-            icon: const Text('₮', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-            label: Text(
-              'sub.pay_crypto_btn'.tr(),
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            onPressed: () => Navigator.pushNamed(context, '/subscription_payment'),
+            icon: const Icon(Icons.currency_bitcoin_rounded, size: 20),
+            label: const Text(
+              'Payer en USDT (TRC20)',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,

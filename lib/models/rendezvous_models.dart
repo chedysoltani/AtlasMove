@@ -23,6 +23,9 @@ class Rendezvous {
   final double? commissionAmount;
   final DateTime? completedAt;
 
+  // Negotiation flag
+  final bool isNegotiable;
+
   // Delivery-specific fields (null for standard RDV services)
   final String? destinationAddress;
   final double? destinationLatitude;
@@ -56,6 +59,7 @@ class Rendezvous {
     this.currency,
     this.commissionAmount,
     this.completedAt,
+    this.isNegotiable = false,
     this.destinationAddress,
     this.destinationLatitude,
     this.destinationLongitude,
@@ -158,6 +162,7 @@ class Rendezvous {
           json['estimated_distance_km']?.toString() ?? ''),
       estimatedFare: double.tryParse(
           json['estimated_fare']?.toString() ?? ''),
+      isNegotiable: json['is_negotiable'] == true,
     );
   }
 }
