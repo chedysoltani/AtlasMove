@@ -29,13 +29,12 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
     if (_formKey.currentState!.validate() && _selectedVehicle != null) {
       // TODO: Finaliser l'inscription
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Inscription réussie ! Bienvenue chez AtlasMove.'),
+        SnackBar(
+          content: Text('signup.success_message'.tr()),
           backgroundColor: AppTheme.successColor,
         ),
       );
-      
-      // Rediriger vers la page de login
+
       Navigator.of(context).pushNamedAndRemoveUntil(
         '/login',
         (route) => false,
@@ -61,9 +60,9 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
           icon: const Icon(Icons.arrow_back, color: AppTheme.primaryColor),
           onPressed: _goToPreviousStep,
         ),
-        title: const Text(
-          'Étape 3/3',
-          style: TextStyle(
+        title: Text(
+          'signup.step3_title'.tr(),
+          style: const TextStyle(
             color: AppTheme.primaryColor,
             fontWeight: FontWeight.w600,
           ),
@@ -74,8 +73,8 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
             padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: Text(
-                'Livreur',
-                style: TextStyle(
+                'signup.driver_badge'.tr(),
+                style: const TextStyle(
                   color: AppTheme.primaryColor,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
@@ -111,30 +110,28 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
-              // Title
+
               Text(
-                'Type de véhicule',
+                'signup.vehicle_type_title'.tr(),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: AppTheme.textWhite,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              
+
               const SizedBox(height: 8),
-              
+
               Text(
-                'Sélectionnez le type de véhicule que vous utilisez pour vos livraisons',
+                'signup.vehicle_type_subtitle'.tr(),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.textSecondary,
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
-              // Form
+
               Form(
                 key: _formKey,
                 child: Column(
@@ -147,10 +144,9 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
                         });
                       },
                     ),
-                    
+
                     const SizedBox(height: 40),
-                    
-                    // Additional Vehicle Info (conditional)
+
                     if (_selectedVehicle == VehicleType.car) ...[
                       Container(
                         padding: const EdgeInsets.all(20),
@@ -163,7 +159,7 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Informations supplémentaires',
+                              'signup.additional_info'.tr(),
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 color: AppTheme.textWhite,
                                 fontWeight: FontWeight.w600,
@@ -171,7 +167,7 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              'Véhicule particulier ou professionnel ?',
+                              'signup.vehicle_private_or_pro'.tr(),
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: AppTheme.textSecondary,
                               ),
@@ -181,9 +177,9 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
                               children: [
                                 Expanded(
                                   child: CustomButton(
-                                    text: 'Particulier',
-                                    type: _selectedVehicle == VehicleType.car 
-                                        ? ButtonType.primary 
+                                    text: 'signup.private'.tr(),
+                                    type: _selectedVehicle == VehicleType.car
+                                        ? ButtonType.primary
                                         : ButtonType.outline,
                                     onPressed: () {
                                       // TODO: Gérer le type de véhicule
@@ -194,7 +190,7 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: CustomButton(
-                                    text: 'Professionnel',
+                                    text: 'signup.professional'.tr(),
                                     type: ButtonType.outline,
                                     onPressed: () {
                                       // TODO: Gérer le type de véhicule
@@ -208,15 +204,14 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
                         ),
                       ),
                     ],
-                    
+
                     const SizedBox(height: 40),
-                    
-                    // Navigation Buttons
+
                     Row(
                       children: [
                         Expanded(
                           child: CustomButton(
-                            text: 'Précédent',
+                            text: 'common.previous'.tr(),
                             onPressed: _goToPreviousStep,
                             type: ButtonType.outline,
                             height: 56,
@@ -225,7 +220,7 @@ class _SignupStep3VehicleState extends State<SignupStep3Vehicle> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: CustomButton(
-                            text: 'Valider / S\'inscrire',
+                            text: 'signup.validate_register'.tr(),
                             onPressed: _completeSignup,
                             height: 56,
                           ),

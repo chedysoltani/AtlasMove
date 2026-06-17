@@ -74,6 +74,7 @@ class HttpClient {
     Map<String, dynamic>? body,
     Map<String, dynamic>? queryParams,
     bool isMultipart = false,
+    bool skipAutoRefresh = false,
   }) async {
     return _makeRequest(
       'POST',
@@ -82,6 +83,7 @@ class HttpClient {
       body: body,
       queryParams: queryParams,
       isMultipart: isMultipart,
+      skipAutoRefresh: skipAutoRefresh,
     );
   }
 
@@ -157,6 +159,7 @@ class HttpClient {
     Map<String, dynamic>? queryParams,
     bool isMultipart = false,
     bool isRetry = false,
+    bool skipAutoRefresh = false,
   }) async {
     try {
       // Refresh proactif si le token est sur le point d'expirer (≥13 min)
@@ -230,8 +233,8 @@ class HttpClient {
         headers: response.headers,
       );
       
-      // Auto-refresh sur 401 (token expiré)
-      if (response.statusCode == 401 && !isRetry) {
+      // Auto-refresh sur 401 (token expiré) — ignoré pour les endpoints publics
+      if (response.statusCode == 401 && !isRetry && !skipAutoRefresh) {
         final newToken = await _tryRefresh();
         if (newToken != null) {
           // Retry la requête originale avec le nouveau token

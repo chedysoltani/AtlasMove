@@ -62,9 +62,9 @@ class _ServicesCatalogueScreenState
       elevation: 0,
       centerTitle: true,
       automaticallyImplyLeading: false,
-      title: const Text(
-        'Catalogue',
-        style: TextStyle(
+      title: Text(
+        'services.catalogue'.tr(),
+        style: const TextStyle(
           color: Colors.black,
           fontSize: 17,
           fontWeight: FontWeight.w700,
@@ -240,108 +240,120 @@ class _ServicesCatalogueScreenState
   Widget _serviceItem(
       BuildContext context, Service service, int index, int total) {
     final isLast = index == total - 1;
+    final hasImage = service.imageUrl != null && service.imageUrl!.isNotEmpty;
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Column(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: service.isActive
-                          ? const Color(0xFF22C55E).withOpacity(0.1)
-                          : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      service.isActive
-                          ? Icons.check_circle_outline_rounded
-                          : Icons.block_rounded,
-                      size: 16,
-                      color: service.isActive
-                          ? const Color(0xFF22C55E)
-                          : Colors.grey.shade400,
-                    ),
-                  ),
-                ],
+              // ─ Image / fallback icon ─
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: hasImage
+                    ? Image.network(
+                        service.imageUrl!,
+                        width: 68,
+                        height: 68,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _serviceFallbackIcon(service),
+                      )
+                    : _serviceFallbackIcon(service),
               ),
               const SizedBox(width: 12),
+
+              // ─ Info ─
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            service.name,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                        _smallBadge(service.transportType, _orange),
-                      ],
+                    Text(
+                      service.name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
                     ),
-                    if (service.description != null) ...[
+                    if (service.basePrice != null) ...[
                       const SizedBox(height: 3),
                       Text(
-                        service.description!,
+                        '${service.basePrice!.toStringAsFixed(2)} ${service.currency ?? 'EUR'}'
+                        '${service.pricePerKm != null ? ' + ${service.pricePerKm!.toStringAsFixed(2)} ${service.currency ?? 'EUR'}/km' : ''}',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade500,
-                          height: 1.4,
+                          fontWeight: FontWeight.w500,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
-                        _smallBadge(service.pricingModel, const Color(0xFF3B82F6)),
+                        _smallBadge(_pricingLabel(service.pricingModel),
+                            const Color(0xFF3B82F6)),
                         if (service.requiresDocument) ...[
                           const SizedBox(width: 5),
                           _smallBadge('Doc', Colors.orange.shade700),
                         ],
-                        const Spacer(),
-                        if (service.basePrice != null)
-                          Text(
-                            '${service.basePrice!.toStringAsFixed(2)} ${service.currency}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.black,
-                            ),
-                          ),
-                        const SizedBox(width: 10),
-                        _miniAcceptBtn(
-                          active: service.isActive,
-                          onTap: () =>
-                              _showAssignmentBottomSheet(context, service),
-                        ),
                       ],
                     ),
                   ],
                 ),
+              ),
+
+              // ─ Accept button + badge ─
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _smallBadge(service.transportType, _orange),
+                  const SizedBox(height: 8),
+                  _miniAcceptBtn(
+                    active: service.isActive,
+                    onTap: () => _showAssignmentBottomSheet(context, service),
+                  ),
+                ],
               ),
             ],
           ),
         ),
         if (!isLast)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Divider(height: 1, color: Colors.grey.shade50),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Divider(height: 1, color: Colors.grey.shade100),
           ),
       ],
     );
+  }
+
+  Widget _serviceFallbackIcon(Service service) {
+    return Container(
+      width: 68,
+      height: 68,
+      decoration: BoxDecoration(
+        color: service.isActive
+            ? _orange.withOpacity(0.08)
+            : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(
+        _categoryIcon(service.name),
+        size: 28,
+        color: service.isActive ? _orange : Colors.grey.shade400,
+      ),
+    );
+  }
+
+  String _pricingLabel(String model) {
+    switch (model.toLowerCase()) {
+      case 'combined': return 'Combiné';
+      case 'per_km': return '/km';
+      case 'fixed': return 'Fixe';
+      case 'hourly': return '/heure';
+      default: return model;
+    }
   }
 
   Widget _smallBadge(String text, Color color) {
@@ -378,7 +390,7 @@ class _ServicesCatalogueScreenState
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
-          'Rejoindre',
+          'services.join'.tr(),
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
@@ -393,7 +405,7 @@ class _ServicesCatalogueScreenState
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
       child: Text(
-        'Aucun service dans cette catégorie',
+        'services.no_category_services'.tr(),
         style: TextStyle(
           fontSize: 13,
           color: Colors.grey.shade400,
@@ -413,7 +425,7 @@ class _ServicesCatalogueScreenState
           const CircularProgressIndicator(color: _orange),
           const SizedBox(height: 16),
           Text(
-            'Chargement du catalogue...',
+            'services.loading_catalogue'.tr(),
             style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
           ),
         ],
@@ -435,16 +447,16 @@ class _ServicesCatalogueScreenState
             child: const Icon(Icons.category_outlined, size: 40, color: _orange),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Catalogue vide',
-            style: TextStyle(
+          Text(
+            'services.catalogue_empty'.tr(),
+            style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: Colors.black87),
           ),
           const SizedBox(height: 6),
           Text(
-            'Aucune catégorie disponible pour le moment',
+            'services.no_categories'.tr(),
             style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
           ),
         ],
@@ -467,9 +479,9 @@ class _ServicesCatalogueScreenState
                   size: 36, color: Colors.red.shade400),
             ),
             const SizedBox(height: 14),
-            const Text(
-              'Erreur de chargement',
-              style: TextStyle(
+            Text(
+              'services.load_error'.tr(),
+              style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: Colors.black87),
@@ -490,9 +502,9 @@ class _ServicesCatalogueScreenState
                   color: _orange,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Text(
-                  'Réessayer',
-                  style: TextStyle(
+                child: Text(
+                  'common.retry'.tr(),
+                  style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                       fontSize: 14),
@@ -586,62 +598,11 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: _orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.work_outline_rounded,
-                    color: _orange, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Rejoindre la mission',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w500),
-                    ),
-                    Text(
-                      widget.service.name,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (widget.service.basePrice != null)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '${widget.service.basePrice!.toStringAsFixed(2)} ${widget.service.currency}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          const SizedBox(height: 16),
+          // ─ Service image header ─
+          _buildServiceHeader(),
           if (widget.service.description != null) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             Text(
               widget.service.description!,
               style: TextStyle(
@@ -650,9 +611,9 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
           ],
           if (widget.service.requiresDocument) ...[
             const SizedBox(height: 20),
-            const Text(
-              'Document requis',
-              style: TextStyle(
+            Text(
+              'services.doc_required'.tr(),
+              style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: Colors.black87),
@@ -691,8 +652,8 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
                     const SizedBox(width: 8),
                     Text(
                       _documentUrl != null
-                          ? 'Document téléchargé'
-                          : 'Appuyez pour télécharger',
+                          ? 'services.doc_uploaded'.tr()
+                          : 'services.doc_tap_upload'.tr(),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -720,7 +681,7 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
                       color: Colors.red.shade600, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    'Ce service est actuellement indisponible',
+                    'services.service_unavailable_now'.tr(),
                     style: TextStyle(
                         color: Colors.red.shade700,
                         fontSize: 13,
@@ -743,9 +704,9 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     alignment: Alignment.center,
-                    child: const Text(
-                      'Annuler',
-                      style: TextStyle(
+                    child: Text(
+                      'common.cancel'.tr(),
+                      style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: Colors.black54),
@@ -778,9 +739,9 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text(
-                            'Confirmer la mission',
-                            style: TextStyle(
+                        : Text(
+                            'services.confirm_mission'.tr(),
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
@@ -793,6 +754,97 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildServiceHeader() {
+    final service = widget.service;
+    final hasImage = service.imageUrl != null && service.imageUrl!.isNotEmpty;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Image ou icône
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: hasImage
+              ? Image.network(
+                  service.imageUrl!,
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _fallbackBox(),
+                )
+              : _fallbackBox(),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'services.join_mission'.tr(),
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                service.name,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black,
+                ),
+              ),
+              if (service.basePrice != null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${service.basePrice!.toStringAsFixed(2)} ${service.currency ?? 'EUR'}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (service.pricePerKm != null) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        '+ ${service.pricePerKm!.toStringAsFixed(2)}/km',
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey.shade500),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _fallbackBox() {
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: BoxDecoration(
+        color: _orange.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Icon(Icons.work_outline_rounded, color: _orange, size: 32),
     );
   }
 
@@ -828,9 +880,9 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
       );
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Mission acceptée avec succès !'),
-          backgroundColor: Color(0xFF22C55E),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('services.mission_accepted'.tr()),
+          backgroundColor: const Color(0xFF22C55E),
         ));
       }
     } catch (e) {

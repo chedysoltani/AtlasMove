@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/call_models.dart';
 import '../services/call_service.dart';
 
@@ -141,12 +142,12 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
               icon: const Icon(Icons.keyboard_arrow_down_rounded,
                   color: Colors.white, size: 28),
               onPressed: () => Navigator.of(context).pop(),
-              tooltip: 'Réduire',
+              tooltip: 'call.minimize'.tr(),
             ),
           ),
           const Spacer(),
           Text(
-            'Atlas Move',
+            'AtlasMove',
             style: TextStyle(
               color: Colors.white.withOpacity(0.5),
               fontSize: 13,
@@ -222,7 +223,7 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
                   letterSpacing: 1.5,
                 ),
               )
-            : const _PulsingLabel(text: 'Appel en cours...'),
+            : _PulsingLabel(text: 'call.connecting'.tr()),
       ],
     );
   }
@@ -233,7 +234,7 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
       children: [
         _ControlButton(
           icon: _isMuted ? Icons.mic_off_rounded : Icons.mic_rounded,
-          label: _isMuted ? 'Désactivé' : 'Micro',
+          label: _isMuted ? 'call.muted'.tr() : 'call.mic'.tr(),
           active: _isMuted,
           onTap: _isActive ? _toggleMute : null,
         ),
@@ -242,7 +243,7 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
           icon: _isSpeakerOn
               ? Icons.volume_up_rounded
               : Icons.volume_off_rounded,
-          label: _isSpeakerOn ? 'Haut-parleur' : 'Oreillette',
+          label: _isSpeakerOn ? 'call.speaker'.tr() : 'call.earpiece'.tr(),
           active: !_isSpeakerOn,
           onTap: _isActive ? _toggleSpeaker : null,
         ),

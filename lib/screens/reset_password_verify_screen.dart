@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../services/auth_service.dart';
 import '../core/network/http_client.dart';
 
@@ -13,8 +14,13 @@ const _green = Color(0xFF22C55E);
 
 class ResetPasswordVerifyScreen extends StatefulWidget {
   final String email;
+  final String sessionToken;
 
-  const ResetPasswordVerifyScreen({super.key, required this.email});
+  const ResetPasswordVerifyScreen({
+    super.key,
+    required this.email,
+    required this.sessionToken,
+  });
 
   @override
   State<ResetPasswordVerifyScreen> createState() =>
@@ -83,13 +89,17 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
   }
 
   Future<void> _submit() async {
-    final token = _tokenCtrl.text.trim();
-    if (token.isEmpty) {
-      setState(() => _errorMessage = 'Collez le token reçu par email');
+    final otpCode = _tokenCtrl.text.trim();
+    if (otpCode.isEmpty || otpCode.length != 6) {
+      setState(() => _errorMessage = 'reset.token_required'.tr());
       return;
     }
     if (_newPassCtrl.text.isEmpty || _confirmPassCtrl.text.isEmpty) {
-      setState(() => _errorMessage = 'Remplissez tous les champs');
+      setState(() => _errorMessage = 'reset.fill_all_fields'.tr());
+      return;
+    }
+    if (_newPassCtrl.text != _confirmPassCtrl.text) {
+      setState(() => _errorMessage = 'auth.passwords_mismatch'.tr());
       return;
     }
     if (_isLoading) return;
@@ -98,9 +108,10 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
 
     try {
       await AuthService.verifyPasswordReset(
-        token: token,
+        email: widget.email,
+        otpCode: otpCode,
         newPassword: _newPassCtrl.text,
-        confirmPassword: _confirmPassCtrl.text,
+        sessionToken: widget.sessionToken,
       );
 
       if (mounted) {
@@ -158,14 +169,14 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
                           ],
                           _animated(2, _buildPasswordField(
                             controller: _newPassCtrl,
-                            hint: 'Nouveau mot de passe',
+                            hint: 'reset.new_password'.tr(),
                             obscure: _obscureNew,
                             onToggle: () => setState(() => _obscureNew = !_obscureNew),
                           )),
                           const SizedBox(height: 12),
                           _animated(3, _buildPasswordField(
                             controller: _confirmPassCtrl,
-                            hint: 'Confirmer le mot de passe',
+                            hint: 'auth.confirm_password'.tr(),
                             obscure: _obscureConfirm,
                             onToggle: () => setState(() => _obscureConfirm = !_obscureConfirm),
                           )),
@@ -266,7 +277,7 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Nouveau mot de passe',
+                        'reset.new_password'.tr(),
                         style: GoogleFonts.poppins(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
@@ -281,7 +292,7 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
                           _accentLine(),
                           const SizedBox(width: 10),
                           Text(
-                            'Token reçu par email',
+                            'reset.token_subtitle'.tr(),
                             style: GoogleFonts.poppins(
                               fontSize: 11,
                               color: Colors.white.withOpacity(0.5),
@@ -308,13 +319,13 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Réinitialiser le mot de passe',
+          'reset.submit'.tr(),
           style: GoogleFonts.poppins(
               fontSize: 18, fontWeight: FontWeight.w800, color: _dark),
         ),
         const SizedBox(height: 4),
         Text(
-          'Collez le token depuis le lien reçu par email.',
+          'reset.verify_subtitle'.tr(namedArgs: {'email': widget.email}),
           style: GoogleFonts.poppins(
               fontSize: 12, color: const Color(0xFF9BA3B4)),
         ),
@@ -336,7 +347,7 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Ouvrez le lien dans votre email et copiez le token qui s\'y trouve.',
+              'reset.token_info'.tr(),
               style: GoogleFonts.poppins(
                   fontSize: 12, color: _orange, height: 1.4),
             ),
@@ -360,13 +371,18 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
       ),
       child: TextField(
         controller: _tokenCtrl,
+        keyboardType: TextInputType.number,
+        maxLength: 6,
         style: GoogleFonts.poppins(
-            fontSize: 13, fontWeight: FontWeight.w500, color: _dark),
+            fontSize: 22, fontWeight: FontWeight.w700, color: _dark,
+            letterSpacing: 8),
+        textAlign: TextAlign.center,
         decoration: InputDecoration(
-          hintText: 'Coller le token ici...',
+          hintText: 'reset.token_hint'.tr(),
           hintStyle: GoogleFonts.poppins(
-              fontSize: 13, color: const Color(0xFFCDD3E0)),
-          prefixIcon: const Icon(Icons.vpn_key_outlined,
+              fontSize: 13, color: const Color(0xFFCDD3E0), letterSpacing: 0),
+          counterText: '',
+          prefixIcon: const Icon(Icons.pin_outlined,
               color: Color(0xFF9BA3B4), size: 20),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
@@ -533,7 +549,7 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
                 child: CircularProgressIndicator(
                     color: Colors.white, strokeWidth: 2.5))
             : Text(
-                'Réinitialiser le mot de passe',
+                'reset.submit'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -561,13 +577,13 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
           ),
           const SizedBox(height: 20),
           Text(
-            'Mot de passe réinitialisé !',
+            'reset.success_title'.tr(),
             style: GoogleFonts.poppins(
                 fontSize: 20, fontWeight: FontWeight.w800, color: _dark),
           ),
           const SizedBox(height: 8),
           Text(
-            'Vous pouvez maintenant vous connecter\navec votre nouveau mot de passe.',
+            'reset.success_subtitle'.tr(),
             style: GoogleFonts.poppins(
                 fontSize: 13,
                 color: const Color(0xFF9BA3B4),

@@ -276,7 +276,10 @@ class AtlasMoveApp extends StatelessWidget {
             '/reset_password_request': (context) => const ResetPasswordRequestScreen(),
             '/reset_password_verify': (context) {
               final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-              return ResetPasswordVerifyScreen(email: args?['email'] ?? '');
+              return ResetPasswordVerifyScreen(
+                email: args?['email'] ?? '',
+                sessionToken: args?['sessionToken'] ?? '',
+              );
             },
             '/signup': (context) => const SignupScreen(),
             '/signup_step1': (context) => const SignupStep1Personal(),

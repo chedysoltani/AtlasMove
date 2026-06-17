@@ -241,17 +241,26 @@ class AuthService {
     }
   }
 
-  /// Demande de réinitialisation par email (envoie un lien avec token)
-  static Future<void> requestPasswordReset({required String email}) async {
+  /// Demande de réinitialisation par OTP — retourne le sessionToken à conserver
+  static Future<String> requestPasswordReset({required String email}) async {
     try {
       final response = await HttpClient.post(
         '/m/auth/forgot-password',
         body: {'email': email.trim()},
+        skipAutoRefresh: true,
       );
       if (!response.isSuccess) {
-        final msg = response.json['message']?.toString() ?? 'Erreur lors de la demande';
+        final msg = response.json['message']?.toString()
+            ?? response.json['data']?['message']?.toString()
+            ?? 'Erreur lors de la demande';
         throw NetworkException(msg);
       }
+      final data = response.json['data'] as Map<String, dynamic>? ?? response.json;
+      final sessionToken = data['sessionToken']?.toString() ?? '';
+      if (sessionToken.isEmpty) {
+        throw NetworkException('Session token manquant dans la réponse');
+      }
+      return sessionToken;
     } on NetworkException {
       rethrow;
     } catch (e) {
@@ -259,29 +268,31 @@ class AuthService {
     }
   }
 
-  /// Réinitialisation du mot de passe avec le token reçu par email
+  /// Réinitialisation du mot de passe via OTP (code à 6 chiffres reçu par email)
   static Future<void> verifyPasswordReset({
-    required String token,
+    required String email,
+    required String otpCode,
     required String newPassword,
-    required String confirmPassword,
+    required String sessionToken,
   }) async {
     try {
       if (newPassword.length < 8) {
         throw ServiceValidationException(['Le mot de passe doit contenir au moins 8 caractères']);
       }
-      if (newPassword != confirmPassword) {
-        throw ServiceValidationException(['Les mots de passe ne correspondent pas']);
-      }
       final response = await HttpClient.post(
         '/m/auth/reset-password',
+        headers: {'x-session-token': sessionToken},
         body: {
-          'token': token.trim(),
-          'password': newPassword,
-          'password_confirmation': confirmPassword,
+          'email': email.trim(),
+          'otpCode': otpCode.trim(),
+          'newPassword': newPassword,
         },
+        skipAutoRefresh: true,
       );
       if (!response.isSuccess) {
-        final msg = response.json['message']?.toString() ?? 'Token invalide ou expiré';
+        final msg = response.json['message']?.toString()
+            ?? response.json['data']?['message']?.toString()
+            ?? 'Code invalide ou expiré';
         throw NetworkException(msg);
       }
     } on ServiceValidationException {

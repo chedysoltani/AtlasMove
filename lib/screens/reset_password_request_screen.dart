@@ -24,7 +24,6 @@ class _ResetPasswordRequestScreenState
   final _emailCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
-  bool _emailSent = false;
   String? _errorMessage;
 
   late final AnimationController _heroCtrl;
@@ -86,9 +85,19 @@ class _ResetPasswordRequestScreenState
     setState(() { _isLoading = true; _errorMessage = null; });
 
     try {
-      await AuthService.requestPasswordReset(email: _emailCtrl.text.trim());
+      final sessionToken = await AuthService.requestPasswordReset(
+        email: _emailCtrl.text.trim(),
+      );
       if (mounted) {
-        setState(() { _isLoading = false; _emailSent = true; });
+        setState(() => _isLoading = false);
+        Navigator.pushNamed(
+          context,
+          '/reset_password_verify',
+          arguments: {
+            'email': _emailCtrl.text.trim(),
+            'sessionToken': sessionToken,
+          },
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -119,9 +128,7 @@ class _ResetPasswordRequestScreenState
                 color: _surface,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
               ),
-              child: _emailSent
-                  ? _buildEmailSentState()
-                  : SingleChildScrollView(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
                 child: Form(
                   key: _formKey,
@@ -145,82 +152,6 @@ class _ResetPasswordRequestScreenState
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildEmailSentState() {
-    const green = Color(0xFF22C55E);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 88, height: 88,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: green.withOpacity(0.1),
-                border: Border.all(color: green.withOpacity(0.35), width: 2),
-              ),
-              child: const Icon(Icons.mark_email_read_rounded,
-                  color: green, size: 44),
-            ),
-            const SizedBox(height: 22),
-            Text(
-              'Email envoyé !',
-              style: GoogleFonts.poppins(
-                  fontSize: 22, fontWeight: FontWeight.w800, color: _dark),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Un lien de réinitialisation a été envoyé à\n${_emailCtrl.text.trim()}\n\nCliquez sur le lien dans votre email pour créer un nouveau mot de passe.',
-              style: GoogleFonts.poppins(
-                  fontSize: 13, color: const Color(0xFF9BA3B4), height: 1.6),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            GestureDetector(
-              onTap: () => Navigator.pushNamedAndRemoveUntil(
-                  context, '/login', (_) => false),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                      colors: [_orange, _orangeLight],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                        color: _orange.withOpacity(0.35),
-                        blurRadius: 18,
-                        offset: const Offset(0, 6)),
-                  ],
-                ),
-                child: Text(
-                  'Retour à la connexion',
-                  style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            GestureDetector(
-              onTap: () => setState(() { _emailSent = false; _errorMessage = null; }),
-              child: Text(
-                'Renvoyer l\'email',
-                style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: _orange),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -310,7 +241,7 @@ class _ResetPasswordRequestScreenState
                         ),
                         const SizedBox(height: 18),
                         Text(
-                          'Mot de passe oublié ?',
+                          'reset.title'.tr(),
                           style: GoogleFonts.poppins(
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
@@ -325,7 +256,7 @@ class _ResetPasswordRequestScreenState
                             _accentLine(),
                             const SizedBox(width: 10),
                             Text(
-                              'Réinitialisation sécurisée',
+                              'reset.secure_reset'.tr(),
                               style: GoogleFonts.poppins(
                                 fontSize: 12,
                                 color: Colors.white.withOpacity(0.5),
@@ -353,13 +284,13 @@ class _ResetPasswordRequestScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Entrez votre email',
+          'reset.enter_email'.tr(),
           style: GoogleFonts.poppins(
               fontSize: 20, fontWeight: FontWeight.w800, color: _dark),
         ),
         const SizedBox(height: 6),
         Text(
-          'Nous vous enverrons un lien sécurisé pour réinitialiser votre mot de passe.',
+          'reset.enter_email_subtitle'.tr(),
           style: GoogleFonts.poppins(
               fontSize: 13, color: const Color(0xFF9BA3B4), height: 1.5),
         ),
@@ -481,7 +412,7 @@ class _ResetPasswordRequestScreenState
                 child: CircularProgressIndicator(
                     color: Colors.white, strokeWidth: 2.5))
             : Text(
-                'Envoyer le lien',
+                'reset.send_link'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -495,12 +426,12 @@ class _ResetPasswordRequestScreenState
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text('Vous vous souvenez ?  ',
+        Text('reset.remember_password'.tr() + '  ',
             style: GoogleFonts.poppins(
                 fontSize: 13, color: const Color(0xFF9BA3B4))),
         GestureDetector(
           onTap: () => Navigator.pop(context),
-          child: Text('Se connecter',
+          child: Text('auth.login_btn'.tr(),
               style: GoogleFonts.poppins(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/custom_button.dart';
@@ -40,9 +41,9 @@ class _SignupStep2DocumentsState extends State<SignupStep2Documents> {
           icon: const Icon(Icons.arrow_back, color: AppTheme.primaryColor),
           onPressed: _goToPreviousStep,
         ),
-        title: const Text(
-          'Étape 2/3',
-          style: TextStyle(
+        title: Text(
+          'signup.step2_title'.tr(),
+          style: const TextStyle(
             color: AppTheme.primaryColor,
             fontWeight: FontWeight.w600,
           ),
@@ -53,8 +54,8 @@ class _SignupStep2DocumentsState extends State<SignupStep2Documents> {
             padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: Text(
-                'Livreur',
-                style: TextStyle(
+                'signup.driver_badge'.tr(),
+                style: const TextStyle(
                   color: AppTheme.primaryColor,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
@@ -90,34 +91,32 @@ class _SignupStep2DocumentsState extends State<SignupStep2Documents> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
-              // Title
+
               Text(
-                'Documents',
+                'signup.documents_title'.tr(),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: AppTheme.textWhite,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              
+
               const SizedBox(height: 8),
-              
+
               Text(
-                'Veuillez télécharger les documents requis pour devenir livreur',
+                'signup.documents_subtitle'.tr(),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.textSecondary,
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
-              // Documents Upload
+
               Column(
                 children: [
                   ImageUploadWidget(
-                    title: 'Carte d\'identité',
+                    title: 'signup.id_card'.tr(),
                     imagePath: _cinImage,
                     onImageChanged: (path) {
                       setState(() {
@@ -126,11 +125,11 @@ class _SignupStep2DocumentsState extends State<SignupStep2Documents> {
                     },
                     isRequired: true,
                   ),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   ImageUploadWidget(
-                    title: 'Permis de conduire',
+                    title: 'signup.driving_license'.tr(),
                     imagePath: _permisImage,
                     onImageChanged: (path) {
                       setState(() {
@@ -139,11 +138,11 @@ class _SignupStep2DocumentsState extends State<SignupStep2Documents> {
                     },
                     isRequired: true,
                   ),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   ImageUploadWidget(
-                    title: 'Carte grise',
+                    title: 'signup.vehicle_registration'.tr(),
                     imagePath: _carteGriseImage,
                     onImageChanged: (path) {
                       setState(() {
@@ -154,15 +153,14 @@ class _SignupStep2DocumentsState extends State<SignupStep2Documents> {
                   ),
                 ],
               ),
-              
+
               const SizedBox(height: 40),
-              
-              // Navigation Buttons
+
               Row(
                 children: [
                   Expanded(
                     child: CustomButton(
-                      text: 'Précédent',
+                      text: 'common.previous'.tr(),
                       onPressed: _goToPreviousStep,
                       type: ButtonType.outline,
                       height: 56,
@@ -171,7 +169,7 @@ class _SignupStep2DocumentsState extends State<SignupStep2Documents> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: CustomButton(
-                      text: 'Suivant',
+                      text: 'common.next'.tr(),
                       onPressed: _goToNextStep,
                       height: 56,
                     ),

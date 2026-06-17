@@ -1,3 +1,10 @@
+String? _resolveUrl(String? url) {
+  if (url == null || url.isEmpty) return null;
+  if (url.startsWith('http')) return url;
+  const base = 'https://api.atla.business';
+  return url.startsWith('/') ? '$base$url' : '$base/$url';
+}
+
 class Service {
   final String id;
   final String name;
@@ -17,6 +24,8 @@ class Service {
   final String? currency;
   final int? maxCapacity;
   final int sortOrder;
+  final String? iconUrl;
+  final String? imageUrl;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -39,6 +48,8 @@ class Service {
     this.currency,
     this.maxCapacity,
     this.sortOrder = 0,
+    this.iconUrl,
+    this.imageUrl,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -93,6 +104,8 @@ class Service {
     currency: json['currency'] ?? 'TND',
     maxCapacity: safeParse<int>('max_capacity', int.parse),
     sortOrder: safeParse<int>('sort_order', int.parse) ?? 0,
+    iconUrl: _resolveUrl(json['icon_url'] as String?),
+    imageUrl: _resolveUrl(json['image_url'] as String?),
 
     // ✅ FIX DATES (anti-crash)
     createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
@@ -445,32 +458,36 @@ class ServiceCatalogue {
   });
 
   factory ServiceCatalogue.fromJson(Map<String, dynamic> json) {
-    print('DEBUG: ServiceCatalogue.fromJson - json keys: ${json.keys.toList()}');
-    
-    // La réponse de l'API a la structure: {data: {data: [...], total: 5}}
-    final dataWrapper = json['data'] as Map<String, dynamic>?;
-    print('DEBUG: ServiceCatalogue.fromJson - dataWrapper: $dataWrapper');
-    
-    final dataList = dataWrapper?['data'] as List? ?? json['data'] as List?;
-    print('DEBUG: ServiceCatalogue.fromJson - dataList length: ${dataList?.length}');
-    
-    if (dataList == null) {
-      print('DEBUG: ServiceCatalogue.fromJson - dataList is null');
-      return ServiceCatalogue(
-        data: [],
-        total: 0,
-      );
+    // Supporte deux formats de réponse :
+    // 1. Nouveau format public : {message, data: [...], total}
+    // 2. Ancien format enveloppé : {data: {data: [...], total}}
+    final raw = json['data'];
+    List<dynamic>? dataList;
+    int? total;
+
+    if (raw is List) {
+      // Nouveau format : data est directement le tableau
+      dataList = raw;
+      total = json['total'] as int?;
+    } else if (raw is Map<String, dynamic>) {
+      // Ancien format enveloppé
+      final inner = raw['data'];
+      dataList = inner is List ? inner : null;
+      total = raw['total'] as int?;
+    }
+
+    if (dataList == null || dataList.isEmpty) {
+      return ServiceCatalogue(data: [], total: 0);
     }
 
     final data = dataList
-        .map((item) => ServiceCategoryWithServices.fromJson(item as Map<String, dynamic>))
+        .whereType<Map<String, dynamic>>()
+        .map((item) => ServiceCategoryWithServices.fromJson(item))
         .toList();
-
-    print('DEBUG: ServiceCatalogue.fromJson - parsed ${data.length} categories');
 
     return ServiceCatalogue(
       data: data,
-      total: dataWrapper?['total'] as int? ?? json['total'] as int? ?? data.length,
+      total: total ?? data.length,
     );
   }
 }

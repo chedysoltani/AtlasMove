@@ -34,6 +34,9 @@ class _SignupScreenState extends State<SignupScreen>
   bool _obscureConfirm = true;
   bool _isLoading = false;
 
+  // Country dial code picker
+  _CountryCode _dialCode = _CountryCode.defaultCode;
+
   late final AnimationController _heroCtrl;
   late final List<AnimationController> _itemCtrls;
 
@@ -88,7 +91,7 @@ class _SignupScreenState extends State<SignupScreen>
         firstName: _firstNameCtrl.text.trim(),
         lastName: _lastNameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
-        phone: _phoneCtrl.text.trim(),
+        phone: '${_dialCode.dial}${_phoneCtrl.text.trim()}',
         password: _passwordCtrl.text,
         confirmPassword: _confirmPasswordCtrl.text,
         referralCode: refCode.isNotEmpty ? refCode : null,
@@ -175,14 +178,7 @@ class _SignupScreenState extends State<SignupScreen>
                         },
                       )),
                       const SizedBox(height: 11),
-                      _a(2, _field(
-                        ctrl: _phoneCtrl, hint: 'auth.phone'.tr(),
-                        icon: Icons.phone_outlined,
-                        keyboard: TextInputType.phone,
-                        action: TextInputAction.next,
-                        validator: (v) => (v == null || v.isEmpty)
-                            ? 'auth.field_required'.tr() : null,
-                      )),
+                      _a(2, _phoneField()),
                       const SizedBox(height: 11),
                       _a(3, _field(
                         ctrl: _passwordCtrl, hint: 'auth.password_hint'.tr(),
@@ -446,4 +442,276 @@ class _SignupScreenState extends State<SignupScreen>
           border: Border.all(color: c, width: 1)));
   Widget _dot(double s, Color c) => Container(width: s, height: s,
       decoration: BoxDecoration(shape: BoxShape.circle, color: c));
+
+  // ── Phone field with country dial-code prefix ──────────────────────────────
+
+  Widget _phoneField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04),
+            blurRadius: 8, offset: const Offset(0, 3))],
+      ),
+      child: TextFormField(
+        controller: _phoneCtrl,
+        keyboardType: TextInputType.phone,
+        textInputAction: TextInputAction.next,
+        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500,
+            color: _dark),
+        validator: (v) => (v == null || v.trim().isEmpty)
+            ? 'auth.field_required'.tr() : null,
+        decoration: InputDecoration(
+          hintText: 'auth.phone'.tr(),
+          hintStyle: GoogleFonts.poppins(fontSize: 13,
+              color: const Color(0xFFCDD3E0)),
+          prefixIcon: _dialCodeButton(),
+          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E6EF))),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: _orange, width: 1.5)),
+          errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFEF4444))),
+          focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5)),
+          filled: true, fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14, vertical: 14),
+          isDense: true,
+        ),
+      ),
+    );
+  }
+
+  Widget _dialCodeButton() {
+    return GestureDetector(
+      onTap: _showCountryPicker,
+      child: Container(
+        margin: const EdgeInsets.only(left: 12, right: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_dialCode.flag, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 4),
+            Text(_dialCode.dial,
+                style: GoogleFonts.poppins(
+                    fontSize: 13, fontWeight: FontWeight.w600,
+                    color: _dark)),
+            const Icon(Icons.arrow_drop_down_rounded,
+                color: Color(0xFF9BA3B4), size: 18),
+            Container(width: 1, height: 22, color: const Color(0xFFE2E6EF),
+                margin: const EdgeInsets.only(left: 6)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCountryPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _CountryPickerSheet(
+        selected: _dialCode,
+        onSelected: (code) {
+          setState(() => _dialCode = code);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+}
+
+// ── Country dial-code data ────────────────────────────────────────────────────
+
+class _CountryCode {
+  final String flag;
+  final String name;
+  final String dial;
+
+  const _CountryCode({required this.flag, required this.name, required this.dial});
+
+  static const _CountryCode defaultCode =
+      _CountryCode(flag: '🇹🇳', name: 'Tunisie', dial: '+216');
+
+  static const List<_CountryCode> all = [
+    _CountryCode(flag: '🇹🇳', name: 'Tunisie',        dial: '+216'),
+    _CountryCode(flag: '🇩🇿', name: 'Algérie',        dial: '+213'),
+    _CountryCode(flag: '🇲🇦', name: 'Maroc',          dial: '+212'),
+    _CountryCode(flag: '🇱🇾', name: 'Libye',          dial: '+218'),
+    _CountryCode(flag: '🇪🇬', name: 'Égypte',         dial: '+20'),
+    _CountryCode(flag: '🇸🇦', name: 'Arabie Saoudite',dial: '+966'),
+    _CountryCode(flag: '🇦🇪', name: 'Émirats',        dial: '+971'),
+    _CountryCode(flag: '🇶🇦', name: 'Qatar',          dial: '+974'),
+    _CountryCode(flag: '🇰🇼', name: 'Koweït',         dial: '+965'),
+    _CountryCode(flag: '🇧🇭', name: 'Bahreïn',        dial: '+973'),
+    _CountryCode(flag: '🇴🇲', name: 'Oman',           dial: '+968'),
+    _CountryCode(flag: '🇯🇴', name: 'Jordanie',       dial: '+962'),
+    _CountryCode(flag: '🇱🇧', name: 'Liban',          dial: '+961'),
+    _CountryCode(flag: '🇸🇩', name: 'Soudan',         dial: '+249'),
+    _CountryCode(flag: '🇫🇷', name: 'France',         dial: '+33'),
+    _CountryCode(flag: '🇩🇪', name: 'Allemagne',      dial: '+49'),
+    _CountryCode(flag: '🇧🇪', name: 'Belgique',       dial: '+32'),
+    _CountryCode(flag: '🇨🇭', name: 'Suisse',         dial: '+41'),
+    _CountryCode(flag: '🇪🇸', name: 'Espagne',        dial: '+34'),
+    _CountryCode(flag: '🇮🇹', name: 'Italie',         dial: '+39'),
+    _CountryCode(flag: '🇬🇧', name: 'Royaume-Uni',    dial: '+44'),
+    _CountryCode(flag: '🇺🇸', name: 'États-Unis',     dial: '+1'),
+    _CountryCode(flag: '🇨🇦', name: 'Canada',         dial: '+1'),
+    _CountryCode(flag: '🇸🇳', name: 'Sénégal',        dial: '+221'),
+    _CountryCode(flag: '🇨🇮', name: "Côte d'Ivoire",  dial: '+225'),
+    _CountryCode(flag: '🇨🇲', name: 'Cameroun',       dial: '+237'),
+    _CountryCode(flag: '🇬🇳', name: 'Guinée',         dial: '+224'),
+    _CountryCode(flag: '🇲🇱', name: 'Mali',           dial: '+223'),
+    _CountryCode(flag: '🇹🇷', name: 'Turquie',        dial: '+90'),
+    _CountryCode(flag: '🇵🇰', name: 'Pakistan',       dial: '+92'),
+  ];
+}
+
+// ── Country picker bottom sheet ───────────────────────────────────────────────
+
+class _CountryPickerSheet extends StatefulWidget {
+  final _CountryCode selected;
+  final void Function(_CountryCode) onSelected;
+
+  const _CountryPickerSheet({required this.selected, required this.onSelected});
+
+  @override
+  State<_CountryPickerSheet> createState() => _CountryPickerSheetState();
+}
+
+class _CountryPickerSheetState extends State<_CountryPickerSheet> {
+  static const _orange = Color(0xFFFF6B35);
+  static const _dark   = Color(0xFF0F172A);
+
+  String _search = '';
+  late List<_CountryCode> _filtered;
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = _CountryCode.all;
+  }
+
+  void _onSearch(String q) {
+    setState(() {
+      _search = q.toLowerCase();
+      _filtered = _CountryCode.all
+          .where((c) =>
+              c.name.toLowerCase().contains(_search) ||
+              c.dial.contains(_search))
+          .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 8),
+            width: 36, height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // Title
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            child: Text('Sélectionner un pays',
+                style: GoogleFonts.poppins(
+                    fontSize: 16, fontWeight: FontWeight.w700, color: _dark)),
+          ),
+          // Search
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              onChanged: _onSearch,
+              style: GoogleFonts.poppins(fontSize: 13, color: _dark),
+              decoration: InputDecoration(
+                hintText: 'Rechercher...',
+                hintStyle: GoogleFonts.poppins(
+                    fontSize: 13, color: Colors.grey.shade400),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    color: Colors.grey, size: 20),
+                filled: true,
+                fillColor: const Color(0xFFF8F9FB),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 10),
+                isDense: true,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // List
+          Expanded(
+            child: ListView.builder(
+              itemCount: _filtered.length,
+              itemBuilder: (_, i) {
+                final c = _filtered[i];
+                final isSelected = c.dial == widget.selected.dial &&
+                    c.name == widget.selected.name;
+                return InkWell(
+                  onTap: () => widget.onSelected(c),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    color: isSelected
+                        ? _orange.withOpacity(0.06)
+                        : Colors.transparent,
+                    child: Row(
+                      children: [
+                        Text(c.flag,
+                            style: const TextStyle(fontSize: 22)),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(c.name,
+                              style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                  color: _dark)),
+                        ),
+                        Text(c.dial,
+                            style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected ? _orange : Colors.grey)),
+                        if (isSelected) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.check_circle_rounded,
+                              color: _orange, size: 18),
+                        ]
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

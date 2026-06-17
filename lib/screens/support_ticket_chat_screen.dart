@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/support_models.dart';
 import '../services/support_service.dart';
 
@@ -27,7 +28,11 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
   SupportTicketChat? _chat;
   bool _loading = true;
   String? _error;
+  bool _sending = false;
+
   final _scrollCtrl = ScrollController();
+  final _msgCtrl = TextEditingController();
+  final _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -38,8 +43,11 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
 
   @override
   void dispose() {
+    SupportWebSocketService.leaveTicket(widget.ticketId);
     SupportWebSocketService.removeListeners();
     _scrollCtrl.dispose();
+    _msgCtrl.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -48,7 +56,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
     final chat = await SupportService.getTicketChat(widget.ticketId);
     if (!mounted) return;
     if (chat == null) {
-      setState(() { _loading = false; _error = 'Impossible de charger le chat.'; });
+      setState(() { _loading = false; _error = 'support.load_chat_error'.tr(); });
     } else {
       setState(() { _loading = false; _chat = chat; });
       _scrollToBottom();
@@ -57,12 +65,41 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
 
   Future<void> _connectWebSocket() async {
     await SupportWebSocketService.connect();
+    SupportWebSocketService.joinTicket(widget.ticketId);
     SupportWebSocketService.listenForTicketUpdate(widget.ticketId, (updated) {
       if (mounted) {
         setState(() => _chat = updated);
         _scrollToBottom();
       }
     });
+  }
+
+  Future<void> _send() async {
+    final text = _msgCtrl.text.trim();
+    if (text.isEmpty || _sending) return;
+
+    setState(() => _sending = true);
+    _msgCtrl.clear();
+    _focusNode.unfocus();
+
+    // Send via REST (primary method per spec); WS event will push the update back
+    final updated = await SupportService.replyToTicket(widget.ticketId, text);
+    if (!mounted) return;
+
+    if (updated != null) {
+      setState(() { _chat = updated; _sending = false; });
+      _scrollToBottom();
+    } else {
+      // REST failed — restore message so user can retry
+      setState(() { _sending = false; });
+      _msgCtrl.text = text;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('support.send_error'.tr()),
+          backgroundColor: _red,
+        ),
+      );
+    }
   }
 
   void _scrollToBottom() {
@@ -85,6 +122,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
         children: [
           _buildHeader(),
           Expanded(child: _buildBody()),
+          _buildInputBar(),
         ],
       ),
     );
@@ -143,11 +181,11 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
     String label;
     switch (status.toLowerCase()) {
       case 'resolved':
-        color = _green; label = 'Résolu'; break;
+        color = _green; label = 'support.status_resolved'.tr(); break;
       case 'closed':
-        color = Colors.grey; label = 'Fermé'; break;
+        color = Colors.grey; label = 'support.status_closed'.tr(); break;
       default:
-        color = _amber; label = 'En cours';
+        color = _amber; label = 'common.in_progress'.tr();
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
@@ -193,7 +231,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
             ElevatedButton(
               onPressed: _load,
               style: ElevatedButton.styleFrom(backgroundColor: _orange),
-              child: Text('Réessayer',
+              child: Text('common.retry'.tr(),
                   style: GoogleFonts.poppins(color: Colors.white)),
             ),
           ],
@@ -210,11 +248,11 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
             Icon(Icons.chat_bubble_outline_rounded,
                 size: 56, color: Colors.grey.shade400),
             const SizedBox(height: 12),
-            Text('Aucun message pour l\'instant',
+            Text('support.no_messages'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 14, color: Colors.grey.shade500)),
             const SizedBox(height: 6),
-            Text('L\'équipe support vous répondra bientôt.',
+            Text('support.team_response'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 12, color: Colors.grey.shade400)),
           ],
@@ -231,6 +269,91 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
         itemCount: messages.length,
         itemBuilder: (context, i) => _buildBubble(messages[i]),
       ),
+    );
+  }
+
+  Widget _buildInputBar() {
+    final isClosed = _chat?.status.toLowerCase() == 'closed';
+    return Container(
+      padding: EdgeInsets.only(
+        left: 12,
+        right: 12,
+        top: 10,
+        bottom: MediaQuery.of(context).padding.bottom + 10,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: _border, width: 1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: isClosed
+          ? Center(
+              child: Text(
+                'support.ticket_closed_reply'.tr(),
+                style: GoogleFonts.poppins(
+                    fontSize: 12, color: Colors.grey.shade500),
+              ),
+            )
+          : Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _surface,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: _border),
+                    ),
+                    child: TextField(
+                      controller: _msgCtrl,
+                      focusNode: _focusNode,
+                      maxLines: 4,
+                      minLines: 1,
+                      textInputAction: TextInputAction.newline,
+                      style: GoogleFonts.poppins(fontSize: 13, color: _navy),
+                      decoration: InputDecoration(
+                        hintText: 'support.message_hint'.tr(),
+                        hintStyle: GoogleFonts.poppins(
+                            fontSize: 13, color: Colors.grey.shade400),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                      ),
+                      onSubmitted: (_) => _send(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _sending
+                    ? const SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: Padding(
+                          padding: EdgeInsets.all(10),
+                          child: CircularProgressIndicator(
+                              color: _orange, strokeWidth: 2.5),
+                        ),
+                      )
+                    : GestureDetector(
+                        onTap: _send,
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: const BoxDecoration(
+                            color: _orange,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.send_rounded,
+                              color: Colors.white, size: 20),
+                        ),
+                      ),
+              ],
+            ),
     );
   }
 

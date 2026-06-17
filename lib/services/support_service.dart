@@ -20,6 +20,27 @@ class SupportService {
       return null;
     }
   }
+
+  static Future<SupportTicketChat?> replyToTicket(
+      String ticketId, String message) async {
+    try {
+      final response = await HttpClient.post(
+        '/m/support/ticket/$ticketId/reply',
+        body: {'message': message},
+      );
+      debugPrint('💬 reply status=${response.statusCode}');
+      if (!response.isSuccess) return null;
+      final raw = response.json;
+      final outer =
+          raw['data'] is Map ? raw['data'] as Map<String, dynamic> : raw;
+      final inner =
+          outer['data'] is Map ? outer['data'] as Map<String, dynamic> : outer;
+      return SupportTicketChat.fromJson(inner);
+    } catch (e) {
+      debugPrint('⚠️ replyToTicket: $e');
+      return null;
+    }
+  }
 }
 
 class SupportWebSocketService {
@@ -53,11 +74,31 @@ class SupportWebSocketService {
       ..connect();
   }
 
+  static void joinTicket(String ticketId) {
+    _socket?.emit('join_ticket', {'ticketId': ticketId});
+    debugPrint('🔌 SupportWS joined room: $ticketId');
+  }
+
+  static void leaveTicket(String ticketId) {
+    _socket?.emit('leave_ticket', {'ticketId': ticketId});
+    debugPrint('🔌 SupportWS left room: $ticketId');
+  }
+
+  static void sendMessage(String ticketId, String message) {
+    _socket?.emit('send_message', {
+      'ticketId': ticketId,
+      'message': message,
+    });
+    debugPrint('💬 SupportWS send_message to $ticketId');
+  }
+
   static void listenForTicketUpdate(
       String ticketId, void Function(SupportTicketChat) onUpdate) {
     _socket?.on('support_ticket_chat_update', (data) {
       try {
-        final map = (data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{});
+        final map = (data is Map
+            ? Map<String, dynamic>.from(data)
+            : <String, dynamic>{});
         if (map['ticketId']?.toString() == ticketId) {
           onUpdate(SupportTicketChat.fromJson(map));
         }

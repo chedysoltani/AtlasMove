@@ -12,6 +12,13 @@ import '../services/rendezvous_service.dart';
 import '../services/geocoding_service.dart';
 import '../utils/fare_calculator.dart';
 
+String? _resolveUrl(String? url) {
+  if (url == null || url.isEmpty) return null;
+  if (url.startsWith('http')) return url;
+  const base = 'https://api.atla.business';
+  return url.startsWith('/') ? '$base$url' : '$base/$url';
+}
+
 // Full service data needed to show pricing card + detect delivery type
 class _ServiceData {
   final String id;
@@ -23,6 +30,7 @@ class _ServiceData {
   final double? pricePerMinute;
   final double? minimumFare;
   final String currency;
+  final String? imageUrl;
 
   const _ServiceData({
     required this.id,
@@ -34,6 +42,7 @@ class _ServiceData {
     this.pricePerMinute,
     this.minimumFare,
     this.currency = 'TND',
+    this.imageUrl,
   });
 
   bool get isDelivery =>
@@ -251,6 +260,7 @@ class _ClientRendezvousBookingScreenState
                 pricePerMinute: double.tryParse(svc['price_per_minute']?.toString() ?? ''),
                 minimumFare: double.tryParse(svc['minimum_fare']?.toString() ?? ''),
                 currency: svc['currency']?.toString() ?? 'TND',
+                imageUrl: _resolveUrl(svc['image_url']?.toString()),
               ));
             }
           }
@@ -273,6 +283,7 @@ class _ClientRendezvousBookingScreenState
               pricePerMinute: double.tryParse(svc['price_per_minute']?.toString() ?? ''),
               minimumFare: double.tryParse(svc['minimum_fare']?.toString() ?? ''),
               currency: svc['currency']?.toString() ?? 'TND',
+              imageUrl: _resolveUrl(svc['image_url']?.toString()),
             ));
           }
         }
@@ -1185,13 +1196,14 @@ class _ClientRendezvousBookingScreenState
     }
 
     final svc = _selectedService;
+    final hasImage = svc?.imageUrl != null && svc!.imageUrl!.isNotEmpty;
+
     return GestureDetector(
       onTap: _showServicePicker,
       child: Container(
-        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: _orange.withOpacity(0.35), width: 1.5),
           boxShadow: [
             BoxShadow(
@@ -1201,81 +1213,192 @@ class _ClientRendezvousBookingScreenState
             ),
           ],
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_orange, _orangeLight],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: _orange.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Icon(
-                serviceIconFor(svc?.transportType ?? ''),
-                color: Colors.white,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: svc == null
-                  ? Text('Sélectionner un service',
-                      style: GoogleFonts.poppins(fontSize: 14, color: _textSecondary))
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          svc.name,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: _textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _servicePriceLine(svc),
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: _textSecondary,
-                          ),
-                        ),
-                      ],
+            // ── Image banner ──────────────────────────────────────────
+            if (hasImage)
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Stack(
+                  children: [
+                    Image.network(
+                      svc!.imageUrl!,
+                      width: double.infinity,
+                      height: 130,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _serviceFallbackBanner(svc),
                     ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _navy.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(10),
+                    // Gradient overlay bas pour lisibilité
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.55),
+                            ],
+                            stops: const [0.45, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Nom + prix en overlay sur l'image
+                    Positioned(
+                      left: 14,
+                      right: 14,
+                      bottom: 12,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  svc.name,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  _servicePriceLine(svc),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    color: Colors.white.withOpacity(0.85),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: Colors.white.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('Changer',
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white)),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.keyboard_arrow_down_rounded,
+                                    color: Colors.white, size: 15),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              // ── Fallback sans image ───────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [_orange, _orangeLight],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _orange.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        serviceIconFor(svc?.transportType ?? ''),
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: svc == null
+                          ? Text('Sélectionner un service',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 14, color: _textSecondary))
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(svc.name,
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: _textPrimary)),
+                                const SizedBox(height: 2),
+                                Text(_servicePriceLine(svc),
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 11, color: _textSecondary)),
+                              ],
+                            ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _navy.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Changer',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: _navy)),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.keyboard_arrow_down_rounded,
+                              color: _navy, size: 15),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Changer',
-                      style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: _navy)),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.keyboard_arrow_down_rounded, color: _navy, size: 15),
-                ],
-              ),
-            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _serviceFallbackBanner(_ServiceData svc) {
+    return Container(
+      width: double.infinity,
+      height: 130,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_orange, _orangeLight],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Icon(serviceIconFor(svc.transportType),
+          color: Colors.white.withOpacity(0.4), size: 56),
     );
   }
 
@@ -2465,10 +2588,31 @@ class _ServicePickerTile extends StatelessWidget {
     }
   }
 
+  Widget _buildIconFallback(IconData icon, bool isSelected) {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        gradient: isSelected
+            ? const LinearGradient(
+                colors: [_orange, _orangeLight],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: isSelected ? null : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Icon(icon,
+          color: isSelected ? Colors.white : _textSecondary, size: 22),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final icon = serviceIconFor(service.transportType);
     final isDelivery = service.isDelivery;
+    final hasImage = service.imageUrl != null && service.imageUrl!.isNotEmpty;
 
     return GestureDetector(
       onTap: onTap,
@@ -2488,26 +2632,18 @@ class _ServicePickerTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Icon
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: isSelected
-                    ? const LinearGradient(
-                        colors: [_orange, _orangeLight],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isSelected ? null : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                icon,
-                color: isSelected ? Colors.white : _textSecondary,
-                size: 22,
-              ),
+            // Image ou icône
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: hasImage
+                  ? Image.network(
+                      service.imageUrl!,
+                      width: 52,
+                      height: 52,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _buildIconFallback(icon, isSelected),
+                    )
+                  : _buildIconFallback(icon, isSelected),
             ),
             const SizedBox(width: 14),
             // Text

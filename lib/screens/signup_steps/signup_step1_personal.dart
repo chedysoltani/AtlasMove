@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/custom_button.dart';
@@ -48,9 +49,9 @@ class _SignupStep1PersonalState extends State<SignupStep1Personal> {
           icon: const Icon(Icons.arrow_back, color: AppTheme.primaryColor),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Étape 1/3',
-          style: TextStyle(
+        title: Text(
+          'signup.step1_title'.tr(),
+          style: const TextStyle(
             color: AppTheme.primaryColor,
             fontWeight: FontWeight.w600,
           ),
@@ -61,8 +62,8 @@ class _SignupStep1PersonalState extends State<SignupStep1Personal> {
             padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: Text(
-                'Livreur',
-                style: TextStyle(
+                'signup.driver_badge'.tr(),
+                style: const TextStyle(
                   color: AppTheme.primaryColor,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
@@ -98,46 +99,43 @@ class _SignupStep1PersonalState extends State<SignupStep1Personal> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
-              // Title
+
               Text(
-                'Informations personnelles',
+                'signup.personal_info_title'.tr(),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: AppTheme.textWhite,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              
+
               const SizedBox(height: 8),
-              
+
               Text(
-                'Veuillez remplir vos informations personnelles pour continuer',
+                'signup.personal_info_subtitle'.tr(),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.textSecondary,
                 ),
               ),
-              
+
               const SizedBox(height: 32),
-              
-              // Form
+
               Form(
                 key: _formKey,
                 child: Column(
                   children: [
-                    // Name Fields Row
                     Row(
                       children: [
                         Expanded(
                           child: CustomTextField(
                             controller: _firstNameController,
-                            labelText: 'Prénom',
+                            labelText: 'auth.first_name'.tr(),
                             hintText: 'Jean',
                             textInputAction: TextInputAction.next,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Veuillez entrer votre prénom';
+                                return 'signup.required_first_name'.tr();
                               }
                               return null;
                             },
@@ -147,12 +145,12 @@ class _SignupStep1PersonalState extends State<SignupStep1Personal> {
                         Expanded(
                           child: CustomTextField(
                             controller: _lastNameController,
-                            labelText: 'Nom',
+                            labelText: 'auth.last_name'.tr(),
                             hintText: 'Dupont',
                             textInputAction: TextInputAction.next,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
-                                return 'Veuillez entrer votre nom';
+                                return 'signup.required_last_name'.tr();
                               }
                               return null;
                             },
@@ -160,93 +158,88 @@ class _SignupStep1PersonalState extends State<SignupStep1Personal> {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 20),
-                    
-                    // Email Field
+
                     CustomTextField(
                       controller: _emailController,
-                      labelText: 'Email',
-                      hintText: 'jean.dupont@email.com',
+                      labelText: 'auth.email'.tr(),
+                      hintText: 'auth.email_hint'.tr(),
                       keyboardType: TextInputType.emailAddress,
                       prefixIcon: const Icon(Icons.email_outlined),
                       textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Veuillez entrer votre email';
+                          return 'auth.email_required'.tr();
                         }
                         if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                          return 'Veuillez entrer un email valide';
+                          return 'auth.email_invalid'.tr();
                         }
                         return null;
                       },
                     ),
-                    
+
                     const SizedBox(height: 20),
-                    
-                    // Phone Field
+
                     CustomTextField(
                       controller: _phoneController,
-                      labelText: 'Numéro de téléphone',
+                      labelText: 'signup.phone_label'.tr(),
                       hintText: '+33 6 12 34 56 78',
                       keyboardType: TextInputType.phone,
                       prefixIcon: const Icon(Icons.phone_outlined),
                       textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Veuillez entrer votre numéro de téléphone';
+                          return 'signup.required_phone'.tr();
                         }
                         return null;
                       },
                     ),
-                    
+
                     const SizedBox(height: 20),
-                    
-                    // Password Field
+
                     CustomTextField(
                       controller: _passwordController,
-                      labelText: 'Mot de passe',
+                      labelText: 'auth.password'.tr(),
                       hintText: '••••••••••',
                       obscureText: true,
                       prefixIcon: const Icon(Icons.lock_outlined),
                       textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Veuillez entrer un mot de passe';
+                          return 'auth.password_required'.tr();
                         }
                         if (value.length < 8) {
-                          return 'Le mot de passe doit contenir au moins 8 caractères';
+                          return 'auth.password_min8'.tr();
                         }
                         return null;
                       },
                     ),
-                    
+
                     const SizedBox(height: 20),
-                    
-                    // Confirm Password Field
+
                     CustomTextField(
                       controller: _confirmPasswordController,
-                      labelText: 'Confirmer le mot de passe',
+                      labelText: 'auth.confirm_password'.tr(),
                       hintText: '••••••••••',
                       obscureText: true,
                       prefixIcon: const Icon(Icons.lock_outlined),
                       textInputAction: TextInputAction.done,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Veuillez confirmer votre mot de passe';
+                          return 'signup.required_confirm_password'.tr();
                         }
                         if (value != _passwordController.text) {
-                          return 'Les mots de passe ne correspondent pas';
+                          return 'auth.passwords_mismatch'.tr();
                         }
                         return null;
                       },
                     ),
-                    
+
                     const SizedBox(height: 40),
-                    
-                    // Next Button
+
                     CustomButton(
-                      text: 'Suivant',
+                      text: 'common.next'.tr(),
                       onPressed: _goToNextStep,
                       width: double.infinity,
                       height: 56,

@@ -46,10 +46,13 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
   bool _isLoading = false;
   String? _errorMessage;
 
-  // Sélecteur de type de véhicule via services
-  List<ServiceCategory> _serviceCategories = [];
-  ServiceCategory? _selectedCategory;
-  bool _loadingCategories = false;
+  // Country dial code picker
+  _CountryCode _dialCode = _CountryCode.defaultCode;
+
+  // Sélecteur de service via catalogue complet
+  List<Service> _allServices = [];
+  Service? _selectedService;
+  bool _loadingServices = false;
 
   final _imagePicker = ImagePicker();
 
@@ -69,43 +72,42 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
           () { if (mounted) c.forward(); });
       return c;
     });
-    _loadCategories();
+    _loadServices();
   }
 
-  Future<void> _loadCategories() async {
-    setState(() => _loadingCategories = true);
+  Future<void> _loadServices() async {
+    setState(() => _loadingServices = true);
     try {
-      // Tente sans token (inscription = pas encore connecté)
-      final cats = await ServiceApi.getCategories(token: '');
-      if (mounted) setState(() => _serviceCategories = cats);
-    } catch (_) {
-      // Fallback liste statique
+      final catalogue = await ServiceApi.getCatalogue(token: '');
+      final flat = catalogue.data
+          .expand((cat) => cat.services.where((s) => s.isActive))
+          .toList();
       if (mounted) {
-        setState(() => _serviceCategories = _fallbackCategories());
+        setState(() => _allServices = flat.isNotEmpty ? flat : _fallbackServices());
       }
+    } catch (_) {
+      if (mounted) setState(() => _allServices = _fallbackServices());
     } finally {
-      if (mounted) setState(() => _loadingCategories = false);
+      if (mounted) setState(() => _loadingServices = false);
     }
   }
 
-  List<ServiceCategory> _fallbackCategories() {
-    final data = [
-      {'id': 'taxi',      'name': 'Taxi Standard',    'transport_type': 'taxi'},
-      {'id': 'vtc',       'name': 'VTC / Chauffeur',  'transport_type': 'vtc'},
-      {'id': 'moto',      'name': 'Moto-taxi',        'transport_type': 'moto'},
-      {'id': 'livraison', 'name': 'Livraison Moto',   'transport_type': 'livraison'},
-      {'id': 'van',       'name': 'Van / Camionnette','transport_type': 'van'},
-      {'id': 'camion',    'name': 'Camion / Poids lourd','transport_type': 'camion'},
+  List<Service> _fallbackServices() {
+    final now = DateTime.now();
+    final entries = [
+      ('taxi_fb',     'Taxi Standard',       'taxi',      3.0,  1.2),
+      ('vtc_fb',      'VTC / Chauffeur',     'vtc',       5.0,  1.8),
+      ('moto_fb',     'Moto-taxi',           'moto',      2.0,  0.8),
+      ('livr_fb',     'Livraison Moto',      'livraison', 2.0,  0.8),
+      ('van_fb',      'Van / Camionnette',   'van',       7.0,  2.2),
+      ('camion_fb',   'Camion / Poids lourd','camion',    10.0, 3.0),
     ];
-    return data.map((d) => ServiceCategory(
-      id: d['id']!,
-      name: d['name']!,
-      transportType: d['transport_type']!,
-      status: 'active',
-      isActive: true,
-      sortOrder: 0,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+    return entries.map((e) => Service(
+      id: e.$1, name: e.$2, categoryId: '',
+      transportType: e.$3, pricingModel: 'combined',
+      isActive: true, sortOrder: 0, currency: 'EUR',
+      basePrice: e.$4, pricePerKm: e.$5,
+      createdAt: now, updatedAt: now,
     )).toList();
   }
 
@@ -168,6 +170,10 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
 
   Future<void> _registerDriver() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedService == null) {
+      setState(() => _errorMessage = 'Veuillez sélectionner un type de véhicule/service');
+      return;
+    }
     if (_idCard == null) {
       setState(() => _errorMessage = 'Veuillez sélectionner votre carte d\'identité');
       return;
@@ -187,7 +193,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
         firstName: _firstNameCtrl.text.trim(),
         lastName: _lastNameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
-        phone: _phoneCtrl.text.trim(),
+        phone: '${_dialCode.dial}${_phoneCtrl.text.trim()}',
         password: _passwordCtrl.text,
         confirmPassword: _confirmPasswordCtrl.text,
         vehicleType: _vehicleTypeCtrl.text.trim(),
@@ -339,15 +345,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                             return null;
                           })),
                       const SizedBox(height: 11),
-                      _a(3, _field(ctrl: _phoneCtrl, hint: 'Téléphone (+216...)',
-                          icon: Icons.phone_outlined,
-                          keyboard: TextInputType.phone,
-                          validator: (v) {
-                            if (v == null || v.isEmpty) return 'Obligatoire';
-                            if (!RegExp(r'^\+[0-9]{10,15}$').hasMatch(v))
-                              return 'Format: +21698765432';
-                            return null;
-                          })),
+                      _a(3, _phoneField()),
 
                       const SizedBox(height: 20),
 
@@ -489,14 +487,17 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
   // ── Vehicle selector ─────────────────────────────────────────────────────
 
   Widget _vehicleSelector() {
-    final hasValue = _selectedCategory != null;
+    final svc = _selectedService;
+    final hasValue = svc != null;
+    final hasImage = hasValue && svc.imageUrl != null && svc.imageUrl!.isNotEmpty;
+
     return GestureDetector(
       onTap: _showVehiclePicker,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: hasValue ? _orange.withOpacity(0.4) : const Color(0xFFE2E6EF),
             width: hasValue ? 1.5 : 1,
@@ -506,30 +507,105 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                 blurRadius: 8, offset: const Offset(0, 3)),
           ],
         ),
-        child: Row(
+        child: Column(
           children: [
-            Icon(
-              hasValue ? _iconForType(_selectedCategory!.transportType) : Icons.directions_car_rounded,
-              color: hasValue ? _orange : const Color(0xFF9BA3B4),
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                hasValue ? _selectedCategory!.name : 'Type de véhicule / Service',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: hasValue ? _dark : const Color(0xFF9BA3B4),
-                  fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
+            // ── Image banner quand service sélectionné avec image ──────
+            if (hasImage)
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                child: Stack(
+                  children: [
+                    Image.network(
+                      svc.imageUrl!,
+                      width: double.infinity,
+                      height: 110,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.5),
+                            ],
+                            stops: const [0.4, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 12, bottom: 10,
+                      child: Text(
+                        svc.name,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14, fontWeight: FontWeight.w700,
+                          color: Colors.white),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            // ── Row infos ─────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  if (!hasImage)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        width: 40, height: 40,
+                        color: hasValue
+                            ? _orange.withOpacity(0.1)
+                            : const Color(0xFFF1F5F9),
+                        child: Icon(
+                          _iconForType(svc?.transportType ?? ''),
+                          color: hasValue ? _orange : const Color(0xFF9BA3B4),
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  if (!hasImage) const SizedBox(width: 12),
+                  Expanded(
+                    child: hasValue
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (!hasImage)
+                                Text(svc.name,
+                                    style: TextStyle(
+                                        fontSize: 14, fontWeight: FontWeight.w700,
+                                        color: _dark)),
+                              if (svc.basePrice != null)
+                                Text(
+                                  '${svc.basePrice!.toStringAsFixed(2)} ${svc.currency ?? 'EUR'}'
+                                  '${svc.pricePerKm != null ? ' + ${svc.pricePerKm!.toStringAsFixed(2)}/km' : ''}',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade500),
+                                ),
+                            ],
+                          )
+                        : Text('Type de véhicule / Service',
+                            style: TextStyle(
+                                fontSize: 14,
+                                color: const Color(0xFF9BA3B4))),
+                  ),
+                  if (_loadingServices)
+                    const SizedBox(width: 18, height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: _orange))
+                  else
+                    Icon(Icons.keyboard_arrow_down_rounded,
+                        color: hasValue ? _orange : const Color(0xFF9BA3B4),
+                        size: 20),
+                ],
+              ),
             ),
-            if (_loadingCategories)
-              const SizedBox(width: 16, height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: _orange))
-            else
-              Icon(Icons.keyboard_arrow_down_rounded,
-                  color: hasValue ? _orange : const Color(0xFF9BA3B4), size: 20),
           ],
         ),
       ),
@@ -537,19 +613,19 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
   }
 
   void _showVehiclePicker() {
-    if (_loadingCategories) return;
+    if (_loadingServices) return;
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _VehiclePickerSheet(
-        categories: _serviceCategories,
-        selected: _selectedCategory,
-        onSelect: (cat) {
+      builder: (_) => _ServicePickerSheet(
+        services: _allServices,
+        selected: _selectedService,
+        onSelect: (svc) {
           setState(() {
-            _selectedCategory = cat;
-            _vehicleTypeCtrl.text = cat.transportType;
+            _selectedService = svc;
+            _vehicleTypeCtrl.text = svc.transportType;
           });
         },
       ),
@@ -557,16 +633,103 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
   }
 
   IconData _iconForType(String type) {
-    switch (type.toLowerCase()) {
-      case 'taxi': return Icons.local_taxi_rounded;
-      case 'vtc': return Icons.directions_car_rounded;
-      case 'moto': return Icons.motorcycle_rounded;
-      case 'livraison': return Icons.delivery_dining_rounded;
-      case 'van': return Icons.airport_shuttle_rounded;
-      case 'camion': return Icons.local_shipping_rounded;
-      case 'bus': return Icons.directions_bus_rounded;
-      default: return Icons.work_outline_rounded;
-    }
+    final t = type.toLowerCase();
+    if (t.contains('taxi')) return Icons.local_taxi_rounded;
+    if (t.contains('vtc') || t.contains('chauffeur')) return Icons.directions_car_rounded;
+    if (t.contains('moto')) return Icons.motorcycle_rounded;
+    if (t.contains('livraison') || t.contains('coursier') || t.contains('delivery')) return Icons.delivery_dining_rounded;
+    if (t.contains('van') || t.contains('camionnette')) return Icons.airport_shuttle_rounded;
+    if (t.contains('camion') || t.contains('truck')) return Icons.local_shipping_rounded;
+    if (t.contains('bus') || t.contains('minibus')) return Icons.directions_bus_rounded;
+    if (t.contains('velo') || t.contains('bicycle')) return Icons.pedal_bike_rounded;
+    if (t.contains('tuk')) return Icons.electric_rickshaw_rounded;
+    return Icons.work_outline_rounded;
+  }
+
+  // ── Phone field with country dial-code prefix ─────────────────────────────
+
+  Widget _phoneField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04),
+            blurRadius: 8, offset: const Offset(0, 3))],
+      ),
+      child: TextFormField(
+        controller: _phoneCtrl,
+        keyboardType: TextInputType.phone,
+        textInputAction: TextInputAction.next,
+        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500,
+            color: _dark),
+        validator: (v) => (v == null || v.trim().isEmpty)
+            ? 'Obligatoire' : null,
+        decoration: InputDecoration(
+          hintText: 'Téléphone',
+          hintStyle: GoogleFonts.poppins(fontSize: 13,
+              color: const Color(0xFFCDD3E0)),
+          prefixIcon: _dialCodeButton(),
+          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E6EF))),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: _orange, width: 1.5)),
+          errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFEF4444))),
+          focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5)),
+          filled: true, fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          isDense: true,
+        ),
+      ),
+    );
+  }
+
+  Widget _dialCodeButton() {
+    return GestureDetector(
+      onTap: _showCountryPicker,
+      child: Container(
+        margin: const EdgeInsets.only(left: 12, right: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_dialCode.flag, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 4),
+            Text(_dialCode.dial,
+                style: GoogleFonts.poppins(
+                    fontSize: 13, fontWeight: FontWeight.w600,
+                    color: _dark)),
+            const Icon(Icons.arrow_drop_down_rounded,
+                color: Color(0xFF9BA3B4), size: 18),
+            Container(width: 1, height: 22, color: const Color(0xFFE2E6EF),
+                margin: const EdgeInsets.only(left: 6)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCountryPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _CountryPickerSheet(
+        selected: _dialCode,
+        onSelected: (code) {
+          setState(() => _dialCode = code);
+          Navigator.pop(context);
+        },
+      ),
+    );
   }
 
   // ── Hero ──────────────────────────────────────────────────────────────────
@@ -883,171 +1046,427 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
       decoration: BoxDecoration(shape: BoxShape.circle, color: c));
 }
 
-// ── Vehicle Picker Bottom Sheet ───────────────────────────────────────────────
+// ── Service Picker Bottom Sheet ───────────────────────────────────────────────
 
-class _VehiclePickerSheet extends StatelessWidget {
-  final List<ServiceCategory> categories;
-  final ServiceCategory? selected;
-  final ValueChanged<ServiceCategory> onSelect;
+class _ServicePickerSheet extends StatefulWidget {
+  final List<Service> services;
+  final Service? selected;
+  final ValueChanged<Service> onSelect;
 
-  const _VehiclePickerSheet({
-    required this.categories,
+  const _ServicePickerSheet({
+    required this.services,
     required this.selected,
     required this.onSelect,
   });
 
+  @override
+  State<_ServicePickerSheet> createState() => _ServicePickerSheetState();
+}
+
+class _ServicePickerSheetState extends State<_ServicePickerSheet> {
   static const _orange = Color(0xFFFF6B35);
   static const _dark = Color(0xFF0F172A);
+
+  String _search = '';
+  late List<Service> _filtered;
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = widget.services;
+  }
+
+  void _onSearch(String q) {
+    setState(() {
+      _search = q.toLowerCase();
+      _filtered = widget.services
+          .where((s) =>
+              s.name.toLowerCase().contains(_search) ||
+              s.transportType.toLowerCase().contains(_search))
+          .toList();
+    });
+  }
+
+  IconData _iconForType(String type) {
+    final t = type.toLowerCase();
+    if (t.contains('taxi')) return Icons.local_taxi_rounded;
+    if (t.contains('vtc') || t.contains('chauffeur')) return Icons.directions_car_rounded;
+    if (t.contains('moto')) return Icons.motorcycle_rounded;
+    if (t.contains('livraison') || t.contains('coursier') || t.contains('delivery')) return Icons.delivery_dining_rounded;
+    if (t.contains('van') || t.contains('camionnette')) return Icons.airport_shuttle_rounded;
+    if (t.contains('camion') || t.contains('truck')) return Icons.local_shipping_rounded;
+    if (t.contains('bus') || t.contains('minibus')) return Icons.directions_bus_rounded;
+    if (t.contains('velo')) return Icons.pedal_bike_rounded;
+    if (t.contains('tuk')) return Icons.electric_rickshaw_rounded;
+    return Icons.work_outline_rounded;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 12),
+          // Handle
           Container(
-            width: 40, height: 4,
+            margin: const EdgeInsets.only(top: 10, bottom: 6),
+            width: 36, height: 4,
             decoration: BoxDecoration(
               color: Colors.grey.shade200,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
-          const SizedBox(height: 16),
+          // Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.directions_car_rounded, color: _orange, size: 18),
+            padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Type de véhicule',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: _dark,
-                  ),
-                ),
-              ],
+                child: const Icon(Icons.directions_car_rounded, color: _orange, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Choisir un service',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _dark)),
+                  Text('${widget.services.length} service${widget.services.length > 1 ? 's' : ''} disponibles',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                ],
+              ),
+            ]),
+          ),
+          // Search
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: TextField(
+              onChanged: _onSearch,
+              style: const TextStyle(fontSize: 13, color: _dark),
+              decoration: InputDecoration(
+                hintText: 'Rechercher un service...',
+                hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                prefixIcon: const Icon(Icons.search_rounded, color: Colors.grey, size: 20),
+                filled: true,
+                fillColor: const Color(0xFFF8F9FB),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                isDense: true,
+              ),
             ),
           ),
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'Choisissez le service qui correspond à votre véhicule',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-            ),
+          const Divider(height: 1, color: Color(0xFFF0F0F0)),
+          // List
+          Expanded(
+            child: _filtered.isEmpty
+                ? Center(child: Text('Aucun service trouvé',
+                    style: TextStyle(color: Colors.grey.shade400)))
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    itemCount: _filtered.length,
+                    itemBuilder: (_, i) => _serviceTile(_filtered[i]),
+                  ),
           ),
-          const SizedBox(height: 16),
-          if (categories.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text('Aucun service disponible',
-                  style: TextStyle(color: Colors.grey.shade400)),
-            )
-          else
-            ...categories.map((cat) => _categoryTile(context, cat)),
-          const SizedBox(height: 8),
+          SizedBox(height: MediaQuery.of(context).viewInsets.bottom + 12),
         ],
       ),
     );
   }
 
-  Widget _categoryTile(BuildContext context, ServiceCategory cat) {
-    final isSelected = selected?.id == cat.id;
+  Widget _serviceTile(Service svc) {
+    final isSelected = widget.selected?.id == svc.id;
+    final hasImage = svc.imageUrl != null && svc.imageUrl!.isNotEmpty;
+
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        onSelect(cat);
+        widget.onSelect(svc);
         Navigator.of(context).pop();
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? _orange.withOpacity(0.06) : Colors.grey.shade50,
+          color: isSelected ? _orange.withOpacity(0.05) : Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? _orange.withOpacity(0.4) : Colors.transparent,
-            width: 1.5,
+            color: isSelected ? _orange : const Color(0xFFE8ECF0),
+            width: isSelected ? 1.5 : 1,
           ),
+          boxShadow: isSelected
+              ? [BoxShadow(color: _orange.withOpacity(0.10), blurRadius: 8, offset: const Offset(0, 3))]
+              : [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4, offset: const Offset(0, 2))],
         ),
         child: Row(
           children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: isSelected ? _orange.withOpacity(0.12) : Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isSelected ? _orange.withOpacity(0.3) : Colors.grey.shade200,
-                ),
-              ),
-              child: Icon(_iconForType(cat.transportType),
-                  color: isSelected ? _orange : Colors.grey.shade500, size: 20),
+            // Image or icon
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: hasImage
+                  ? Image.network(
+                      svc.imageUrl!,
+                      width: 58,
+                      height: 58,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _iconBox(svc, isSelected),
+                    )
+                  : _iconBox(svc, isSelected),
             ),
             const SizedBox(width: 12),
+            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(cat.name,
+                  Text(svc.name,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: isSelected ? _dark : Colors.black87,
-                      )),
-                  const SizedBox(height: 2),
-                  Text(cat.transportType,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
-                        fontWeight: FontWeight.w400,
-                      )),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  if (svc.basePrice != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      '${svc.basePrice!.toStringAsFixed(2)} ${svc.currency ?? 'EUR'}'
+                      '${svc.pricePerKm != null ? ' + ${svc.pricePerKm!.toStringAsFixed(2)}/km' : ''}',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                    ),
+                  ],
                 ],
               ),
             ),
-            if (isSelected)
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: _orange,
-                  shape: BoxShape.circle,
+            // Badge + check
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: (isSelected ? _orange : Colors.grey.shade400).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    svc.transportType.toUpperCase().replaceAll('_', ' '),
+                    style: TextStyle(
+                      fontSize: 8, fontWeight: FontWeight.w700,
+                      color: isSelected ? _orange : Colors.grey.shade500,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
                 ),
-                child: const Icon(Icons.check_rounded, color: Colors.white, size: 12),
-              ),
+                if (isSelected) ...[
+                  const SizedBox(height: 6),
+                  const Icon(Icons.check_circle_rounded, color: _orange, size: 18),
+                ],
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  IconData _iconForType(String type) {
-    switch (type.toLowerCase()) {
-      case 'taxi': return Icons.local_taxi_rounded;
-      case 'vtc': return Icons.directions_car_rounded;
-      case 'moto': return Icons.motorcycle_rounded;
-      case 'livraison': return Icons.delivery_dining_rounded;
-      case 'van': return Icons.airport_shuttle_rounded;
-      case 'camion': return Icons.local_shipping_rounded;
-      case 'bus': return Icons.directions_bus_rounded;
-      default: return Icons.work_outline_rounded;
-    }
+  Widget _iconBox(Service svc, bool isSelected) {
+    return Container(
+      width: 58, height: 58,
+      decoration: BoxDecoration(
+        color: isSelected ? _orange.withOpacity(0.12) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(_iconForType(svc.transportType),
+          color: isSelected ? _orange : Colors.grey.shade400, size: 26),
+    );
+  }
+}
+
+// ── Country dial-code data ────────────────────────────────────────────────────
+
+class _CountryCode {
+  final String flag;
+  final String name;
+  final String dial;
+
+  const _CountryCode({required this.flag, required this.name, required this.dial});
+
+  static const _CountryCode defaultCode =
+      _CountryCode(flag: '🇹🇳', name: 'Tunisie', dial: '+216');
+
+  static const List<_CountryCode> all = [
+    _CountryCode(flag: '🇹🇳', name: 'Tunisie',         dial: '+216'),
+    _CountryCode(flag: '🇩🇿', name: 'Algérie',         dial: '+213'),
+    _CountryCode(flag: '🇲🇦', name: 'Maroc',           dial: '+212'),
+    _CountryCode(flag: '🇱🇾', name: 'Libye',           dial: '+218'),
+    _CountryCode(flag: '🇪🇬', name: 'Égypte',          dial: '+20'),
+    _CountryCode(flag: '🇸🇦', name: 'Arabie Saoudite', dial: '+966'),
+    _CountryCode(flag: '🇦🇪', name: 'Émirats',         dial: '+971'),
+    _CountryCode(flag: '🇶🇦', name: 'Qatar',           dial: '+974'),
+    _CountryCode(flag: '🇰🇼', name: 'Koweït',          dial: '+965'),
+    _CountryCode(flag: '🇧🇭', name: 'Bahreïn',         dial: '+973'),
+    _CountryCode(flag: '🇴🇲', name: 'Oman',            dial: '+968'),
+    _CountryCode(flag: '🇯🇴', name: 'Jordanie',        dial: '+962'),
+    _CountryCode(flag: '🇱🇧', name: 'Liban',           dial: '+961'),
+    _CountryCode(flag: '🇸🇩', name: 'Soudan',          dial: '+249'),
+    _CountryCode(flag: '🇫🇷', name: 'France',          dial: '+33'),
+    _CountryCode(flag: '🇩🇪', name: 'Allemagne',       dial: '+49'),
+    _CountryCode(flag: '🇧🇪', name: 'Belgique',        dial: '+32'),
+    _CountryCode(flag: '🇨🇭', name: 'Suisse',          dial: '+41'),
+    _CountryCode(flag: '🇪🇸', name: 'Espagne',         dial: '+34'),
+    _CountryCode(flag: '🇮🇹', name: 'Italie',          dial: '+39'),
+    _CountryCode(flag: '🇬🇧', name: 'Royaume-Uni',     dial: '+44'),
+    _CountryCode(flag: '🇺🇸', name: 'États-Unis',      dial: '+1'),
+    _CountryCode(flag: '🇨🇦', name: 'Canada',          dial: '+1'),
+    _CountryCode(flag: '🇸🇳', name: 'Sénégal',         dial: '+221'),
+    _CountryCode(flag: '🇨🇮', name: "Côte d'Ivoire",   dial: '+225'),
+    _CountryCode(flag: '🇨🇲', name: 'Cameroun',        dial: '+237'),
+    _CountryCode(flag: '🇬🇳', name: 'Guinée',          dial: '+224'),
+    _CountryCode(flag: '🇲🇱', name: 'Mali',            dial: '+223'),
+    _CountryCode(flag: '🇹🇷', name: 'Turquie',         dial: '+90'),
+    _CountryCode(flag: '🇵🇰', name: 'Pakistan',        dial: '+92'),
+  ];
+}
+
+// ── Country picker bottom sheet ───────────────────────────────────────────────
+
+class _CountryPickerSheet extends StatefulWidget {
+  final _CountryCode selected;
+  final void Function(_CountryCode) onSelected;
+
+  const _CountryPickerSheet({required this.selected, required this.onSelected});
+
+  @override
+  State<_CountryPickerSheet> createState() => _CountryPickerSheetState();
+}
+
+class _CountryPickerSheetState extends State<_CountryPickerSheet> {
+  static const _orange = Color(0xFFFF6B35);
+  static const _dark   = Color(0xFF0F172A);
+
+  String _search = '';
+  late List<_CountryCode> _filtered;
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = _CountryCode.all;
+  }
+
+  void _onSearch(String q) {
+    setState(() {
+      _search = q.toLowerCase();
+      _filtered = _CountryCode.all
+          .where((c) =>
+              c.name.toLowerCase().contains(_search) ||
+              c.dial.contains(_search))
+          .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 8),
+            width: 36, height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            child: Text('Sélectionner un pays',
+                style: GoogleFonts.poppins(
+                    fontSize: 16, fontWeight: FontWeight.w700, color: _dark)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              onChanged: _onSearch,
+              style: GoogleFonts.poppins(fontSize: 13, color: _dark),
+              decoration: InputDecoration(
+                hintText: 'Rechercher...',
+                hintStyle: GoogleFonts.poppins(
+                    fontSize: 13, color: Colors.grey.shade400),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    color: Colors.grey, size: 20),
+                filled: true,
+                fillColor: const Color(0xFFF8F9FB),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 10),
+                isDense: true,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: ListView.builder(
+              itemCount: _filtered.length,
+              itemBuilder: (_, i) {
+                final c = _filtered[i];
+                final isSelected = c.dial == widget.selected.dial &&
+                    c.name == widget.selected.name;
+                return InkWell(
+                  onTap: () => widget.onSelected(c),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    color: isSelected
+                        ? _orange.withOpacity(0.06)
+                        : Colors.transparent,
+                    child: Row(
+                      children: [
+                        Text(c.flag, style: const TextStyle(fontSize: 22)),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(c.name,
+                              style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                  color: _dark)),
+                        ),
+                        Text(c.dial,
+                            style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected ? _orange : Colors.grey)),
+                        if (isSelected) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.check_circle_rounded,
+                              color: _orange, size: 18),
+                        ]
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

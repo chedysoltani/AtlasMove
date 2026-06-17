@@ -559,7 +559,7 @@ class _LoginScreenState extends State<LoginScreen>
       child: GestureDetector(
         onTap: () => Navigator.pushNamed(context, '/reset_password_request'),
         child: Text(
-          'Mot de passe oublié ?',
+          'auth.forgot_password'.tr(),
           style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: FontWeight.w600,
@@ -630,12 +630,12 @@ class _LoginScreenState extends State<LoginScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('Livreur / Chauffeur ?', style: GoogleFonts.poppins(
+            Text('auth.driver_question'.tr(), style: GoogleFonts.poppins(
               fontSize: 13, color: const Color(0xFF9BA3B4))),
             const SizedBox(width: 4),
             GestureDetector(
               onTap: () => Navigator.pushNamed(context, '/driver_register'),
-              child: Text('Inscription livreur', style: GoogleFonts.poppins(
+              child: Text('auth.register_driver_btn'.tr(), style: GoogleFonts.poppins(
                 fontSize: 13, fontWeight: FontWeight.w600, color: _orange)),
             ),
           ],

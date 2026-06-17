@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../models/driver_subscription_models.dart';
 import '../services/subscription_service.dart';
@@ -98,7 +99,7 @@ class _DriverSubscriptionPaymentScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Preuve soumise — en attente de validation',
+            content: Text('sub_payment.proof_submitted'.tr(),
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             backgroundColor: _amber,
             behavior: SnackBarBehavior.floating,
@@ -134,7 +135,7 @@ class _DriverSubscriptionPaymentScreenState
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text(
-          'Paiement Abonnement',
+          'sub_payment.title'.tr(),
           style: GoogleFonts.poppins(
               color: _navy, fontWeight: FontWeight.w700, fontSize: 17),
         ),
@@ -201,7 +202,7 @@ class _DriverSubscriptionPaymentScreenState
             TextButton.icon(
               onPressed: _load,
               icon: const Icon(Icons.refresh_rounded, color: _orange),
-              label: Text('Réessayer',
+              label: Text('common.retry'.tr(),
                   style: GoogleFonts.poppins(color: _orange, fontWeight: FontWeight.w600)),
             ),
           ],
@@ -227,17 +228,17 @@ class _DriverSubscriptionPaymentScreenState
     if (isActive) {
       gradientStart = const Color(0xFF16A34A);
       gradientEnd = _green;
-      statusLabel = 'Abonnement actif ✓';
+      statusLabel = 'sub_payment.status_active'.tr();
       statusIcon = Icons.verified_rounded;
     } else if (isPending) {
       gradientStart = const Color(0xFFD97706);
       gradientEnd = _amber;
-      statusLabel = 'En attente de validation';
+      statusLabel = 'sub_payment.status_pending'.tr();
       statusIcon = Icons.hourglass_top_rounded;
     } else {
       gradientStart = _teal;
       gradientEnd = const Color(0xFF00B4A0);
-      statusLabel = 'Paiement requis';
+      statusLabel = 'sub_payment.status_required'.tr();
       statusIcon = Icons.payment_rounded;
     }
 
@@ -267,7 +268,7 @@ class _DriverSubscriptionPaymentScreenState
                   color: Colors.white70, size: 18),
               const SizedBox(width: 8),
               Text(
-                'Abonnement Taxi — AtlasMove',
+                'sub_payment.subscription_label'.tr(),
                 style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
               ),
             ],
@@ -342,7 +343,7 @@ class _DriverSubscriptionPaymentScreenState
               ),
               const SizedBox(width: 10),
               Text(
-                'Adresse de paiement',
+                'sub_payment.wallet_address'.tr(),
                 style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700, fontSize: 15, color: _navy),
               ),
@@ -365,7 +366,7 @@ class _DriverSubscriptionPaymentScreenState
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Réseau : ${info.network} — Envoyez uniquement via ce réseau, sinon les fonds seront perdus définitivement.',
+                    'sub_payment.network_warning'.tr(namedArgs: {'network': info.network}),
                     style: GoogleFonts.poppins(
                         fontSize: 11,
                         color: const Color(0xFF92400E),
@@ -402,7 +403,7 @@ class _DriverSubscriptionPaymentScreenState
                     Clipboard.setData(ClipboardData(text: info.walletAddress));
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Adresse copiée',
+                        content: Text('common.copied'.tr(),
                             style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                         backgroundColor: _green,
                         behavior: SnackBarBehavior.floating,
@@ -424,7 +425,7 @@ class _DriverSubscriptionPaymentScreenState
                       children: [
                         const Icon(Icons.copy_rounded, color: _teal, size: 14),
                         const SizedBox(width: 4),
-                        Text('Copier',
+                        Text('common.copy'.tr(),
                             style: GoogleFonts.poppins(
                                 color: _teal,
                                 fontSize: 11,
@@ -443,7 +444,7 @@ class _DriverSubscriptionPaymentScreenState
           Center(
             child: Column(
               children: [
-                Text('Scanner avec votre wallet',
+                Text('sub_payment.scan_wallet'.tr(),
                     style: GoogleFonts.poppins(
                         fontSize: 11, color: _textSecondary)),
                 const SizedBox(height: 10),
@@ -484,17 +485,17 @@ class _DriverSubscriptionPaymentScreenState
       bg = _green.withOpacity(0.08);
       textColor = _green;
       icon = Icons.check_circle_rounded;
-      message = 'Paiement validé — abonnement activé ✓';
+      message = 'sub_payment.payment_validated'.tr();
     } else if (record.isPending) {
       bg = _amber.withOpacity(0.08);
       textColor = const Color(0xFF92400E);
       icon = Icons.hourglass_top_rounded;
-      message = 'Preuve soumise — en attente de validation par l\'équipe AtlasMove.';
+      message = 'sub_payment.proof_pending'.tr();
     } else if (record.isRejected) {
       bg = _red.withOpacity(0.08);
       textColor = _red;
       icon = Icons.cancel_rounded;
-      message = 'Paiement rejeté — vérifiez le hash et soumettez à nouveau.';
+      message = 'sub_payment.payment_rejected'.tr();
     } else {
       return const SizedBox.shrink();
     }
@@ -556,14 +557,14 @@ class _DriverSubscriptionPaymentScreenState
                       color: _orange, size: 20),
                 ),
                 const SizedBox(width: 10),
-                Text('Confirmer le paiement',
+                Text('sub_payment.confirm_payment'.tr(),
                     style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700, fontSize: 15, color: _navy)),
               ],
             ),
             const SizedBox(height: 14),
             Text(
-              'Après avoir transféré 90 USDT (réseau TRC20), collez le hash de transaction (TXID) ci-dessous.',
+              'sub_payment.form_hint'.tr(),
               style: GoogleFonts.poppins(
                   fontSize: 12, color: _textSecondary, height: 1.5),
             ),
@@ -571,7 +572,7 @@ class _DriverSubscriptionPaymentScreenState
             TextFormField(
               controller: _hashController,
               decoration: InputDecoration(
-                labelText: 'Hash de la transaction (TXID)',
+                labelText: 'sub_payment.txid_label'.tr(),
                 labelStyle:
                     GoogleFonts.poppins(fontSize: 13, color: _textSecondary),
                 hintText: '0x...',
@@ -595,7 +596,7 @@ class _DriverSubscriptionPaymentScreenState
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.paste_rounded,
                       color: _textSecondary, size: 18),
-                  tooltip: 'Coller',
+                  tooltip: 'sub_payment.paste'.tr(),
                   onPressed: () async {
                     final data = await Clipboard.getData('text/plain');
                     if (data?.text != null) {
@@ -606,8 +607,8 @@ class _DriverSubscriptionPaymentScreenState
               ),
               style: GoogleFonts.poppins(fontSize: 12, color: _navy),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Le hash est requis';
-                if (v.trim().length < 10) return 'Hash invalide';
+                if (v == null || v.trim().isEmpty) return 'sub_payment.hash_required'.tr();
+                if (v.trim().length < 10) return 'sub_payment.hash_invalid'.tr();
                 return null;
               },
             ),
@@ -631,7 +632,7 @@ class _DriverSubscriptionPaymentScreenState
                         child: CircularProgressIndicator(
                             color: Colors.white, strokeWidth: 2.5))
                     : Text(
-                        'Confirmer le paiement',
+                        'sub_payment.confirm_payment'.tr(),
                         style: GoogleFonts.poppins(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -651,7 +652,7 @@ class _DriverSubscriptionPaymentScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Historique des paiements',
+        Text('sub_payment.history_title'.tr(),
             style: GoogleFonts.poppins(
                 fontWeight: FontWeight.w700, fontSize: 16, color: _navy)),
         const SizedBox(height: 12),
@@ -668,7 +669,7 @@ class _DriverSubscriptionPaymentScreenState
                 children: [
                   const Icon(Icons.history_rounded, color: _border, size: 40),
                   const SizedBox(height: 10),
-                  Text('Aucun paiement soumis',
+                  Text('sub_payment.no_payments'.tr(),
                       style:
                           GoogleFonts.poppins(color: _textSecondary, fontSize: 13)),
                 ],
@@ -688,15 +689,15 @@ class _DriverSubscriptionPaymentScreenState
 
     if (record.isPaid) {
       statusColor = _green;
-      statusLabel = 'Validé';
+      statusLabel = 'sub_payment.validated'.tr();
       statusIcon = Icons.check_circle_rounded;
     } else if (record.isPending) {
       statusColor = _amber;
-      statusLabel = 'En attente';
+      statusLabel = 'common.pending'.tr();
       statusIcon = Icons.hourglass_top_rounded;
     } else {
       statusColor = _red;
-      statusLabel = 'Rejeté';
+      statusLabel = 'common.rejected'.tr();
       statusIcon = Icons.cancel_rounded;
     }
 
@@ -726,7 +727,7 @@ class _DriverSubscriptionPaymentScreenState
           Row(
             children: [
               Text(
-                dateLabel.isNotEmpty ? 'Paiement du $dateLabel' : 'Abonnement',
+                dateLabel.isNotEmpty ? 'sub_payment.payment_of'.tr(namedArgs: {'date': dateLabel}) : 'sub_payment.subscription_label'.tr(),
                 style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w700, fontSize: 13, color: _navy),
               ),
@@ -786,7 +787,7 @@ class _DriverSubscriptionPaymentScreenState
           if (record.paidAt != null) ...[
             const SizedBox(height: 4),
             Text(
-              'Validé le ${_formatDate(record.paidAt!)}',
+              'sub_payment.validated_on'.tr(namedArgs: {'date': _formatDate(record.paidAt!)}),
               style: GoogleFonts.poppins(fontSize: 10, color: _textSecondary),
             ),
           ],

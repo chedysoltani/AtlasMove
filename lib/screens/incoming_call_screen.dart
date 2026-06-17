@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/call_models.dart';
 import '../services/call_service.dart';
 import 'active_call_screen.dart';
@@ -75,7 +76,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Impossible de rejoindre l\'appel'),
+          title: Text('call.join_error'.tr()),
           content: SelectableText(err),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
@@ -160,9 +161,9 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                   color: const Color(0xFF22C55E).withOpacity(0.3),
                 ),
               ),
-              child: const Text(
-                'Appel entrant...',
-                style: TextStyle(
+              child: Text(
+                'call.incoming'.tr(),
+                style: const TextStyle(
                   color: Color(0xFF22C55E),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -182,7 +183,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                   _CallActionButton(
                     icon: Icons.call_end_rounded,
                     color: const Color(0xFFEF4444),
-                    label: 'Refuser',
+                    label: 'common.reject'.tr(),
                     onTap: _reject,
                   ),
 
@@ -192,7 +193,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                         ? Icons.hourglass_top_rounded
                         : Icons.call_rounded,
                     color: const Color(0xFF22C55E),
-                    label: 'Accepter',
+                    label: 'common.accept'.tr(),
                     onTap: _isAnswering ? null : _accept,
                   ),
                 ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../core/network/http_client.dart';
 import 'support_ticket_chat_screen.dart';
 
@@ -31,51 +32,26 @@ class _SupportScreenState extends State<SupportScreen>
   final _msgCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  String _selectedCategory = 'Compte';
   bool _isSending = false;
   bool _messageSent = false;
-  String? _ticketId;   // UUID pour l'API chat
-  String? _ticketRef;  // TICK-YYYYMMDD-XXX pour l'affichage
+  String? _ticketId;
+  String? _ticketRef;
   String? _errorMsg;
 
-  final _categories = ['Compte', 'Paiement', 'Livraison', 'Technique', 'Autre'];
+  static const _categoryKeys = [
+    'support.cat_account', 'support.cat_payment',
+    'support.cat_delivery', 'support.cat_technical', 'support.cat_other',
+  ];
+  String _selectedCategoryKey = 'support.cat_account';
 
-  final _faqItems = const [
-    _FaqItem(
-      question: 'Comment modifier mes informations personnelles ?',
-      answer:
-          'Rendez-vous dans Mon Profil → icône édition en haut à droite. Vous pouvez modifier votre nom, téléphone et photo de profil.',
-    ),
-    _FaqItem(
-      question: 'Comment fonctionne la commission ?',
-      answer:
-          'La commission est de 10 % sur votre chiffre d\'affaires mensuel. Le premier mois est offert. Elle est calculée automatiquement chaque mois dans "Mes Gains".',
-    ),
-    _FaqItem(
-      question: 'Comment payer ma commission ?',
-      answer:
-          'Depuis "Mes Gains" → bouton "Payer maintenant". Transférez le montant en USDT TRC20 vers l\'adresse affichée, puis collez le hash de transaction pour confirmation.',
-    ),
-    _FaqItem(
-      question: 'Je ne peux pas me connecter à mon compte',
-      answer:
-          'Vérifiez votre email et mot de passe. Si vous avez oublié votre mot de passe, utilisez "Mot de passe oublié ?" sur la page de connexion. Contactez le support si le problème persiste.',
-    ),
-    _FaqItem(
-      question: 'Comment annuler ou modifier un rendez-vous ?',
-      answer:
-          'Depuis "Mes Rendez-vous", appuyez sur le rendez-vous concerné. Vous pouvez le modifier ou l\'annuler tant qu\'il n\'est pas en cours.',
-    ),
-    _FaqItem(
-      question: 'Mon paiement de commission n\'a pas été validé',
-      answer:
-          'La validation prend jusqu\'à 24–48h. Assurez-vous d\'avoir soumis le bon hash de transaction (TXID). Si le délai est dépassé, contactez-nous en indiquant votre hash.',
-    ),
-    _FaqItem(
-      question: 'Comment activer les notifications ?',
-      answer:
-          'Allez dans les paramètres de votre téléphone → Applications → AtlasMove → Notifications → Activer. Redémarrez l\'application ensuite.',
-    ),
+  List<_FaqItem> get _faqItems => [
+    _FaqItem(question: 'support.faq_q1'.tr(), answer: 'support.faq_a1'.tr()),
+    _FaqItem(question: 'support.faq_q2'.tr(), answer: 'support.faq_a2'.tr()),
+    _FaqItem(question: 'support.faq_q3'.tr(), answer: 'support.faq_a3'.tr()),
+    _FaqItem(question: 'support.faq_q4'.tr(), answer: 'support.faq_a4'.tr()),
+    _FaqItem(question: 'support.faq_q5'.tr(), answer: 'support.faq_a5'.tr()),
+    _FaqItem(question: 'support.faq_q6'.tr(), answer: 'support.faq_a6'.tr()),
+    _FaqItem(question: 'support.faq_q7'.tr(), answer: 'support.faq_a7'.tr()),
   ];
 
   @override
@@ -131,14 +107,14 @@ class _SupportScreenState extends State<SupportScreen>
   Future<void> _sendMessage() async {
     final msg = _msgCtrl.text.trim();
     if (msg.length < 10) {
-      setState(() => _errorMsg = 'Le message doit contenir au moins 10 caractères.');
+      setState(() => _errorMsg = 'support.message_min_length'.tr());
       return;
     }
     setState(() { _isSending = true; _errorMsg = null; });
     try {
       final response = await HttpClient.post(
         '/m/support/ticket',
-        body: {'category': _selectedCategory, 'message': msg},
+        body: {'category': _selectedCategoryKey.tr(), 'message': msg},
       );
       if (!mounted) return;
       final raw = response.json;
@@ -298,7 +274,7 @@ class _SupportScreenState extends State<SupportScreen>
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Centre d\'aide',
+                          'support.title'.tr(),
                           style: GoogleFonts.poppins(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
@@ -313,7 +289,7 @@ class _SupportScreenState extends State<SupportScreen>
                             _accentLine(),
                             const SizedBox(width: 10),
                             Text(
-                              'Nous sommes là pour vous',
+                              'support.subtitle'.tr(),
                               style: GoogleFonts.poppins(
                                 fontSize: 12,
                                 color: Colors.white.withOpacity(0.5),
@@ -342,7 +318,7 @@ class _SupportScreenState extends State<SupportScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Contactez-nous', Icons.headset_mic_rounded),
+        _sectionTitle('support.contact_us'.tr(), Icons.headset_mic_rounded),
         const SizedBox(height: 14),
         Row(
           children: [
@@ -359,10 +335,10 @@ class _SupportScreenState extends State<SupportScreen>
             Expanded(
               child: _contactCard(
                 icon: Icons.phone_rounded,
-                label: 'Téléphone',
+                label: 'support.copy_number'.tr(),
                 value: '+216 XX XXX XXX',
                 color: _green,
-                onTap: () => _copyToClipboard('+216XXXXXXXX', 'Téléphone'),
+                onTap: () => _copyToClipboard('+216XXXXXXXX', 'support.copy_number'.tr()),
               ),
             ),
           ],
@@ -443,7 +419,7 @@ class _SupportScreenState extends State<SupportScreen>
 
   Widget _whatsAppCard() {
     return GestureDetector(
-      onTap: () => _copyToClipboard('+216XXXXXXXX', 'Numéro WhatsApp'),
+      onTap: () => _copyToClipboard('+216XXXXXXXX', 'support.copy_number'.tr()),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
@@ -478,7 +454,7 @@ class _SupportScreenState extends State<SupportScreen>
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: _textPrim)),
-                  Text('Réponse en moins d\'1h en horaires ouvrés',
+                  Text('support.whatsapp_hint'.tr(),
                       style: GoogleFonts.poppins(
                           fontSize: 11, color: _textSecond)),
                 ],
@@ -490,7 +466,7 @@ class _SupportScreenState extends State<SupportScreen>
                 color: const Color(0xFF25D366).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text('Copier n°',
+              child: Text('support.copy_number'.tr(),
                   style: GoogleFonts.poppins(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -516,7 +492,7 @@ class _SupportScreenState extends State<SupportScreen>
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Support disponible Lun – Sam · 9h00 – 19h00',
+              'support.availability'.tr(),
               style: GoogleFonts.poppins(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
@@ -535,7 +511,7 @@ class _SupportScreenState extends State<SupportScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Questions fréquentes', Icons.help_outline_rounded),
+        _sectionTitle('support.faq_title'.tr(), Icons.help_outline_rounded),
         const SizedBox(height: 14),
         Container(
           decoration: BoxDecoration(
@@ -576,7 +552,7 @@ class _SupportScreenState extends State<SupportScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Signaler un problème', Icons.bug_report_rounded),
+        _sectionTitle('support.report_title'.tr(), Icons.bug_report_rounded),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(20),
@@ -596,7 +572,7 @@ class _SupportScreenState extends State<SupportScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Catégorie',
+                Text('support.category'.tr(),
                     style: GoogleFonts.poppins(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -604,7 +580,7 @@ class _SupportScreenState extends State<SupportScreen>
                 const SizedBox(height: 10),
                 _buildCategoryChips(),
                 const SizedBox(height: 18),
-                Text('Message',
+                Text('support.message_label'.tr(),
                     style: GoogleFonts.poppins(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -633,10 +609,11 @@ class _SupportScreenState extends State<SupportScreen>
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: _categories.map((cat) {
-        final selected = _selectedCategory == cat;
+      children: _categoryKeys.map((key) {
+        final cat = key.tr();
+        final selected = _selectedCategoryKey == key;
         return GestureDetector(
-          onTap: () => setState(() => _selectedCategory = cat),
+          onTap: () => setState(() => _selectedCategoryKey = key),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -675,7 +652,7 @@ class _SupportScreenState extends State<SupportScreen>
         keyboardType: TextInputType.multiline,
         style: GoogleFonts.poppins(fontSize: 13, color: _textPrim),
         decoration: InputDecoration(
-          hintText: 'Décrivez votre problème en détail...',
+          hintText: 'support.message_hint'.tr(),
           hintStyle: GoogleFonts.poppins(
               fontSize: 13, color: const Color(0xFFCDD3E0)),
           border: InputBorder.none,
@@ -706,7 +683,7 @@ class _SupportScreenState extends State<SupportScreen>
               const Icon(Icons.check_circle_outline_rounded,
                   color: _green, size: 18),
               const SizedBox(width: 8),
-              Text('Ticket créé avec succès !',
+              Text('support.ticket_created'.tr(),
                   style: GoogleFonts.poppins(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -738,7 +715,7 @@ class _SupportScreenState extends State<SupportScreen>
           Padding(
             padding: const EdgeInsets.only(left: 26),
             child: Text(
-              'Notre équipe vous répondra bientôt.',
+              'support.team_response'.tr(),
               style: GoogleFonts.poppins(
                   fontSize: 12, color: _green, height: 1.4),
             ),
@@ -750,7 +727,7 @@ class _SupportScreenState extends State<SupportScreen>
               onTap: () {
                 if (_ticketId == null) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('ID du ticket non disponible.',
+                    content: Text('support.ticket_id_unavailable'.tr(),
                         style: GoogleFonts.poppins(fontSize: 13)),
                     backgroundColor: _red,
                     behavior: SnackBarBehavior.floating,
@@ -780,7 +757,7 @@ class _SupportScreenState extends State<SupportScreen>
                     const Icon(Icons.chat_bubble_outline_rounded,
                         color: Colors.white, size: 15),
                     const SizedBox(width: 6),
-                    Text('Voir le chat',
+                    Text('support.view_chat'.tr(),
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -857,7 +834,7 @@ class _SupportScreenState extends State<SupportScreen>
                     const Icon(Icons.send_rounded,
                         color: Colors.white, size: 18),
                     const SizedBox(width: 8),
-                    Text('Envoyer le message',
+                    Text('support.send_message'.tr(),
                         style: GoogleFonts.poppins(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,

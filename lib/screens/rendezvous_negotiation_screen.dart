@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/rendezvous_models.dart';
 import '../services/rendezvous_service.dart';
 import '../utils/fare_calculator.dart';
@@ -68,7 +69,7 @@ class _RendezvousNegotiationScreenState
     setState(() => _actingIds.add(offer.id));
     try {
       await RendezvousService.acceptOffer(offer.id);
-      _showSnack('Offre acceptée — RDV confirmé', success: true);
+      _showSnack('rdv.offer_accepted_confirmed'.tr(), success: true);
       await _load();
     } catch (e) {
       _showSnack('Erreur : $e', success: false);
@@ -81,7 +82,7 @@ class _RendezvousNegotiationScreenState
     setState(() => _actingIds.add(offer.id));
     try {
       await RendezvousService.rejectOffer(offer.id);
-      _showSnack('Offre refusée');
+      _showSnack('rdv.offer_refused_msg'.tr());
       await _load();
     } catch (e) {
       _showSnack('Erreur : $e', success: false);
@@ -100,7 +101,7 @@ class _RendezvousNegotiationScreenState
         title: Row(children: [
           const Text('💬', style: TextStyle(fontSize: 22)),
           const SizedBox(width: 8),
-          Text('Contre-proposition',
+          Text('rdv.counter_title'.tr(),
               style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 16)),
         ]),
         content: Column(
@@ -108,7 +109,7 @@ class _RendezvousNegotiationScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Offre actuelle : ${FareCalculator.formatFare(offer.proposedFare, currency)}',
+              'rdv.current_offer'.tr(namedArgs: {'amount': FareCalculator.formatFare(offer.proposedFare, currency)}),
               style: GoogleFonts.poppins(fontSize: 13, color: _textSecondary),
             ),
             const SizedBox(height: 12),
@@ -116,7 +117,7 @@ class _RendezvousNegotiationScreenState
               controller: ctrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
-                labelText: 'Votre prix ($currency)',
+                labelText: 'rdv.your_price'.tr(namedArgs: {'currency': currency}),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 prefixIcon: const Icon(Icons.payments_rounded),
               ),
@@ -127,7 +128,7 @@ class _RendezvousNegotiationScreenState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Annuler',
+            child: Text('common.cancel'.tr(),
                 style: GoogleFonts.poppins(color: _textSecondary)),
           ),
           ElevatedButton(
@@ -140,7 +141,7 @@ class _RendezvousNegotiationScreenState
               final v = double.tryParse(ctrl.text.replaceAll(',', '.'));
               if (v != null && v > 0) Navigator.pop(ctx, v);
             },
-            child: Text('Envoyer',
+            child: Text('common.send'.tr(),
                 style: GoogleFonts.poppins(
                     color: Colors.white, fontWeight: FontWeight.w700)),
           ),
@@ -151,7 +152,7 @@ class _RendezvousNegotiationScreenState
     setState(() => _actingIds.add(offer.id));
     try {
       await RendezvousService.counterOffer(offer.id, value);
-      _showSnack('Contre-proposition de ${FareCalculator.formatFare(value, currency)} envoyée');
+      _showSnack('rdv.counter_sent'.tr(namedArgs: {'amount': FareCalculator.formatFare(value, currency)}));
       await _load();
     } catch (e) {
       _showSnack('Erreur : $e', success: false);
@@ -184,7 +185,7 @@ class _RendezvousNegotiationScreenState
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Négociation',
+            Text('rdv.negotiation'.tr(),
                 style: GoogleFonts.poppins(
                     color: _navy, fontWeight: FontWeight.w700, fontSize: 16)),
             Text(widget.rdv.serviceName,
@@ -213,7 +214,7 @@ class _RendezvousNegotiationScreenState
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                           child: Text(
-                            'Historique des offres',
+                            'rdv.offers_history'.tr(),
                             style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 15,
@@ -253,7 +254,7 @@ class _RendezvousNegotiationScreenState
           TextButton.icon(
             onPressed: _load,
             icon: const Icon(Icons.refresh_rounded, color: _orange),
-            label: Text('Réessayer',
+            label: Text('common.retry'.tr(),
                 style: GoogleFonts.poppins(
                     color: _orange, fontWeight: FontWeight.w600)),
           ),
@@ -274,14 +275,14 @@ class _RendezvousNegotiationScreenState
             child: const Icon(Icons.handshake_rounded, color: _indigo, size: 30),
           ),
           const SizedBox(height: 14),
-          Text('Aucune offre pour le moment',
+          Text('rdv.no_offers'.tr(),
               style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700, fontSize: 15, color: _navy)),
           const SizedBox(height: 6),
           Text(
             widget.isDriver
-                ? 'Proposez un prix via le bouton "Proposer" sur la carte disponible.'
-                : 'Le livreur peut proposer un prix différent. Revenez ici pour répondre.',
+                ? 'rdv.driver_no_offer_hint'.tr()
+                : 'rdv.client_no_offer_hint'.tr(),
             style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
             textAlign: TextAlign.center,
           ),
@@ -335,7 +336,7 @@ class _RendezvousNegotiationScreenState
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Prix proposé par le client',
+                  Text('rdv.client_price'.tr(),
                       style: GoogleFonts.poppins(
                           fontSize: 12, color: _textSecondary)),
                   Text(
@@ -364,19 +365,19 @@ class _RendezvousNegotiationScreenState
     switch (offer.status) {
       case 'accepted':
         statusColor = _green;
-        statusLabel = 'Acceptée';
+        statusLabel = 'rdv.offer_accepted_label'.tr();
         break;
       case 'rejected':
         statusColor = _red;
-        statusLabel = 'Refusée';
+        statusLabel = 'rdv.offer_refused_label'.tr();
         break;
       case 'countered':
         statusColor = _amber;
-        statusLabel = 'Contre-offre';
+        statusLabel = 'rdv.counter_offer'.tr();
         break;
       default:
         statusColor = _indigo;
-        statusLabel = 'En attente';
+        statusLabel = 'common.pending'.tr();
     }
 
     final isActing = _actingIds.contains(offer.id);
@@ -426,7 +427,7 @@ class _RendezvousNegotiationScreenState
                         children: [
                           Text(
                             isFromMe
-                                ? (widget.isDriver ? 'Vous (livreur)' : 'Vous (client)')
+                                ? (widget.isDriver ? 'rdv.you_driver'.tr() : 'rdv.you_client'.tr())
                                 : (widget.isDriver ? 'Client' : 'Livreur'),
                             style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w700,
@@ -483,7 +484,7 @@ class _RendezvousNegotiationScreenState
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: _red))
                           : const Icon(Icons.close_rounded, size: 16, color: _red),
-                      label: Text('Refuser',
+                      label: Text('common.reject'.tr(),
                           style: GoogleFonts.poppins(
                               fontSize: 13, fontWeight: FontWeight.w600, color: _red)),
                       style: OutlinedButton.styleFrom(
@@ -500,7 +501,7 @@ class _RendezvousNegotiationScreenState
                     child: OutlinedButton.icon(
                       onPressed: isActing ? null : () => _counter(offer),
                       icon: const Icon(Icons.edit_rounded, size: 16, color: _indigo),
-                      label: Text('Contre',
+                      label: Text('rdv.counter_btn'.tr(),
                           style: GoogleFonts.poppins(
                               fontSize: 13, fontWeight: FontWeight.w600, color: _indigo)),
                       style: OutlinedButton.styleFrom(
@@ -524,7 +525,7 @@ class _RendezvousNegotiationScreenState
                                   strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.check_rounded,
                               size: 16, color: Colors.white),
-                      label: Text('Accepter',
+                      label: Text('common.accept'.tr(),
                           style: GoogleFonts.poppins(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,

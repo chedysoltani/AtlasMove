@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../services/notification_service.dart';
 import '../services/trip_service.dart';
 import '../screens/driver_active_ride.dart';
+import '../screens/support_ticket_chat_screen.dart';
 import '../utils/app_theme.dart';
 
 class NotificationSheet extends StatefulWidget {
@@ -262,6 +263,7 @@ class _NotificationSheetState extends State<NotificationSheet> {
   }
 
   Future<void> _handleNotificationTap(NotificationItem notification) async {
+    debugPrint('🔔 NOTIF TAP — actionUrl: ${notification.actionUrl}  metadata: ${notification.metadata}  type: ${notification.type.name}');
     // Marquer comme lu
     if (notification.status == NotificationStatus.unread) {
       _notificationService.markAsRead(notification.id);
@@ -276,9 +278,9 @@ class _NotificationSheetState extends State<NotificationSheet> {
     
     // Fermer le sheet
     Navigator.pop(context);
-    
+
     // Suivre le deep link
-    _navigateDeepLink(notification.actionUrl);
+    _navigateDeepLink(notification);
   }
 
   Future<void> _handleDriverTripNotificationClick() async {
@@ -300,10 +302,9 @@ class _NotificationSheetState extends State<NotificationSheet> {
     }
   }
 
-  void _navigateDeepLink(String? actionUrl) {
-    if (actionUrl == null || actionUrl.isEmpty) return;
-
-    final path = actionUrl.toLowerCase().trim();
+  void _navigateDeepLink(NotificationItem notification) {
+    final actionUrl = notification.actionUrl;
+    final path = (actionUrl ?? '').toLowerCase().trim();
 
     // Intercepter si c'est un livreur pour éviter le 403 et ouvrir la carte directement
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -312,6 +313,22 @@ class _NotificationSheetState extends State<NotificationSheet> {
         _handleDriverTripNotificationClick();
         return;
       }
+    }
+
+    // Support ticket chat — metadata.ticketId is the primary source (actionUrl may be null)
+    final metaTicketId = notification.metadata['ticketId']?.toString();
+    if ((metaTicketId != null && metaTicketId.isNotEmpty) ||
+        path.contains('/support')) {
+      final ticketId = metaTicketId ?? _extractTicketId(path);
+      if (ticketId != null && ticketId.isNotEmpty) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SupportTicketChatScreen(ticketId: ticketId),
+          ),
+        );
+      }
+      return;
     }
 
     if (path.contains('/trips/') && path.contains('/offers')) {
@@ -339,6 +356,18 @@ class _NotificationSheetState extends State<NotificationSheet> {
     } else if (path.contains('/driver_dashboard')) {
       Navigator.pushNamed(context, '/driver_dashboard');
     }
+  }
+
+  /// Extracts a UUID-like ticketId from paths like /support/ticket/<id> or /support/tickets/<id>
+  String? _extractTicketId(String path) {
+    final parts = path.split('/').where((p) => p.isNotEmpty).toList();
+    final idx = parts.indexWhere((p) => p == 'ticket' || p == 'tickets');
+    if (idx != -1 && idx + 1 < parts.length) {
+      final candidate = parts[idx + 1];
+      // Accept UUIDs or alphanumeric IDs (at least 8 chars)
+      if (candidate.length >= 8) return candidate;
+    }
+    return null;
   }
 
   @override
@@ -576,7 +605,7 @@ class _NotificationSheetState extends State<NotificationSheet> {
                           _notificationService.markAsRead(notification.id);
                         }
                         Navigator.pop(context);
-                        _navigateDeepLink(notification.actionUrl);
+                        _navigateDeepLink(notification);
                       },
                       icon: const Icon(Icons.arrow_right_alt_rounded, size: 16),
                       label: Text(
