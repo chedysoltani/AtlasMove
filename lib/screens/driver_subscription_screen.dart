@@ -535,7 +535,8 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
-            onPressed: () => Navigator.pushNamed(context, '/subscription_payment'),
+            onPressed: () => Navigator.pushNamed(context, '/subscription_payment')
+                .then((_) => _subService.fetchStatus()),
             icon: const Icon(Icons.currency_bitcoin_rounded, size: 20),
             label: const Text(
               'Payer en USDT (TRC20)',

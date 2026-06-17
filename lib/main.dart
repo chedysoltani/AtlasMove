@@ -61,6 +61,7 @@ import 'screens/reset_password_request_screen.dart';
 import 'screens/reset_password_verify_screen.dart';
 import 'screens/support_screen.dart';
 import 'screens/driver_subscription_payment_screen.dart';
+import 'screens/legal_consent_screen.dart';
 import 'services/location_foreground_service.dart';
 import 'core/network/http_client.dart';
 
@@ -85,6 +86,17 @@ void main() async {
   // Initialiser Stripe
   Stripe.publishableKey = dotenv.env['STRIPE_PUBLISHABLE_KEY'] ?? '';
   await Stripe.instance.applySettings();
+
+  // Accords légaux non acceptés → naviguer vers /legal_consent
+  bool _legalConsentNavigating = false;
+  HttpClient.onLegalConsentRequired = () {
+    if (_legalConsentNavigating) return;
+    _legalConsentNavigating = true;
+    navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        '/legal_consent', (route) => false);
+    Future.delayed(const Duration(seconds: 3),
+        () => _legalConsentNavigating = false);
+  };
 
   // Session expirée → déconnecter les services et naviguer vers /login
   bool _sessionExpiredNavigating = false;
@@ -259,6 +271,7 @@ class AtlasMoveApp extends StatelessWidget {
             '/landing': (context) => const LandingScreen(),
             '/login': (context) => const LoginScreen(),
             '/support': (context) => const SupportScreen(),
+            '/legal_consent': (context) => const LegalConsentScreen(),
             '/subscription_payment': (context) => const DriverSubscriptionPaymentScreen(),
             '/reset_password_request': (context) => const ResetPasswordRequestScreen(),
             '/reset_password_verify': (context) {

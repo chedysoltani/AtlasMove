@@ -22,6 +22,10 @@ class HttpClient {
   /// Appelé après chaque refresh de token réussi.
   /// Branché dans main.dart pour reconnecter les sockets avec le nouveau token.
   static void Function()? onTokenRefreshed;
+
+  /// Appelé quand le backend renvoie 403 pour accords légaux non acceptés.
+  /// Branché dans main.dart pour naviguer vers /legal_consent.
+  static void Function()? onLegalConsentRequired;
   
   /// Headers par défaut pour toutes les requêtes
   static Future<Map<String, String>> _defaultHeaders() async {
@@ -245,6 +249,23 @@ class HttpClient {
           onSessionExpired?.call();
           throw SessionExpiredException();
         }
+      }
+
+      // 403 → accords légaux non acceptés
+      if (response.statusCode == 403) {
+        try {
+          final errorBody = jsonDecode(response.body);
+          final msg = (errorBody['message'] ?? errorBody['error'] ?? '').toString().toLowerCase();
+          if (msg.contains('legal') || msg.contains('agreement') ||
+              msg.contains('privacy') || msg.contains('terms') ||
+              msg.contains('accepted') ||
+              // French keywords
+              msg.contains('politique') || msg.contains('confidentialit') ||
+              msg.contains('conditions') || msg.contains('utilisation') ||
+              msg.contains('accepter') || msg.contains('accords')) {
+            onLegalConsentRequired?.call();
+          }
+        } catch (_) {}
       }
 
       // Gestion des autres erreurs HTTP

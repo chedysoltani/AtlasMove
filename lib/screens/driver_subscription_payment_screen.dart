@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../models/driver_subscription_models.dart';
 import '../services/subscription_service.dart';
+import '../services/location_service.dart';
 
 const _orange = Color(0xFFFF6B35);
 const _navy = Color(0xFF1E293B);
@@ -51,8 +52,12 @@ class _DriverSubscriptionPaymentScreenState
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
+      final position = await LocationService().getCurrentPosition();
       final results = await Future.wait([
-        SubscriptionPaymentService.fetchPaymentInfo(),
+        SubscriptionPaymentService.fetchPaymentInfo(
+          latitude: position?.latitude,
+          longitude: position?.longitude,
+        ),
         SubscriptionPaymentService.fetchPaymentHistory(),
       ]);
       if (mounted) {

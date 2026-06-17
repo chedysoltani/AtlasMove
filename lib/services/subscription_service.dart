@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../core/network/http_client.dart';
 import '../models/driver_subscription_models.dart';
@@ -5,9 +6,19 @@ import '../models/driver_subscription_models.dart';
 // ── Manual USDT payment service (hash submission flow) ─────────────────────
 
 class SubscriptionPaymentService {
-  static Future<SubscriptionPaymentInfo?> fetchPaymentInfo() async {
+  static Future<SubscriptionPaymentInfo?> fetchPaymentInfo({
+    double? latitude,
+    double? longitude,
+  }) async {
     try {
-      final response = await HttpClient.get('/m/livreur/subscription/payment-info');
+      final params = <String, String>{};
+      if (latitude != null) params['latitude'] = latitude.toStringAsFixed(6);
+      if (longitude != null) params['longitude'] = longitude.toStringAsFixed(6);
+
+      final query = params.isNotEmpty
+          ? '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}'
+          : '';
+      final response = await HttpClient.get('/m/livreur/subscription/payment-info$query');
       debugPrint('💳 sub payment-info status=${response.statusCode}');
       if (!response.isSuccess) return null;
 
@@ -34,14 +45,19 @@ class SubscriptionPaymentService {
       debugPrint('💳 sub payment-history status=${response.statusCode}');
       if (!response.isSuccess) return [];
 
-      final raw = response.json;
+      // Le backend peut retourner un tableau JSON direct ou enveloppé dans data
+      final decoded = jsonDecode(response.body);
       List list = [];
-      final outer = raw['data'];
-      if (outer is List) {
-        list = outer;
-      } else if (outer is Map<String, dynamic>) {
-        final inner = outer['data'];
-        list = (inner is List) ? inner : [];
+      if (decoded is List) {
+        list = decoded;
+      } else if (decoded is Map) {
+        final outer = decoded['data'];
+        if (outer is List) {
+          list = outer;
+        } else if (outer is Map) {
+          final inner = outer['data'];
+          list = (inner is List) ? inner : [];
+        }
       }
       return list
           .map((j) => SubscriptionPaymentRecord.fromJson(j as Map<String, dynamic>))

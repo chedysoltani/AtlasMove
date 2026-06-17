@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../core/network/http_client.dart';
+import 'support_ticket_chat_screen.dart';
 
 const _orange = Color(0xFFFF6B35);
 const _orangeLight = Color(0xFFFF8C42);
@@ -32,6 +34,9 @@ class _SupportScreenState extends State<SupportScreen>
   String _selectedCategory = 'Compte';
   bool _isSending = false;
   bool _messageSent = false;
+  String? _ticketId;   // UUID pour l'API chat
+  String? _ticketRef;  // TICK-YYYYMMDD-XXX pour l'affichage
+  String? _errorMsg;
 
   final _categories = ['Compte', 'Paiement', 'Livraison', 'Technique', 'Autre'];
 
@@ -124,14 +129,41 @@ class _SupportScreenState extends State<SupportScreen>
   }
 
   Future<void> _sendMessage() async {
-    if (_msgCtrl.text.trim().isEmpty) return;
-    setState(() => _isSending = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (mounted) {
-      setState(() { _isSending = false; _messageSent = true; });
+    final msg = _msgCtrl.text.trim();
+    if (msg.length < 10) {
+      setState(() => _errorMsg = 'Le message doit contenir au moins 10 caractères.');
+      return;
+    }
+    setState(() { _isSending = true; _errorMsg = null; });
+    try {
+      final response = await HttpClient.post(
+        '/m/support/ticket',
+        body: {'category': _selectedCategory, 'message': msg},
+      );
+      if (!mounted) return;
+      final raw = response.json;
+      final outer = raw['data'] is Map ? raw['data'] as Map<String, dynamic> : raw;
+      final inner = outer['data'] is Map ? outer['data'] as Map<String, dynamic> : outer;
+      final ticketId = inner['id']?.toString() ??
+    inner['ticket_id']?.toString() ??
+    inner['ticketId']?.toString() ??
+    outer['ticket_id']?.toString();
+
+      final ticketRef = inner['ticket_id']?.toString() ?? inner['ticketId']?.toString();
+      debugPrint('🎫 ticket uuid=$ticketId ref=$ticketRef');
+      setState(() {
+        _isSending = false;
+        _messageSent = true;
+        _ticketId = ticketId;
+        _ticketRef = ticketRef;
+      });
       _msgCtrl.clear();
-      await Future.delayed(const Duration(seconds: 4));
-      if (mounted) setState(() => _messageSent = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isSending = false;
+        _errorMsg = e.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
@@ -580,6 +612,10 @@ class _SupportScreenState extends State<SupportScreen>
                 const SizedBox(height: 8),
                 _buildMessageField(),
                 const SizedBox(height: 16),
+                if (_errorMsg != null) ...[
+                  _buildErrorBanner(_errorMsg!),
+                  const SizedBox(height: 10),
+                ],
                 if (_messageSent) ...[
                   _buildSentBanner(),
                   const SizedBox(height: 14),
@@ -647,7 +683,8 @@ class _SupportScreenState extends State<SupportScreen>
               const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
         onChanged: (_) {
-          if (_messageSent) setState(() => _messageSent = false);
+          if (_messageSent || _errorMsg != null)
+            setState(() { _messageSent = false; _errorMsg = null; });
         },
       ),
     );
@@ -655,23 +692,126 @@ class _SupportScreenState extends State<SupportScreen>
 
   Widget _buildSentBanner() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: _green.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _green.withOpacity(0.3)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.check_circle_outline_rounded,
-              color: _green, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
+          Row(
+            children: [
+              const Icon(Icons.check_circle_outline_rounded,
+                  color: _green, size: 18),
+              const SizedBox(width: 8),
+              Text('Ticket créé avec succès !',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _green)),
+            ],
+          ),
+          if (_ticketId != null) ...[
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 26),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _green.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _ticketRef ?? _ticketId!,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: _green),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 26),
             child: Text(
-              'Message envoyé ! Notre équipe vous répondra par email.',
+              'Notre équipe vous répondra bientôt.',
               style: GoogleFonts.poppins(
                   fontSize: 12, color: _green, height: 1.4),
             ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () {
+                if (_ticketId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('ID du ticket non disponible.',
+                        style: GoogleFonts.poppins(fontSize: 13)),
+                    backgroundColor: _red,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ));
+                  return;
+                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        SupportTicketChatScreen(ticketId: _ticketId!),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _green,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.chat_bubble_outline_rounded,
+                        color: Colors.white, size: 15),
+                    const SizedBox(width: 6),
+                    Text('Voir le chat',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        )),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorBanner(String msg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: _red.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _red.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: _red, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(msg,
+                style: GoogleFonts.poppins(
+                    fontSize: 12, color: _red, height: 1.4)),
           ),
         ],
       ),
@@ -699,7 +839,7 @@ class _SupportScreenState extends State<SupportScreen>
           ],
         ),
         child: TextButton(
-          onPressed: _isSending || _msgCtrl.text.trim().isEmpty
+          onPressed: _isSending || _msgCtrl.text.trim().length < 10
               ? null
               : _sendMessage,
           style: TextButton.styleFrom(

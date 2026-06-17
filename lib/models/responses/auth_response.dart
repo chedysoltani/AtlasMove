@@ -32,8 +32,19 @@ class AuthResponse {
       final firstName = data['first_name'] ?? nameParts[0];
       final lastName = data['last_name'] ?? '';
 
+      // Cherche l'id UUID dans plusieurs emplacements possibles de la réponse
+      final nestedData = data['data'] is Map ? data['data'] as Map<String, dynamic> : null;
+      final nestedUser = data['user'] is Map ? data['user'] as Map<String, dynamic> : null;
+      final userId = data['id'] ??
+          data['userId'] ??
+          data['user_id'] ??
+          nestedUser?['id'] ??
+          nestedData?['id'] ??
+          nestedData?['userId'] ??
+          email; // fallback: email (indique un bug backend si déclenché)
+
       final userMap = {
-        'id': data['id'] ?? email,
+        'id': userId,
         'first_name': firstName,
         'last_name': lastName,
         'email': email,
