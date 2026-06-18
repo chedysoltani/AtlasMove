@@ -17,7 +17,7 @@ class ServiceApi {
       'User-Agent': 'AtlasMove/1.0 (Flutter)',
     };
     
-    if (token != null) {
+    if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
     
@@ -80,30 +80,31 @@ class ServiceApi {
     }
   }
 
-  static Future<ServiceCatalogue> getCatalogue({required String token}) async {
+  static Future<ServiceCatalogue> getCatalogue({
+    String? token,
+    double? latitude,
+    double? longitude,
+  }) async {
     try {
-      final uri = Uri.parse('$_baseUrl/api/v1/services/catalogue');
-      print('DEBUG: Appel API getCatalogue...');
-      print('DEBUG: API URL: $uri');
-      print('DEBUG: Token: ${token.isEmpty ? 'vide' : 'présent'}');
+      final queryParams = <String, String>{};
+      if (latitude != null) queryParams['latitude'] = latitude.toString();
+      if (longitude != null) queryParams['longitude'] = longitude.toString();
+
+      final uri = Uri.parse('$_baseUrl/api/v1/services/catalogue')
+          .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
 
       final response = await http.get(
         uri,
         headers: _getHeaders(token),
       ).timeout(_timeout);
 
-      print('DEBUG: Response status: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        print('DEBUG: Response data keys: ${data.keys.toList()}');
         return ServiceCatalogue.fromJson(data);
       } else {
-        print('DEBUG: API Error: ${response.body}');
         throw _handleApiError(response);
       }
     } catch (e) {
-      print('DEBUG: Exception getCatalogue: $e');
       throw _handleException(e);
     }
   }

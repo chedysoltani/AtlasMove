@@ -156,9 +156,11 @@ class _LoginScreenState extends State<LoginScreen>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    return Scaffold(
-      backgroundColor: _dark,
-      body: Column(
+    return PopScope(
+      canPop: Navigator.of(context).canPop(),
+      child: Scaffold(
+        backgroundColor: _dark,
+        body: Column(
         children: [
           // ── Dark hero header ──────────────────────────────────────────
           SizedBox(
@@ -198,6 +200,7 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -262,7 +265,9 @@ class _LoginScreenState extends State<LoginScreen>
 
                   // Back button
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () {
+                      if (Navigator.of(context).canPop()) Navigator.pop(context);
+                    },
                     child: Container(
                       width: 40, height: 40,
                       decoration: BoxDecoration(

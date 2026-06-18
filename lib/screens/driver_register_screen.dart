@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/requests/driver_register_request.dart';
 import '../models/service_models.dart';
 import '../services/auth_service.dart';
+import '../services/location_service.dart';
 import '../services/service_api.dart';
 import '../utils/app_theme.dart';
 
@@ -78,14 +79,25 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
   Future<void> _loadServices() async {
     setState(() => _loadingServices = true);
     try {
-      final catalogue = await ServiceApi.getCatalogue(token: '');
+      double? lat, lon;
+      try {
+        final pos = await LocationService()
+            .getCurrentPosition()
+            .timeout(const Duration(seconds: 3));
+        lat = pos?.latitude;
+        lon = pos?.longitude;
+      } catch (_) {}
+
+      final catalogue = await ServiceApi.getCatalogue(latitude: lat, longitude: lon);
       final flat = catalogue.data
           .expand((cat) => cat.services.where((s) => s.isActive))
           .toList();
+      print('DEBUG REGISTER: catalogue.data=${catalogue.data.length} categories, flat=${flat.length} services');
       if (mounted) {
         setState(() => _allServices = flat.isNotEmpty ? flat : _fallbackServices());
       }
-    } catch (_) {
+    } catch (e) {
+      print('DEBUG REGISTER: getCatalogue error: $e');
       if (mounted) setState(() => _allServices = _fallbackServices());
     } finally {
       if (mounted) setState(() => _loadingServices = false);
@@ -193,10 +205,11 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
         firstName: _firstNameCtrl.text.trim(),
         lastName: _lastNameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
-        phone: '${_dialCode.dial}${_phoneCtrl.text.trim()}',
+        phone: '${_dialCode.dial}${_phoneCtrl.text.trim().replaceAll(' ', '')}',
         password: _passwordCtrl.text,
         confirmPassword: _confirmPasswordCtrl.text,
-        vehicleType: _vehicleTypeCtrl.text.trim(),
+        vehicleType: _mapToBackendVehicleType(
+            _selectedService?.transportType ?? _vehicleTypeCtrl.text.trim()),
         cinNumber: _cinCtrl.text.trim(),
         drivingLicenseNumber: _drivingLicenseNumberCtrl.text.trim(),
         vehiclePlateNumber: _vehiclePlateCtrl.text.trim(),
@@ -484,6 +497,46 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
     );
   }
 
+  // Mappe le transport_type du catalogue vers les valeurs acceptées par le backend
+  String _mapToBackendVehicleType(String transportType) {
+    const t2v = <String, String>{
+      // Voiture
+      'taxi': 'voiture', 'taxi_standard': 'voiture', 'vtc': 'voiture',
+      'voiture': 'voiture', 'voiture_luxe': 'voiture', 'covoiturage': 'voiture',
+      'transfert_aeroport': 'voiture', 'transport_scolaire': 'voiture',
+      'tuk_tuk': 'voiture', 'ambulance': 'voiture', 'helicoptere': 'voiture',
+      // Moto
+      'moto': 'moto', 'moto_taxi': 'moto', 'coursier_moto': 'moto',
+      'coursier_velo': 'moto',
+      // Fourgonnette
+      'livraison': 'fourgonnette', 'delivery': 'fourgonnette',
+      'livraison_voiture': 'fourgonnette', 'van': 'fourgonnette',
+      'camionnette_15t': 'fourgonnette', 'tricycle_cargo': 'fourgonnette',
+      // Bus
+      'bus': 'bus', 'minibus_collectif': 'bus', 'bus_charter': 'bus',
+      // Semi-remorque
+      'semi_remorque': 'semi_remorque',
+      // Poids lourd
+      'poids_lourd': 'poids_lourd', 'pickup_truck': 'poids_lourd',
+      'transport_engins': 'poids_lourd',
+      // Tracteur
+      'tracteur': 'tracteur', 'tracteur_agricole': 'tracteur',
+      'chariot_elevateur': 'tracteur',
+      // Camion
+      'camion': 'camion', 'camion_35t': 'camion', 'camion_10t': 'camion',
+      'camion_20t': 'camion', 'camion_plateau': 'camion', 'camion_benne': 'camion',
+      'camion_frigo': 'camion', 'camion_citerne': 'camion', 'camion_grue': 'camion',
+      'camion_fourgon': 'camion', 'camion_demenagement': 'camion',
+      'camion_toupie': 'camion',
+    };
+    final t = transportType.toLowerCase();
+    if (t2v.containsKey(t)) return t2v[t]!;
+    if (t.contains('camion')) return 'camion';
+    if (t.contains('moto')) return 'moto';
+    if (t.contains('bus')) return 'bus';
+    return 'voiture';
+  }
+
   // ── Vehicle selector ─────────────────────────────────────────────────────
 
   Widget _vehicleSelector() {
@@ -625,7 +678,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
         onSelect: (svc) {
           setState(() {
             _selectedService = svc;
-            _vehicleTypeCtrl.text = svc.transportType;
+            _vehicleTypeCtrl.text = _mapToBackendVehicleType(svc.transportType);
           });
         },
       ),

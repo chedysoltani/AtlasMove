@@ -83,8 +83,8 @@ class CatalogueNotifier extends AsyncNotifier<ServiceCatalogue> {
       }
     }
 
-    final token = await TokenStorage.getAccessToken() ?? '';
-    return ServiceApi.getCatalogue(token: token);
+    final token = await TokenStorage.getAccessToken();
+    return ServiceApi.getCatalogue(token: token, latitude: latitude, longitude: longitude);
   }
 }
 

@@ -85,10 +85,11 @@ class Service {
         ? ServiceCategory.fromJson(categoryJson)
         : null,
 
-    // ✅ FIX TRANSPORT TYPE
-    transportType: categoryJson != null
-        ? categoryJson['transport_type'] ?? ''
-        : '',
+    transportType: (json['transport_type']?.toString().isNotEmpty == true)
+        ? json['transport_type'] as String
+        : categoryJson != null
+            ? categoryJson['transport_type']?.toString() ?? ''
+            : '',
 
     pricingModel: json['pricing_model'] ?? '',
     isActive: json['is_active'] ?? true,
@@ -159,19 +160,17 @@ class ServiceCategory {
   });
 
   factory ServiceCategory.fromJson(Map<String, dynamic> json) {
-    print('DEBUG: ServiceCategory.fromJson - parsing category with keys: ${json.keys.toList()}');
-    
     return ServiceCategory(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String?,
-      iconUrl: json['icon_url'] as String?,
-      transportType: json['transport_type'] as String,
-      status: json['status'] as String? ?? 'active',
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString(),
+      iconUrl: json['icon_url']?.toString(),
+      transportType: json['transport_type']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'active',
       isActive: json['is_active'] as bool? ?? true,
       sortOrder: json['sort_order'] as int? ?? 0,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? DateTime.now(),
     );
   }
 
@@ -520,21 +519,36 @@ class ServiceCategoryWithServices {
   });
 
   factory ServiceCategoryWithServices.fromJson(Map<String, dynamic> json) {
-    final services = (json['services'] as List?)
-        ?.map((item) => Service.fromJson(item as Map<String, dynamic>))
-        .toList() ?? [];
+    final catTransportType = json['transport_type']?.toString() ?? '';
+    final rawServices = json['services'];
+    final services = rawServices is List
+        ? rawServices
+            .whereType<Map<String, dynamic>>()
+            .map((item) {
+              // Hérite le transport_type de la catégorie si absent sur le service
+              if ((item['transport_type'] == null ||
+                      item['transport_type'].toString().isEmpty) &&
+                  catTransportType.isNotEmpty) {
+                final enriched = Map<String, dynamic>.from(item);
+                enriched['transport_type'] = catTransportType;
+                return Service.fromJson(enriched);
+              }
+              return Service.fromJson(item);
+            })
+            .toList()
+        : <Service>[];
 
     return ServiceCategoryWithServices(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String?,
-      iconUrl: json['icon_url'] as String?,
-      transportType: json['transport_type'] as String,
-      status: json['status'] as String? ?? 'active',
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString(),
+      iconUrl: json['icon_url']?.toString(),
+      transportType: json['transport_type']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'active',
       isActive: json['is_active'] as bool? ?? true,
       sortOrder: json['sort_order'] as int? ?? 0,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? DateTime.now(),
       services: services,
     );
   }
