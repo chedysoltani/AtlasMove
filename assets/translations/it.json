@@ -1,4 +1,4 @@
-{
+﻿{
   "common": {
     "cancel": "Annulla",
     "confirm": "Conferma",
@@ -162,7 +162,7 @@
     "cancel_renewal_title": "Annullare il rinnovo?",
     "cancel_renewal_body": "Il tuo abbonamento rimarrà attivo fino alla scadenza, ma non si rinnoverà automaticamente.",
     "cancel_notice": "Rinnovo annullato. Il tuo abbonamento rimane attivo fino alla scadenza.",
-    "payment_secured": "Pagamenti sicuri tramite Stripe o criptovalute.",
+    "payment_secured": "La fatturazione è gestita tramite il nostro portale web sicuro.",
     "badge": "PREMIUM AUTISTA",
     "trial_offer": "15 GIORNI GRATUITI",
     "tagline": "Ottimizza i tuoi guadagni senza commissioni.",
@@ -238,6 +238,7 @@
     "accept": "Accetta",
     "refuse": "Rifiuta",
     "rides_title": "Le Mie Corse",
+    "ride_started": "Cliente a bordo",
     "active_ride": "Corsa in corso",
     "ride_completed": "Corsa completata",
     "earnings_title": "I Miei Guadagni",

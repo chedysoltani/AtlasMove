@@ -659,6 +659,37 @@ class TripService {
     return null;
   }
 
+  /// Fetch full trip detail for client when a driver accepted directly (no bid).
+  /// Backend: GET /m/trips/{id}
+  static Future<AcceptedTripDetail?> getClientTripAcceptedDetail(String tripId) async {
+    try {
+      final response = await HttpClient.get('/m/trips/$tripId');
+      if (response.isSuccess) {
+        final raw = response.json['data']?['data'] ?? response.json['data'] ?? response.json;
+        if (raw is! Map) return null;
+        final driver = raw['driver'] as Map<String, dynamic>?
+            ?? raw['livreur'] as Map<String, dynamic>?;
+        final fareRaw = raw['fare'] ?? raw['offered_fare'] ?? raw['estimated_fare'];
+        return AcceptedTripDetail(
+          status: raw['status'] as String? ?? '',
+          fare: fareRaw is num ? fareRaw.toDouble() : 0.0,
+          currency: raw['currency'] as String? ?? 'TND',
+          driverName: driver?['name'] as String?
+              ?? driver?['full_name'] as String?
+              ?? 'Chauffeur',
+          driverPhoto: driver?['photo'] as String? ?? driver?['avatar'] as String?,
+          driverRating: (driver?['rating'] as num?)?.toDouble() ?? 4.5,
+          driverVehicle: driver?['vehicle'] as String?
+              ?? raw['vehicle_description'] as String?
+              ?? '',
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ TripService.getClientTripAcceptedDetail: $e');
+    }
+    return null;
+  }
+
   /// Fetch current driver GPS position for a client's active trip.
   /// Backend: GET /m/trips/{id}/driver-location
   static Future<DriverLocationDto?> getDriverLocation(String tripId) async {
@@ -695,6 +726,26 @@ class DriverLocationDto {
     required this.latitude,
     required this.longitude,
     this.heading,
+  });
+}
+
+class AcceptedTripDetail {
+  final String status;
+  final double fare;
+  final String currency;
+  final String driverName;
+  final String? driverPhoto;
+  final double driverRating;
+  final String driverVehicle;
+
+  const AcceptedTripDetail({
+    required this.status,
+    required this.fare,
+    required this.currency,
+    required this.driverName,
+    this.driverPhoto,
+    required this.driverRating,
+    required this.driverVehicle,
   });
 }
 

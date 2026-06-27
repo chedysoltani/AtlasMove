@@ -123,7 +123,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     _markerCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
-    )..addListener(() => setState(() {}));
+    )..addListener(() { if (mounted) setState(() {}); });
 
     // Load custom markers
     _loadIcons();
@@ -146,19 +146,85 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
 
   // ── Custom icons ─────────────────────────────────────────────────────────────
   Future<void> _loadIcons() async {
-    // Driver: caricon.png resized to 60×60 dp
-    final carData = await rootBundle.load('assets/images/caricon.png');
-    final carCodec = await ui.instantiateImageCodec(
-        carData.buffer.asUint8List(), targetWidth: 120, targetHeight: 120);
-    final carFrame = await carCodec.getNextFrame();
-    final carPng = await carFrame.image.toByteData(format: ui.ImageByteFormat.png);
-    _driverIcon = BitmapDescriptor.fromBytes(
-        carPng!.buffer.asUint8List(), size: const Size(60, 60));
+    _driverIcon = await _buildCarIcon();
 
     // Pickup: green circle with white dot
     _pickupIcon = await _buildPickupIcon();
 
     if (mounted) setState(() {});
+  }
+
+  Future<BitmapDescriptor> _buildCarIcon() async {
+    const double dp = 52.0, px = 3.0, size = dp * px;
+    final rec = ui.PictureRecorder();
+    final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
+    final cx = size / 2, cy = size / 2;
+
+    // Shadow
+    canvas.drawCircle(Offset(cx, cy + 3), size * 0.44,
+        Paint()
+          ..color = Colors.black.withOpacity(0.22)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+
+    // Orange circle background
+    canvas.drawCircle(Offset(cx, cy), size * 0.44,
+        Paint()..color = const Color(0xFFF97316));
+
+    // White border
+    canvas.drawCircle(Offset(cx, cy), size * 0.44,
+        Paint()
+          ..color = Colors.white.withOpacity(0.25)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = px * 1.5);
+
+    // ── Car body (top-down view) ──
+    final bodyW = size * 0.30, bodyH = size * 0.52;
+    final bodyRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(cx, cy), width: bodyW, height: bodyH),
+      Radius.circular(size * 0.10),
+    );
+    canvas.drawRRect(bodyRect, Paint()..color = Colors.white);
+
+    // Windshield (top)
+    final windW = size * 0.22, windH = size * 0.13;
+    final windRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(cx, cy - size * 0.13), width: windW, height: windH),
+      Radius.circular(size * 0.04),
+    );
+    canvas.drawRRect(windRect,
+        Paint()..color = const Color(0xFFF97316).withOpacity(0.55));
+
+    // Rear window (bottom)
+    final rearRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(cx, cy + size * 0.13), width: windW, height: windH * 0.8),
+      Radius.circular(size * 0.04),
+    );
+    canvas.drawRRect(rearRect,
+        Paint()..color = const Color(0xFFF97316).withOpacity(0.55));
+
+    // Wheels (4 corners)
+    final wheelW = size * 0.09, wheelH = size * 0.14;
+    final wheelPaint = Paint()..color = const Color(0xFF1A1F36);
+    for (final pos in [
+      Offset(cx - bodyW * 0.62, cy - bodyH * 0.28),
+      Offset(cx + bodyW * 0.62, cy - bodyH * 0.28),
+      Offset(cx - bodyW * 0.62, cy + bodyH * 0.28),
+      Offset(cx + bodyW * 0.62, cy + bodyH * 0.28),
+    ]) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: pos, width: wheelW, height: wheelH),
+          Radius.circular(size * 0.03),
+        ),
+        wheelPaint,
+      );
+    }
+
+    final pic = rec.endRecording();
+    final img = await pic.toImage(size.toInt(), size.toInt());
+    final data = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(),
+        size: const Size(dp, dp));
   }
 
   Future<BitmapDescriptor> _buildPickupIcon() async {

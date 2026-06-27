@@ -106,7 +106,11 @@ class _DriverDashboardState extends State<DriverDashboard>
       _loadDailyStats();
     });
     NotificationService().initialize();
-    CallService().connectSocket();
+    try {
+      CallService().connectSocket();
+    } catch (e) {
+      debugPrint('CallService socket error: $e');
+    }
 
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -188,6 +192,7 @@ class _DriverDashboardState extends State<DriverDashboard>
       await LocationForegroundService.start();
     } catch (_) {}
   }
+
 
   Future<void> _resumeActiveRideIfAny() async {
     try {
@@ -798,7 +803,7 @@ class _DriverDashboardState extends State<DriverDashboard>
 
   Widget _buildPastDueBanner() {
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
+      onTap: () => Navigator.pushNamed(context, _bannerRoute),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -848,7 +853,7 @@ class _DriverDashboardState extends State<DriverDashboard>
             : 'Essai gratuit actif · encore $days jours restants';
 
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
+      onTap: () => Navigator.pushNamed(context, _bannerRoute),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -886,7 +891,7 @@ class _DriverDashboardState extends State<DriverDashboard>
 
   Widget _buildInactiveBanner() {
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/driver_subscription'),
+      onTap: () => Navigator.pushNamed(context, _bannerRoute),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -963,6 +968,11 @@ class _DriverDashboardState extends State<DriverDashboard>
   bool get _isTaxiDriver =>
       _driverTransportType != null &&
       TransportTypeConstants.taxiSlugs.contains(_driverTransportType);
+
+  String get _bannerRoute =>
+      (_driverTransportType == null || _isTaxiDriver)
+          ? '/driver_subscription'
+          : '/driver_earnings';
 
   void _showMenu() {
     showModalBottomSheet(

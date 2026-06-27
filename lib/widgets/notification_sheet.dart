@@ -351,8 +351,6 @@ class _NotificationSheetState extends State<NotificationSheet> {
       Navigator.pushNamed(context, '/client_rewards');
     } else if (path.contains('/cards')) {
       Navigator.pushNamed(context, '/cards');
-    } else if (path.contains('/payment_history')) {
-      Navigator.pushNamed(context, '/payment_history');
     } else if (path.contains('/driver_dashboard')) {
       Navigator.pushNamed(context, '/driver_dashboard');
     }

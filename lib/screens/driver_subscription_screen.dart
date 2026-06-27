@@ -533,24 +533,6 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
           ),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pushNamed(context, '/subscription_payment')
-                .then((_) => _subService.fetchStatus()),
-            icon: const Icon(Icons.currency_bitcoin_rounded, size: 20),
-            label: const Text(
-              'Payer en USDT (TRC20)',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              foregroundColor: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              side: const BorderSide(color: Color(0xFF009387), width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            ),
-          ),
         ],
 
         // Cancel renewal button (shown when active and not already requested)
@@ -594,11 +576,15 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
           ),
         ],
 
-        const SizedBox(height: 12),
-        Text(
-          'sub.payment_secured'.tr(),
+        const SizedBox(height: 16),
+        const Text(
+          'La facturation est gérée via notre portail web sécurisé.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade600, height: 1.4),
+          style: TextStyle(
+            fontSize: 11,
+            color: Color(0xFF6B7280),
+            height: 1.4,
+          ),
         ),
       ],
     );

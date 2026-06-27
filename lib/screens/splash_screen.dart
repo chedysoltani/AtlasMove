@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../utils/app_theme.dart';
 import '../core/storage/token_storage.dart';
@@ -108,7 +108,7 @@ class _SplashScreenState extends State<SplashScreen>
           fit: StackFit.expand,
           children: [
             Image.asset(
-              'assets/images/image1.png',
+              'assets/images/image1.jpg',
               fit: BoxFit.cover,
             ),
             Container(

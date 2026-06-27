@@ -21,18 +21,29 @@ import '../services/location_foreground_service.dart';
 
 enum RidePhase { arriving, started, completed }
 
-// Style carte navigation — identique au côté client
+// Style carte navigation chauffeur — fond clair, routes bien visibles, sans trafic
 const String _navMapStyle = '''[
+  {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
   {"featureType":"poi","stylers":[{"visibility":"off"}]},
   {"featureType":"transit","stylers":[{"visibility":"off"}]},
-  {"featureType":"administrative","stylers":[{"visibility":"simplified"}]},
-  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#ffffff"}]},
-  {"featureType":"landscape","stylers":[{"color":"#f5f0e8"}]},
-  {"featureType":"water","stylers":[{"color":"#a8d4f5"}]},
-  {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#f5f1eb"}]},
-  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#e8e0d0"}]},
-  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#555555"}]},
-  {"featureType":"road","elementType":"labels.text.stroke","stylers":[{"color":"#ffffff"},{"weight":"3"}]}
+  {"featureType":"landscape","elementType":"geometry.fill","stylers":[{"color":"#f0ede8"}]},
+  {"featureType":"landscape.man_made","elementType":"geometry.fill","stylers":[{"color":"#e8e4de"}]},
+  {"featureType":"road","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
+  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#d4cfc9"},{"weight":"1"}]},
+  {"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
+  {"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"color":"#c8c3bc"}]},
+  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#ffe082"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#f5c518"},{"weight":"1"}]},
+  {"featureType":"road.local","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
+  {"featureType":"road.local","elementType":"geometry.stroke","stylers":[{"color":"#ddd8d0"}]},
+  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#666666"}]},
+  {"featureType":"road","elementType":"labels.text.stroke","stylers":[{"color":"#ffffff"},{"weight":"3"}]},
+  {"featureType":"water","elementType":"geometry.fill","stylers":[{"color":"#aed6f1"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#5b8fa8"}]},
+  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#333333"}]},
+  {"featureType":"administrative.neighborhood","elementType":"labels.text.fill","stylers":[{"color":"#777777"}]},
+  {"featureType":"building","elementType":"geometry.fill","stylers":[{"color":"#e4ddd5"}]},
+  {"featureType":"building","elementType":"geometry.stroke","stylers":[{"color":"#d4ccc4"}]}
 ]''';
 
 class DriverActiveRideScreen extends ConsumerStatefulWidget {
@@ -123,18 +134,61 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   }
 
   Future<BitmapDescriptor> _createCarIcon() async {
-    final data = await rootBundle.load('assets/images/caricon.png');
-    final codec = await ui.instantiateImageCodec(
-      data.buffer.asUint8List(),
-      targetWidth: 120,
-      targetHeight: 120,
-    );
-    final frame = await codec.getNextFrame();
-    final png = await frame.image.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(
-      png!.buffer.asUint8List(),
-      size: const Size(60, 60),
-    );
+    const double dp = 52.0, px = 3.0, size = dp * px;
+    final rec = ui.PictureRecorder();
+    final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
+    final cx = size / 2, cy = size / 2;
+    // Shadow
+    canvas.drawCircle(Offset(cx, cy + 3), size * 0.44,
+        Paint()
+          ..color = Colors.black.withOpacity(0.22)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+    // Orange circle
+    canvas.drawCircle(Offset(cx, cy), size * 0.44, Paint()..color = const Color(0xFFF97316));
+    // White border
+    canvas.drawCircle(Offset(cx, cy), size * 0.44,
+        Paint()
+          ..color = Colors.white.withOpacity(0.25)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = px * 1.5);
+    // Car body
+    final bodyW = size * 0.30, bodyH = size * 0.52;
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromCenter(center: Offset(cx, cy), width: bodyW, height: bodyH),
+            Radius.circular(size * 0.10)),
+        Paint()..color = Colors.white);
+    // Windshield
+    final windW = size * 0.22, windH = size * 0.13;
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromCenter(center: Offset(cx, cy - size * 0.13), width: windW, height: windH),
+            Radius.circular(size * 0.04)),
+        Paint()..color = const Color(0xFFF97316).withOpacity(0.55));
+    // Rear window
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromCenter(center: Offset(cx, cy + size * 0.13), width: windW, height: windH * 0.8),
+            Radius.circular(size * 0.04)),
+        Paint()..color = const Color(0xFFF97316).withOpacity(0.55));
+    // Wheels
+    final wheelPaint = Paint()..color = const Color(0xFF1A1F36);
+    for (final pos in [
+      Offset(cx - bodyW * 0.62, cy - bodyH * 0.28),
+      Offset(cx + bodyW * 0.62, cy - bodyH * 0.28),
+      Offset(cx - bodyW * 0.62, cy + bodyH * 0.28),
+      Offset(cx + bodyW * 0.62, cy + bodyH * 0.28),
+    ]) {
+      canvas.drawRRect(
+          RRect.fromRectAndRadius(
+              Rect.fromCenter(center: pos, width: size * 0.09, height: size * 0.14),
+              Radius.circular(size * 0.03)),
+          wheelPaint);
+    }
+    final pic = rec.endRecording();
+    final img = await pic.toImage(size.toInt(), size.toInt());
+    final data = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(), size: const Size(dp, dp));
   }
 
   @override
@@ -201,11 +255,12 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
     // Throttle route fetching to once every 10 seconds to avoid API spam
     final now = DateTime.now();
-    if (_isFetchingRoute || 
+    if (_isFetchingRoute ||
         (_lastRouteFetchTime != null && now.difference(_lastRouteFetchTime!).inSeconds < 10)) {
       return;
     }
 
+    if (!mounted) return;
     setState(() => _isFetchingRoute = true);
 
     try {
@@ -382,11 +437,11 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
           ),
           
           // Map Controls
-          if (_isMapReady && mapState.status == MapStatus.ready)
+          if (_isMapReady)
             _buildMapControls(mapState),
-            
+
           // Bottom Sheet with ride info
-          if (_isMapReady && mapState.status == MapStatus.ready)
+          if (_isMapReady)
             Positioned(
               bottom: 0,
               left: 0,
@@ -409,9 +464,9 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
         tilt: 70.0,
         bearing: _currentBearing,
       ),
+      style: _navMapStyle,
       onMapCreated: (GoogleMapController controller) async {
         ref.read(mapProvider.notifier).setMapController(controller);
-        await controller.setMapStyle(_navMapStyle);
         setState(() => _isMapReady = true);
 
         // Caméra initiale selon la phase
@@ -432,8 +487,8 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       rotateGesturesEnabled: true,
       markers: mapState.markers,
       polylines: mapState.polylines,
-      trafficEnabled: true,
-      buildingsEnabled: false,
+      trafficEnabled: false,
+      buildingsEnabled: true,
       // Padding minimal → map plein écran comme inDrive
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 90,
@@ -707,6 +762,18 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
                         Text(widget.trip.serviceName,
                             style: TextStyle(
                                 color: Colors.grey.shade500, fontSize: 11)),
+                        if (widget.trip.clientPhone != null &&
+                            widget.trip.clientPhone!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              widget.trip.clientPhone!,
+                              style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -885,7 +952,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
         };
         break;
       case RidePhase.started:
-        buttonText = 'driver.rides_title'.tr();
+        buttonText = 'driver.ride_started'.tr();
         onPressed = () {
           _updatePhase(RidePhase.completed, 'in_progress');
         };

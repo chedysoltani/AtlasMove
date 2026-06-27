@@ -632,14 +632,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                         ),
                       ],
                       
-                      // Bidding controls panel if expanded
-                      if (trip.isNegotiable && _isBiddingExpanded[trip.id] == true) ...[
-                        _buildBiddingPanel(trip),
-                        const SizedBox(height: 12),
-                      ],
-                      
                       // Default actions row
-                      if (_isBiddingExpanded[trip.id] != true)
                         Row(
                           children: [
                             // Refuser
@@ -666,28 +659,24 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                             ),
                             const SizedBox(width: 8),
                             
-                            // Négocier
+                            // Proposer offre
                             if (trip.isNegotiable && _submittedBids[trip.id] == null) ...[
                               Expanded(
                                 flex: 4,
-                                child: OutlinedButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _isBiddingExpanded[trip.id] = true;
-                                      _bidInputs[trip.id] = (trip.offeredFare ?? trip.estimatedFare) + 1.0;
-                                    });
-                                  },
-                                  style: OutlinedButton.styleFrom(
+                                child: ElevatedButton(
+                                  onPressed: () => _showOfferBottomSheet(trip),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFF97316),
+                                    foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 14),
+                                    elevation: 0,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    side: const BorderSide(color: Colors.orange, width: 1.5),
                                   ),
                                   child: const Text(
-                                    'Négocier 🤝',
+                                    'Offre',
                                     style: TextStyle(
-                                      color: Colors.orange,
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -709,18 +698,6 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                                   ),
                             ),
                           ],
-                        )
-                      else
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _isBiddingExpanded[trip.id] = false;
-                            });
-                          },
-                          child: Text(
-                            'common.back'.tr(),
-                            style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
-                          ),
                         ),
                     ],
                   ),
@@ -728,6 +705,135 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  void _showOfferBottomSheet(AvailableTrip trip) {
+    double bid = (trip.offeredFare ?? trip.estimatedFare) + 1.0;
+    final clientFare = trip.offeredFare ?? trip.estimatedFare;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModal) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Proposer votre tarif',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          if (bid > clientFare) {
+                            setModal(() => bid = double.parse((bid - 0.5).toStringAsFixed(2)));
+                          }
+                        },
+                        child: Container(
+                          width: 48, height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: const Icon(Icons.remove, size: 20),
+                        ),
+                      ),
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 24),
+                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFF97316), width: 1.5),
+                        ),
+                        child: Text(
+                          '${bid.toStringAsFixed(2)} ${trip.currency}',
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setModal(() => bid = double.parse((bid + 0.5).toStringAsFixed(2)));
+                        },
+                        child: Container(
+                          width: 48, height: 48,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: const Icon(Icons.add, size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF97316),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        try {
+                          await TripService.submitDriverOffer(trip.id, bid);
+                          setState(() => _submittedBids[trip.id] = bid);
+                          _startBidAcceptancePolling(trip, bid);
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('driver.offer_submitted_short'.tr(namedArgs: {'amount': bid.toStringAsFixed(2), 'currency': trip.currency})),
+                            backgroundColor: Colors.green,
+                          ));
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('common.unknown_error'.tr()),
+                            backgroundColor: Colors.red,
+                          ));
+                        }
+                      },
+                      child: const Text(
+                        'Envoyer l\'offre',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -815,12 +921,13 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            height: 40,
+            height: 48,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
+                backgroundColor: const Color(0xFFF97316),
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 elevation: 0,
               ),

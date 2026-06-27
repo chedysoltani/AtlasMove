@@ -46,7 +46,11 @@ class _ClientDashboardState extends State<ClientDashboard>
     )..forward();
     _loadDashboardData();
     NotificationService().initialize();
-    CallService().connectSocket();
+    try {
+      CallService().connectSocket();
+    } catch (e) {
+      debugPrint('CallService socket error: $e');
+    }
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,

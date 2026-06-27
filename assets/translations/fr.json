@@ -1,4 +1,4 @@
-{
+﻿{
   "common": {
     "cancel": "Annuler",
     "confirm": "Confirmer",
@@ -162,7 +162,7 @@
     "cancel_renewal_title": "Annuler le renouvellement ?",
     "cancel_renewal_body": "Votre abonnement restera actif jusqu'à la date d'expiration, mais ne sera pas renouvelé automatiquement.",
     "cancel_notice": "Renouvellement annulé. Votre abonnement reste actif jusqu'à expiration.",
-    "payment_secured": "Paiements sécurisés via Stripe ou cryptomonnaies.",
+    "payment_secured": "La facturation est gérée via notre portail web sécurisé.",
     "badge": "PREMIUM LIVREUR",
     "trial_offer": "15 JOURS OFFERTS",
     "tagline": "Optimisez vos revenus sans aucune commission.",
@@ -238,6 +238,7 @@
     "accept": "Accepter",
     "refuse": "Refuser",
     "rides_title": "Mes Courses",
+    "ride_started": "Client à bord",
     "active_ride": "Course en cours",
     "ride_completed": "Course terminée",
     "earnings_title": "Mes Gains",

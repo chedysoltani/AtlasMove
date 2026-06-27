@@ -229,6 +229,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                               _supportButton(),
                               const SizedBox(height: 28),
                               _saveButton(),
+                              const SizedBox(height: 16),
+                              _deleteAccountButton(),
                             ],
                           ),
                         ),
@@ -654,6 +656,20 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
         ]),
       );
+
+  Widget _deleteAccountButton() {
+    return OutlinedButton.icon(
+      onPressed: () => Navigator.pushNamed(context, '/delete_account'),
+      icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444)),
+      label: const Text('Supprimer mon compte'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 50),
+        side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        foregroundColor: const Color(0xFFEF4444),
+      ),
+    );
+  }
 
   // ─── Logout ───────────────────────────────────────────────────────
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart' as provider;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -16,7 +15,6 @@ import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/client_dashboard.dart';
 import 'screens/booking_screen.dart';
-import 'screens/payment_screen.dart';
 import 'screens/otp_verification_screen.dart';
 import 'screens/profile_screen.dart';
 import 'examples/auth_example.dart';
@@ -29,9 +27,6 @@ import 'screens/driver_profile.dart';
 import 'screens/driver_register_screen.dart';
 import 'screens/driver_register_test_screen.dart';
 import 'screens/client_trip_history_screen.dart';
-import 'screens/signup_steps/signup_step1_personal.dart';
-import 'screens/signup_steps/signup_step2_documents.dart';
-import 'screens/signup_steps/signup_step3_vehicle.dart';
 import 'providers/auth_provider.dart';
 import 'screens/services_screen.dart';
 import 'screens/services_catalogue_screen.dart';
@@ -40,15 +35,12 @@ import 'screens/create_ride_screen.dart';
 import 'screens/driver_offer_screen.dart';
 import 'screens/client_rewards_screen.dart';
 import 'screens/cards_list_screen.dart';
-import 'screens/payment_history_screen.dart';
 import 'models/trip_models.dart';
 import 'services/notification_service.dart';
 import 'widgets/notification_sheet.dart';
 import 'models/notification_model.dart';
 import 'screens/driver_subscription_screen.dart';
-import 'screens/driver_crypto_select_screen.dart';
-import 'screens/driver_crypto_recharge_screen.dart';
-import 'screens/driver_usdt_payment_screen.dart';
+import 'screens/delete_account_screen.dart';
 import 'screens/language_selection_screen.dart';
 import 'screens/referral_screen.dart';
 import 'screens/client_rendezvous_booking_screen.dart';
@@ -60,7 +52,6 @@ import 'services/call_service.dart';
 import 'screens/reset_password_request_screen.dart';
 import 'screens/reset_password_verify_screen.dart';
 import 'screens/support_screen.dart';
-import 'screens/driver_subscription_payment_screen.dart';
 import 'screens/legal_consent_screen.dart';
 import 'services/location_foreground_service.dart';
 import 'core/network/http_client.dart';
@@ -72,7 +63,11 @@ void main() async {
   await EasyLocalization.ensureInitialized();
 
   // Initialiser Firebase (requis pour FCM)
-  await Firebase.initializeApp();
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase init error: $e');
+  }
 
   // Pré-configurer le foreground service (sans le démarrer)
   LocationForegroundService.init();
@@ -81,11 +76,11 @@ void main() async {
   await initializeDateFormatting('fr', null);
 
   // Charger les variables d'environnement
-  await dotenv.load(fileName: ".env");
-
-  // Initialiser Stripe
-  Stripe.publishableKey = dotenv.env['STRIPE_PUBLISHABLE_KEY'] ?? '';
-  await Stripe.instance.applySettings();
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint('Dotenv load error: $e');
+  }
 
   // Accords légaux non acceptés → naviguer vers /legal_consent
   bool _legalConsentNavigating = false;
@@ -138,7 +133,11 @@ void main() async {
   };
 
   // Connecter le socket d'appel dès le démarrage (réessaie si pas encore authentifié)
-  CallService().connectSocket();
+  try {
+    CallService().connectSocket();
+  } catch (e) {
+    debugPrint('CallService socket error: $e');
+  }
 
   // Bonus de parrainage reçu en temps réel
   NotificationService.onReferralBonusReceived = (pointsGained, message) {
@@ -272,7 +271,6 @@ class AtlasMoveApp extends StatelessWidget {
             '/login': (context) => const LoginScreen(),
             '/support': (context) => const SupportScreen(),
             '/legal_consent': (context) => const LegalConsentScreen(),
-            '/subscription_payment': (context) => const DriverSubscriptionPaymentScreen(),
             '/reset_password_request': (context) => const ResetPasswordRequestScreen(),
             '/reset_password_verify': (context) {
               final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
@@ -282,13 +280,9 @@ class AtlasMoveApp extends StatelessWidget {
               );
             },
             '/signup': (context) => const SignupScreen(),
-            '/signup_step1': (context) => const SignupStep1Personal(),
-            '/signup_step2': (context) => const SignupStep2Documents(),
-            '/signup_step3': (context) => const SignupStep3Vehicle(),
             '/client_dashboard': (context) => const ClientDashboard(),
             '/client_trip_history': (context) => const ClientTripHistoryScreen(),
             '/booking': (context) => const BookingScreen(),
-            '/payment': (context) => const PaymentPage(),
             '/otp_verification': (context) {
               final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
               return OtpVerificationScreen(
@@ -312,11 +306,8 @@ class AtlasMoveApp extends StatelessWidget {
             '/driver_offer': (context) => const DriverOfferScreen(),
             '/client_rewards': (context) => const ClientRewardsScreen(),
             '/cards': (context) => const CardsListScreen(),
-            '/payment_history': (context) => const PaymentHistoryScreen(),
             '/driver_subscription': (context) => const DriverSubscriptionScreen(),
-            '/driver_crypto_select': (context) => const DriverCryptoSelectScreen(),
-            '/driver_crypto_recharge': (context) => const DriverCryptoRechargeScreen(),
-            '/driver_usdt_payment': (context) => const DriverUsdtPaymentScreen(),
+            '/delete_account': (context) => const DeleteAccountScreen(),
             '/language': (context) => const LanguageSelectionScreen(),
             '/referral': (context) => const ReferralScreen(),
             '/client_rendezvous_booking': (context) =>

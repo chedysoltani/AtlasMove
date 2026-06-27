@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/user.dart';
@@ -248,7 +248,7 @@ class _SignupScreenState extends State<SignupScreen>
         // Image de fond
         Positioned.fill(
           child: Image.asset(
-            'assets/images/image3.png',
+            'assets/images/image3.jpg',
             fit: BoxFit.cover,
             alignment: Alignment.topCenter,
           ),

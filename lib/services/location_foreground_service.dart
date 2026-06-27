@@ -58,7 +58,6 @@ class LocationForegroundService {
     init();
 
     await FlutterForegroundTask.requestNotificationPermission();
-    await FlutterForegroundTask.requestIgnoreBatteryOptimization();
 
     if (await FlutterForegroundTask.isRunningService) {
       // Mise à jour du texte de la notification si déjà actif

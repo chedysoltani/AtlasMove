@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart' as provider_pkg;
@@ -8,6 +8,7 @@ import '../models/user.dart';
 import '../providers/auth_provider.dart';
 import '../services/auth_service.dart';
 import '../models/responses/auth_response.dart';
+import 'package:geolocator/geolocator.dart';
 import '../core/network/http_client.dart';
 import '../utils/app_theme.dart';
 
@@ -107,6 +108,15 @@ class _LoginScreenState extends State<LoginScreen>
           authProvider.setToken(response.token);
           await _saveTokenToPreferences(response.token);
 
+          // Demander la permission localisation immédiatement après login
+          try {
+            final locPerm = await Geolocator.checkPermission();
+            if (locPerm == LocationPermission.denied) {
+              await Geolocator.requestPermission();
+            }
+          } catch (_) {}
+
+          if (!mounted) return;
           if (response.user.role == UserRole.client) {
             Navigator.of(context)
                 .pushNamedAndRemoveUntil('/client_dashboard', (_) => false);
@@ -215,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen>
           // Background image
           Positioned.fill(
             child: Image.asset(
-              'assets/images/image4.png',
+              'assets/images/image4.jpg',
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
             ),

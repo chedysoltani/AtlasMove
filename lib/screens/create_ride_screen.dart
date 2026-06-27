@@ -15,8 +15,6 @@ import '../services/location_service.dart';
 import '../services/geocoding_service.dart';
 import '../services/trip_service.dart';
 import '../services/notification_service.dart';
-import '../providers/cards_provider.dart';
-import '../models/card_models.dart';
 import 'client_active_ride_screen.dart';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
@@ -172,7 +170,6 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(mapProvider.notifier).initializeMap();
-      ref.read(cardsProvider.notifier).loadCards();
       LocationService().getCurrentPosition().then((pos) {
         ref.read(catalogueProvider.notifier).fetchCatalogue(
           latitude: pos?.latitude,
@@ -189,9 +186,11 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     });
     _destinationController.addListener(_onDestinationChanged);
     _destinationFocusNode.addListener(() {
-      setState(() {
-        _isDestinationFocused = _destinationFocusNode.hasFocus;
-      });
+      if (mounted) {
+        setState(() {
+          _isDestinationFocused = _destinationFocusNode.hasFocus;
+        });
+      }
     });
   }
 
@@ -486,16 +485,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         return;
       }
 
-      // 4. Validation de la Carte (si paiement par carte)
-      if (_paymentType == 'card') {
-        final cardsState = ref.read(cardsProvider);
-        if (cardsState.cards.isEmpty) {
-          if (mounted) _showNoCardDialog();
-          return;
-        }
-      }
-
-      // 5. Appel API — snapshot pickup position before the async gap
+      // 4. Appel API — snapshot pickup position before the async gap
       _pickupCoordinates = mapState.currentPosition;
       final response = await TripService.createTrip(
         serviceId: _selectedService!.id,
@@ -556,17 +546,51 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       }
 
       try {
-        // Fallback: vérifier le statut du trip au cas où le socket rate l'événement
         final status = await TripService.getClientTripStatus(tripId);
         if (status != null) {
-          final cancelled = status == 'cancelled_by_livreur' ||
-              status == 'cancelled_by_client' ||
-              status == 'cancelled_by_admin' ||
-              status == 'expired';
-          if (cancelled) {
+          // Annulé / expiré → afficher dialog
+          const cancelledStatuses = {
+            'cancelled_by_livreur',
+            'cancelled_by_client',
+            'cancelled_by_admin',
+            'expired',
+          };
+          if (cancelledStatuses.contains(status)) {
             timer.cancel();
             NotificationService.onTripCancelledReceived = null;
             if (mounted) _showTripExpiredDialog();
+            return;
+          }
+
+          // Accepté directement par le chauffeur (sans négociation)
+          const acceptedStatuses = {'accepted', 'livreur_en_route', 'in_progress'};
+          if (acceptedStatuses.contains(status)) {
+            timer.cancel();
+            NotificationService.onTripCancelledReceived = null;
+            if (!mounted) return;
+            final detail = await TripService.getClientTripAcceptedDetail(tripId);
+            if (!mounted) return;
+            final tripData = _tripResponse?.data;
+            final currentPos = ref.read(mapProvider).currentPosition;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ClientActiveRideScreen(
+                  tripId: tripId,
+                  lockedFare: (detail?.fare ?? 0.0) > 0
+                      ? detail!.fare
+                      : (tripData?.estimatedFare ?? _customOfferedFare ?? 0.0),
+                  currency: detail?.currency ?? tripData?.currency ?? 'TND',
+                  driverName: detail?.driverName ?? 'Chauffeur',
+                  driverPhoto: detail?.driverPhoto,
+                  driverRating: detail?.driverRating ?? 4.5,
+                  driverVehicle: detail?.driverVehicle ?? '',
+                  destination: _destinationController.text,
+                  pickupLatitude: _pickupCoordinates?.latitude ?? currentPos?.latitude,
+                  pickupLongitude: _pickupCoordinates?.longitude ?? currentPos?.longitude,
+                ),
+              ),
+            );
             return;
           }
         }
@@ -2528,40 +2552,50 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   }
 
   Widget _buildPaymentSelection() {
-    final cardsState = ref.watch(cardsProvider);
-    final defaultCard = cardsState.cards.isNotEmpty 
-        ? cardsState.cards.firstWhere((c) => c.isDefault, orElse: () => cardsState.cards.first)
-        : null;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('booking.payment_mode'.tr(), style: _AppTextStyles.sectionLabel),
         const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          decoration: BoxDecoration(
+            color: _AppColors.accent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.payments_rounded, color: _AppColors.white, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                'booking.cash'.tr(),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _AppColors.white,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.check_rounded, color: _AppColors.white, size: 16),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
         Row(
           children: [
-            _buildCompactPaymentItem(
-              id: 'cash',
-              label: 'booking.cash'.tr(),
-              icon: Icons.payments_rounded,
-              isSelected: _paymentType == 'cash',
-            ),
-            const SizedBox(width: 12),
-            _buildCompactPaymentItem(
-              id: 'card',
-              label: defaultCard != null ? 'booking.card'.tr() : 'booking.add_card'.tr(),
-              subLabel: defaultCard?.maskedLabel,
-              icon: Icons.credit_card_rounded,
-              isSelected: _paymentType == 'card',
-              onTap: () {
-                if (defaultCard == null) {
-                  _showNoCardDialog();
-                } else if (_paymentType == 'card') {
-                  Navigator.pushNamed(context, '/cards');
-                } else {
-                  setState(() => _paymentType = 'card');
-                }
-              },
+            const Icon(Icons.credit_card_rounded, color: _AppColors.gray400, size: 13),
+            const SizedBox(width: 6),
+            const Text(
+              'Paiement par carte bientôt disponible',
+              style: TextStyle(fontSize: 11, color: _AppColors.gray400),
             ),
           ],
         ),
@@ -2735,29 +2769,6 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: const Text('Réessayer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showNoCardDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('booking.no_card_title'.tr()),
-        content: Text('booking.no_card_body'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('common.cancel'.tr()),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushNamed(context, '/cards');
-            },
-            child: Text('nav.cards'.tr()),
           ),
         ],
       ),

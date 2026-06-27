@@ -1,4 +1,4 @@
-{
+﻿{
   "common": {
     "cancel": "Abbrechen",
     "confirm": "Bestätigen",
@@ -162,7 +162,7 @@
     "cancel_renewal_title": "Verlängerung kündigen?",
     "cancel_renewal_body": "Ihr Abonnement bleibt bis zum Ablaufdatum aktiv, wird aber nicht automatisch verlängert.",
     "cancel_notice": "Verlängerung gekündigt. Ihr Abonnement bleibt bis zum Ablauf aktiv.",
-    "payment_secured": "Sichere Zahlungen über Stripe oder Kryptowährungen.",
+    "payment_secured": "Die Abrechnung erfolgt über unser sicheres Webportal.",
     "badge": "PREMIUM FAHRER",
     "trial_offer": "15 TAGE GRATIS",
     "tagline": "Maximieren Sie Ihre Einnahmen ohne Provisionen.",
@@ -238,6 +238,7 @@
     "accept": "Akzeptieren",
     "refuse": "Ablehnen",
     "rides_title": "Meine Fahrten",
+    "ride_started": "Fahrgast eingestiegen",
     "active_ride": "Fahrt läuft",
     "ride_completed": "Fahrt abgeschlossen",
     "earnings_title": "Meine Einnahmen",

@@ -1,4 +1,4 @@
-{
+﻿{
   "common": {
     "cancel": "Cancelar",
     "confirm": "Confirmar",
@@ -162,7 +162,7 @@
     "cancel_renewal_title": "¿Cancelar renovación?",
     "cancel_renewal_body": "Tu suscripción permanecerá activa hasta la fecha de vencimiento, pero no se renovará automáticamente.",
     "cancel_notice": "Renovación cancelada. Tu suscripción permanece activa hasta el vencimiento.",
-    "payment_secured": "Pagos seguros a través de Stripe o criptomonedas.",
+    "payment_secured": "La facturación se gestiona a través de nuestro portal web seguro.",
     "badge": "PREMIUM CONDUCTOR",
     "trial_offer": "15 DÍAS GRATIS",
     "tagline": "Optimiza tus ingresos sin comisiones.",
@@ -238,6 +238,7 @@
     "accept": "Aceptar",
     "refuse": "Rechazar",
     "rides_title": "Mis Viajes",
+    "ride_started": "Cliente a bordo",
     "active_ride": "Viaje en curso",
     "ride_completed": "Viaje completado",
     "earnings_title": "Mis Ganancias",

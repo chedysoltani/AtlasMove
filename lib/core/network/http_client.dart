@@ -140,13 +140,17 @@ class HttpClient {
   static Future<HttpResponse> delete(
     String endpoint, {
     Map<String, String>? headers,
+    Map<String, dynamic>? body,
     Map<String, dynamic>? queryParams,
+    bool skipAutoRefresh = false,
   }) async {
     return _makeRequest(
       'DELETE',
       endpoint,
       headers: headers,
+      body: body,
       queryParams: queryParams,
+      skipAutoRefresh: skipAutoRefresh,
     );
   }
 

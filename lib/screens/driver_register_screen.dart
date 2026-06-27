@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -157,26 +157,6 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
     }
   }
 
-  Future<void> _fillTestImages() async {
-    try {
-      final byteData = await rootBundle.load('assets/images/image1.png');
-      final bytes = byteData.buffer.asUint8List();
-      final tmpDir = Directory.systemTemp;
-      final idFile    = File('${tmpDir.path}/test_id_card.png');
-      final licFile   = File('${tmpDir.path}/test_driving_license.png');
-      final regFile   = File('${tmpDir.path}/test_vehicle_registration.png');
-      await idFile.writeAsBytes(bytes);
-      await licFile.writeAsBytes(bytes);
-      await regFile.writeAsBytes(bytes);
-      setState(() {
-        _idCard = idFile;
-        _drivingLicense = licFile;
-        _vehicleRegistration = regFile;
-      });
-    } catch (e) {
-      setState(() => _errorMessage = 'Erreur images test: $e');
-    }
-  }
 
   // ── Register ──────────────────────────────────────────────────────────────
 
@@ -440,10 +420,6 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                       _a(6, _sectionLabel('Documents requis',
                           Icons.folder_rounded)),
                       const SizedBox(height: 12),
-                      if (kDebugMode) ...[
-                        _a(6, _devFillButton()),
-                        const SizedBox(height: 10),
-                      ],
                       _a(6, _docCard(
                         icon: Icons.credit_card_rounded,
                         title: 'Carte d\'identité',
@@ -794,7 +770,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
         // Image de fond
         Positioned.fill(
           child: Image.asset(
-            'assets/images/image2.png',
+            'assets/images/image2.jpg',
             fit: BoxFit.cover,
             alignment: Alignment.centerRight,
           ),
@@ -907,20 +883,6 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
     ]);
   }
 
-  Widget _devFillButton() => SizedBox(
-    width: double.infinity,
-    child: OutlinedButton.icon(
-      onPressed: _fillTestImages,
-      icon: const Icon(Icons.bug_report_rounded, size: 16),
-      label: const Text('DEV — Remplir avec images de test'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFF7C3AED),
-        side: const BorderSide(color: Color(0xFF7C3AED)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-      ),
-    ),
-  );
 
   Widget _docCard({
     required IconData icon,

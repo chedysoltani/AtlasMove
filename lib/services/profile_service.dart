@@ -150,6 +150,18 @@ class ProfileService {
     }
   }
 
+  /// Supprimer le compte — appel DELETE /m/auth/me puis nettoyage session
+  static Future<void> deleteAccount(String password) async {
+    // skipAutoRefresh=true : un 401 ici = mot de passe incorrect, pas token expiré
+    await HttpClient.delete(
+      '/m/auth/me',
+      body: {'password': password},
+      skipAutoRefresh: true,
+    );
+    LocationTrackingService().stopLocationTracking();
+    await TokenStorage.clearTokens();
+  }
+
   /// Déconnecter l'utilisateur — arrêt des services + nettoyage complet du storage
   static Future<void> logout() async {
     // 1. Stopper le tracking de position immédiatement

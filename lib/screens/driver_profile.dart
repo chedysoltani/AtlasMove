@@ -259,6 +259,12 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
                                     'auth.logout'.tr(), const Color(0xFFEF4444),
                                     _showLogoutDialog),
                               ]),
+                              const SizedBox(height: 20),
+                              _section('Zone dangereuse', Icons.warning_amber_rounded, [
+                                _actionRow(Icons.delete_forever_rounded,
+                                    'Supprimer mon compte', const Color(0xFFEF4444),
+                                    () => Navigator.pushNamed(context, '/delete_account')),
+                              ]),
                               const SizedBox(height: 28),
 
                               // ── Save button ───────────────────────────
