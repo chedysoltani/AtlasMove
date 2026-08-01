@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -42,6 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isLoadingProfile = true;
   User? _currentUser;
   String? _profilePictureUrl;
+  String? _localAvatarPath; // aperçu local avant confirmation de l'upload
   String? _errorMessage;
 
   late AnimationController _animCtrl;
@@ -79,7 +81,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (mounted) {
         setState(() {
           _currentUser = response.user;
-          _profilePictureUrl = _currentUser?.profilePicture;
+          _profilePictureUrl = ProfileService.resolveAvatarUrl(_currentUser?.profilePicture);
           _firstNameCtrl.text = _currentUser?.firstName ?? '';
           _lastNameCtrl.text = _currentUser?.lastName ?? '';
           _emailCtrl.text = _currentUser?.email ?? '';
@@ -109,22 +111,29 @@ class _ProfileScreenState extends State<ProfileScreen>
         maxWidth: 1024,
       );
       if (image == null) return;
-      // Show local preview immediately
-      setState(() => _profilePictureUrl = image.path);
-      // Upload to server
-      setState(() => _isLoading = true);
+      // Aperçu local immédiat
+      setState(() { _localAvatarPath = image.path; _isLoading = true; });
       try {
         final result = await ProfileService.uploadProfilePicture(image.path);
-        final url = result['data']?['profilePicture'] ??
-            result['profilePicture'] ??
-            result['data']?['profile_picture'] ??
-            result['profile_picture'];
+        final url = result['avatarUrl'] ??
+            result['data']?['avatarUrl'] ??
+            result['data']?['profilePicture'] ??
+            result['profilePicture'];
         if (mounted && url is String) {
-          setState(() => _profilePictureUrl = url);
+          setState(() {
+            _profilePictureUrl = ProfileService.resolveAvatarUrl(url, bust: true);
+            _localAvatarPath = null;
+          });
           _showSnack('Photo mise à jour', success: true);
+        } else if (mounted) {
+          setState(() => _localAvatarPath = null);
+          _showSnack('Upload réussi mais URL manquante', success: false);
         }
       } catch (e) {
-        if (mounted) _showSnack('Échec upload photo: $e', success: false);
+        if (mounted) {
+          setState(() => _localAvatarPath = null);
+          _showSnack('Échec upload photo: ${_getErrorMessage(e)}', success: false);
+        }
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -305,23 +314,43 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ],
                       ),
                       child: ClipOval(
-                        child: _profilePictureUrl != null &&
-                                _profilePictureUrl!.isNotEmpty &&
-                                _profilePictureUrl!.startsWith('http')
-                            ? Image.network(
-                                _profilePictureUrl!,
+                        child: _localAvatarPath != null
+                            ? Image.file(
+                                File(_localAvatarPath!),
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) =>
                                     _avatarPlaceholder(),
                               )
-                            : _avatarPlaceholder(),
+                            : (_profilePictureUrl != null &&
+                                    _profilePictureUrl!.isNotEmpty
+                                ? Image.network(
+                                    _profilePictureUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _avatarPlaceholder(),
+                                  )
+                                : _avatarPlaceholder()),
                       ),
                     ),
+                    if (_isLoading)
+                      Positioned.fill(
+                        child: ClipOval(
+                          child: Container(
+                            color: Colors.black45,
+                            child: const Center(
+                              child: SizedBox(
+                                  width: 22, height: 22,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2)),
+                            ),
+                          ),
+                        ),
+                      ),
                     Positioned(
                       bottom: 0,
                       right: 0,
                       child: GestureDetector(
-                        onTap: _pickImage,
+                        onTap: _isLoading ? null : _pickImage,
                         child: Container(
                           width: 28, height: 28,
                           decoration: BoxDecoration(

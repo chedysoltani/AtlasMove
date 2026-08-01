@@ -1,3 +1,4 @@
+import 'dart:io';
 import '../core/network/http_client.dart';
 import '../core/storage/token_storage.dart';
 import '../models/requests/update_profile_request.dart';
@@ -64,38 +65,62 @@ class ProfileService {
     }
   }
 
-  /// Télécharger une photo de profil
+  static const int _maxAvatarBytes = 5 * 1024 * 1024; // 5 MB
+  static const _allowedAvatarExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+
+  /// Télécharger une photo de profil (PATCH /users/profile/avatar, multipart, champ "avatar")
   static Future<Map<String, dynamic>> uploadProfilePicture(String filePath) async {
+    final ext = filePath.split('.').last.toLowerCase();
+    if (!_allowedAvatarExtensions.contains(ext)) {
+      final fakeResponse = HttpResponse(
+          statusCode: 422,
+          body: '{"errors": ["Format d\'image non supporté (jpg, jpeg, png, gif uniquement)"]}',
+          headers: {});
+      throw ValidationException(
+          ['Format d\'image non supporté (jpg, jpeg, png, gif uniquement)'], fakeResponse);
+    }
+
+    final file = File(filePath);
+    if (await file.exists() && await file.length() > _maxAvatarBytes) {
+      final fakeResponse = HttpResponse(
+          statusCode: 422,
+          body: '{"errors": ["L\'image dépasse la taille maximale de 5 Mo"]}',
+          headers: {});
+      throw ValidationException(['L\'image dépasse la taille maximale de 5 Mo'], fakeResponse);
+    }
+
     try {
-      // Utiliser multipart pour l'upload de fichier
-      final response = await HttpClient.postMultipart(
-        '/users/profile-picture',
+      final response = await HttpClient.patchMultipart(
+        '/users/profile/avatar',
         body: {
-          'profile_picture': filePath,
+          'avatar': filePath,
         },
       );
 
-      // Traitement de la réponse
       final responseData = response.json;
-      
+
       if (response.statusCode == 200) {
         return responseData;
       } else {
         throw AuthErrorResponse.fromJson(responseData, response.statusCode);
       }
+    } on ValidationException {
+      rethrow;
+    } on AuthErrorResponse {
+      rethrow;
     } catch (e) {
       throw NetworkException('Erreur lors du téléchargement de la photo: $e');
     }
   }
 
-  /// Supprimer la photo de profil
+  /// Supprimer la photo de profil (DELETE /users/profile/avatar)
   static Future<UpdateProfileResponse> deleteProfilePicture() async {
     try {
-      final response = await HttpClient.delete('/users/profile-picture');
-      
+      final response = await HttpClient.delete('/users/profile/avatar');
+
       // Traitement de la réponse
       final responseData = response.json;
-      
+
       if (response.statusCode == 200) {
         return UpdateProfileResponse.fromJson(responseData);
       } else {
@@ -104,6 +129,16 @@ class ProfileService {
     } catch (e) {
       throw NetworkException('Erreur lors de la suppression de la photo: $e');
     }
+  }
+
+  /// Résout une URL d'avatar potentiellement relative (ex: /uploads/avatars/xxx.png)
+  /// en URL absolue, avec cache-busting optionnel pour forcer le rechargement de l'image.
+  static String? resolveAvatarUrl(String? path, {bool bust = false}) {
+    if (path == null || path.isEmpty) return null;
+    final absolute = path.startsWith('http') ? path : '${HttpClient.host}$path';
+    if (!bust) return absolute;
+    final separator = absolute.contains('?') ? '&' : '?';
+    return '$absolute${separator}t=${DateTime.now().millisecondsSinceEpoch}';
   }
 
   /// Changer le mot de passe

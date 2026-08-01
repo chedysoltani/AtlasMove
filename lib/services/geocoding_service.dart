@@ -81,7 +81,7 @@ class GeocodingService {
 
       final response = await http
           .get(Uri.parse(url), headers: _headers)
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 15));
 
       debugPrint('GEO: status=${response.statusCode} body=${response.body.substring(0, response.body.length.clamp(0, 300))}');
 
@@ -175,7 +175,7 @@ class GeocodingService {
       debugPrint('GEO: geocode → $url');
       final response = await http
           .get(Uri.parse(url), headers: _headers)
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -208,7 +208,7 @@ class GeocodingService {
 
       final response = await http
           .get(Uri.parse(url), headers: _headers)
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -349,7 +349,7 @@ class GeocodingService {
     final response = await http.get(
       Uri.parse(url),
       headers: {'User-Agent': 'AtlasMove/1.0'},
-    ).timeout(const Duration(seconds: 8));
+    ).timeout(const Duration(seconds: 15));
 
     if (response.statusCode != 200) return [];
 
@@ -405,7 +405,7 @@ class GeocodingService {
       final response = await http.get(
         Uri.parse(url),
         headers: {'User-Agent': 'AtlasMove/1.0'},
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map;
@@ -432,7 +432,7 @@ class GeocodingService {
 
       final response = await http
           .get(Uri.parse(url), headers: _headers)
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -460,7 +460,7 @@ class GeocodingService {
       final response = await http.get(
         Uri.parse(url),
         headers: {'User-Agent': 'AtlasMove/1.0'},
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
@@ -499,7 +499,7 @@ class GeocodingService {
       final response = await http.get(
         Uri.parse(url),
         headers: {'User-Agent': 'AtlasMove/1.0'},
-      ).timeout(const Duration(seconds: 8));
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
@@ -518,7 +518,7 @@ class GeocodingService {
           final r2 = await http.get(
             Uri.parse(fallbackUrl),
             headers: {'User-Agent': 'AtlasMove/1.0'},
-          ).timeout(const Duration(seconds: 8));
+          ).timeout(const Duration(seconds: 15));
           if (r2.statusCode == 200) {
             final List d2 = json.decode(r2.body);
             results = d2

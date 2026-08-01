@@ -140,10 +140,10 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
       setState(() { _localAvatarPath = image.path; _isUploadingPhoto = true; });
       try {
         final result = await ProfileService.uploadProfilePicture(image.path);
-        final url = result['data']?['profilePicture'] ??
-            result['profilePicture'] ??
-            result['data']?['profile_picture'] ??
-            result['profile_picture'];
+        final url = result['avatarUrl'] ??
+            result['data']?['avatarUrl'] ??
+            result['data']?['profilePicture'] ??
+            result['profilePicture'];
         if (mounted) {
           if (url is String) {
             setState(() => _localAvatarPath = null);
@@ -156,7 +156,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
       } catch (e) {
         if (mounted) {
           setState(() => _localAvatarPath = null);
-          _showSnack('Échec upload: $e', ok: false);
+          _showSnack('Échec upload: ${_errMsg(e)}', ok: false);
         }
       } finally {
         if (mounted) setState(() => _isUploadingPhoto = false);
@@ -337,9 +337,9 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
                           : _localAvatarPath != null
                               ? Image.file(File(_localAvatarPath!), fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) => _avatarFallback(initials))
-                              : (_user?.profilePicture != null &&
-                                        _user!.profilePicture!.startsWith('http')
-                                    ? Image.network(_user!.profilePicture!,
+                              : (ProfileService.resolveAvatarUrl(_user?.profilePicture) != null
+                                    ? Image.network(
+                                        ProfileService.resolveAvatarUrl(_user?.profilePicture)!,
                                         fit: BoxFit.cover,
                                         errorBuilder: (_, __, ___) => _avatarFallback(initials))
                                     : _avatarFallback(initials)),

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/trip_models.dart';
 import '../core/network/http_client.dart';
+import 'profile_service.dart';
 
 class FareEstimate {
   final double estimatedFare;
@@ -670,14 +671,23 @@ class TripService {
         final driver = raw['driver'] as Map<String, dynamic>?
             ?? raw['livreur'] as Map<String, dynamic>?;
         final fareRaw = raw['fare'] ?? raw['offered_fare'] ?? raw['estimated_fare'];
+        final fullName = driver != null
+            ? '${driver['first_name'] ?? ''} ${driver['last_name'] ?? ''}'.trim()
+            : '';
         return AcceptedTripDetail(
           status: raw['status'] as String? ?? '',
           fare: fareRaw is num ? fareRaw.toDouble() : 0.0,
           currency: raw['currency'] as String? ?? 'TND',
-          driverName: driver?['name'] as String?
-              ?? driver?['full_name'] as String?
-              ?? 'Chauffeur',
-          driverPhoto: driver?['photo'] as String? ?? driver?['avatar'] as String?,
+          driverName: fullName.isNotEmpty
+              ? fullName
+              : (driver?['name'] as String?
+                  ?? driver?['full_name'] as String?
+                  ?? 'Chauffeur'),
+          driverPhone: driver?['phone'] as String?,
+          driverPhoto: ProfileService.resolveAvatarUrl(
+              driver?['profile_picture'] as String?
+                  ?? driver?['photo'] as String?
+                  ?? driver?['avatar'] as String?),
           driverRating: (driver?['rating'] as num?)?.toDouble() ?? 4.5,
           driverVehicle: driver?['vehicle'] as String?
               ?? raw['vehicle_description'] as String?
@@ -734,6 +744,7 @@ class AcceptedTripDetail {
   final double fare;
   final String currency;
   final String driverName;
+  final String? driverPhone;
   final String? driverPhoto;
   final double driverRating;
   final String driverVehicle;
@@ -743,6 +754,7 @@ class AcceptedTripDetail {
     required this.fare,
     required this.currency,
     required this.driverName,
+    this.driverPhone,
     this.driverPhoto,
     required this.driverRating,
     required this.driverVehicle,

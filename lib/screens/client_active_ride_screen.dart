@@ -34,6 +34,7 @@ class ClientActiveRideScreen extends ConsumerStatefulWidget {
   final double lockedFare;
   final String currency;
   final String driverName;
+  final String? driverPhone;
   final String? driverPhoto;
   final double driverRating;
   final String driverVehicle;
@@ -41,6 +42,8 @@ class ClientActiveRideScreen extends ConsumerStatefulWidget {
   // Optional — pass for live map; screen degrades gracefully if absent
   final double? pickupLatitude;
   final double? pickupLongitude;
+  final double? destinationLatitude;
+  final double? destinationLongitude;
 
   const ClientActiveRideScreen({
     super.key,
@@ -48,12 +51,15 @@ class ClientActiveRideScreen extends ConsumerStatefulWidget {
     required this.lockedFare,
     required this.currency,
     required this.driverName,
+    this.driverPhone,
     this.driverPhoto,
     required this.driverRating,
     required this.driverVehicle,
     required this.destination,
     this.pickupLatitude,
     this.pickupLongitude,
+    this.destinationLatitude,
+    this.destinationLongitude,
   });
 
   @override
@@ -81,6 +87,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   bool       _fetchingRoute = false;
   BitmapDescriptor? _driverIcon;
   BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _destinationIcon;
 
   // ── Cancellation / navigation ────────────────────────────────────────────────
   bool _isCancelling = false;
@@ -93,6 +100,11 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   LatLng? get _pickupLatLng => _hasPickupCoords
       ? LatLng(widget.pickupLatitude!, widget.pickupLongitude!)
       : null;
+
+  LatLng? get _destinationLatLng =>
+      widget.destinationLatitude != null && widget.destinationLongitude != null
+          ? LatLng(widget.destinationLatitude!, widget.destinationLongitude!)
+          : null;
 
   // Current interpolated driver position (used for marker + camera)
   LatLng? get _smoothDriverPos {
@@ -125,7 +137,6 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
       duration: const Duration(milliseconds: 700),
     )..addListener(() { if (mounted) setState(() {}); });
 
-    // Load custom markers
     _loadIcons();
 
     // Start WebSocket + fallback polling via provider
@@ -147,11 +158,57 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   // ── Custom icons ─────────────────────────────────────────────────────────────
   Future<void> _loadIcons() async {
     _driverIcon = await _buildCarIcon();
-
-    // Pickup: green circle with white dot
     _pickupIcon = await _buildPickupIcon();
-
+    _destinationIcon = await _buildDestinationIcon();
     if (mounted) setState(() {});
+  }
+
+  Future<BitmapDescriptor> _buildDestinationIcon() async {
+    const double dp = 44.0, px = 3.0, size = dp * px;
+    final rec = ui.PictureRecorder();
+    final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
+    final cx = size / 2, cy = size * 0.42, r = size * 0.30;
+    // Shadow
+    canvas.drawCircle(Offset(cx, cy + 4), r + 6,
+        Paint()..color = Colors.black.withOpacity(0.2)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+    // Red fill circle
+    canvas.drawCircle(Offset(cx, cy), r + 6, Paint()..color = Colors.white);
+    canvas.drawCircle(Offset(cx, cy), r + 3, Paint()..color = const Color(0xFFEF4444));
+    // White inner dot
+    canvas.drawCircle(Offset(cx, cy), r * 0.4, Paint()..color = Colors.white);
+    // Pin tail
+    final path = Path()
+      ..moveTo(cx - r * 0.5, cy + r * 0.9)
+      ..lineTo(cx, cy + r * 2.4)
+      ..lineTo(cx + r * 0.5, cy + r * 0.9)
+      ..close();
+    canvas.drawPath(path, Paint()..color = const Color(0xFFEF4444));
+    final pic = rec.endRecording();
+    final img = await pic.toImage(size.toInt(), size.toInt());
+    final data = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(), size: const Size(dp, dp));
+  }
+
+  void _drawRideRoute() {
+    final pickup = _pickupLatLng;
+    final dest = _destinationLatLng;
+    if (pickup == null || dest == null || !mounted) return;
+    _fetchRoute(pickup, dest);
+    if (_isMapReady && _mapController != null) {
+      const pad = 0.003;
+      final bounds = LatLngBounds(
+        southwest: LatLng(
+          math.min(pickup.latitude, dest.latitude) - pad,
+          math.min(pickup.longitude, dest.longitude) - pad,
+        ),
+        northeast: LatLng(
+          math.max(pickup.latitude, dest.latitude) + pad,
+          math.max(pickup.longitude, dest.longitude) + pad,
+        ),
+      );
+      _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+    }
   }
 
   Future<BitmapDescriptor> _buildCarIcon() async {
@@ -267,18 +324,26 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     _markerTo   = newPos;
     _markerCtrl.forward(from: 0.0);
 
-    // Follow camera: frame driver + pickup
+    // Follow camera: frame driver + destination (inProgress) or driver + pickup (arriving)
     if (_followCamera && _isMapReady && _mapController != null) {
-      _frameBothPoints(newPos);
+      final status = ref.read(activeRideProvider).status;
+      final target = (status == RideStatus.inProgress && _destinationLatLng != null)
+          ? _destinationLatLng!
+          : (_pickupLatLng ?? newPos);
+      _frameBothPoints2(newPos, target);
     }
 
     // Throttle route re-fetch to once every 10 seconds
     final now = DateTime.now();
     if (!_fetchingRoute &&
-        _pickupLatLng != null &&
         (_lastRouteFetch == null ||
             now.difference(_lastRouteFetch!).inSeconds >= 10)) {
-      _fetchRoute(newPos, _pickupLatLng!);
+      final status = ref.read(activeRideProvider).status;
+      if (status == RideStatus.inProgress && _destinationLatLng != null) {
+        _fetchRoute(newPos, _destinationLatLng!);
+      } else if (_pickupLatLng != null) {
+        _fetchRoute(newPos, _pickupLatLng!);
+      }
     }
   }
 
@@ -289,16 +354,19 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
           CameraUpdate.newCameraPosition(CameraPosition(target: driverPos, zoom: 16)));
       return;
     }
-    // Add small padding to avoid markers touching the bounds edge
+    _frameBothPoints2(driverPos, pickup);
+  }
+
+  void _frameBothPoints2(LatLng a, LatLng b) {
     const pad = 0.002;
     final bounds = LatLngBounds(
       southwest: LatLng(
-        math.min(driverPos.latitude,  pickup.latitude)  - pad,
-        math.min(driverPos.longitude, pickup.longitude) - pad,
+        math.min(a.latitude,  b.latitude)  - pad,
+        math.min(a.longitude, b.longitude) - pad,
       ),
       northeast: LatLng(
-        math.max(driverPos.latitude,  pickup.latitude)  + pad,
-        math.max(driverPos.longitude, pickup.longitude) + pad,
+        math.max(a.latitude,  b.latitude)  + pad,
+        math.max(a.longitude, b.longitude) + pad,
       ),
     );
     _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
@@ -423,6 +491,12 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
         _onNewDriverPosition(nextPos);
       }
 
+      // When ride starts (inProgress), draw route pickup → destination
+      if (next.status == RideStatus.inProgress &&
+          prev?.status != RideStatus.inProgress) {
+        _drawRideRoute();
+      }
+
       // Auto-navigate when ride ends (guard against multiple calls)
       if (next.status == RideStatus.completed && mounted && !_hasNavigated) {
         _hasNavigated = true;
@@ -511,6 +585,19 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
       ));
     }
 
+    // Destination marker — shown when ride is in progress
+    final destLatLng = _destinationLatLng;
+    if (destLatLng != null && rideState.status == RideStatus.inProgress) {
+      markers.add(Marker(
+        markerId: const MarkerId('destination'),
+        position: destLatLng,
+        icon: _destinationIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        anchor: const Offset(0.5, 1.0),
+        infoWindow: InfoWindow(title: widget.destination),
+        zIndex: 3,
+      ));
+    }
+
     return GoogleMap(
       initialCameraPosition: CameraPosition(target: initialTarget, zoom: 15),
       onMapCreated: (ctrl) async {
@@ -531,7 +618,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
       trafficEnabled: true,
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 80,
-        bottom: 270,
+        bottom: 340,
       ),
     );
   }
@@ -621,7 +708,6 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   }
 
   Widget _buildBottomSheet(ActiveRideState rideState) {
-    final color = _statusColor(rideState.status);
     final isCancelable = rideState.status == RideStatus.accepted ||
         rideState.status == RideStatus.arriving;
     final isFinished = rideState.status == RideStatus.completed ||
@@ -652,35 +738,21 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // ── Timeline ────────────────────────────────────────────
+              _buildRideTimeline(rideState),
               const SizedBox(height: 14),
+
+              // ── ETA (uniquement quand le driver est en route) ───────
+              if (rideState.status == RideStatus.arriving &&
+                  rideState.driverLocation != null &&
+                  _pickupLatLng != null)
+                _buildEtaRow(rideState.driverLocation!),
+
+              // ── Driver info ─────────────────────────────────────────
               _buildDriverRow(),
-              const SizedBox(height: 14),
-              // Status badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: color.withOpacity(0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(_statusIcon(rideState.status), color: color, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _statusLabel(rideState.status),
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
-                      ),
-                    ),
-                    if (!isFinished)
-                      SizedBox(
-                        width: 14, height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: color),
-                      ),
-                  ],
-                ),
-              ),
+
               if (!isFinished) ...[
                 const SizedBox(height: 10),
                 _buildFareRow(),
@@ -695,6 +767,117 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
         ),
       ),
     );
+  }
+
+  /// Timeline horizontale 4 étapes
+  Widget _buildRideTimeline(ActiveRideState rideState) {
+    final steps = [
+      (label: 'Confirmé',  done: true),
+      (label: 'En route',  done: rideState.status == RideStatus.arriving ||
+          rideState.status == RideStatus.inProgress ||
+          rideState.status == RideStatus.completed),
+      (label: 'Arrivé',   done: rideState.status == RideStatus.inProgress ||
+          rideState.status == RideStatus.completed),
+      (label: 'Terminé',  done: rideState.status == RideStatus.completed),
+    ];
+    final activeIndex = steps.lastIndexWhere((s) => s.done);
+
+    return Row(
+      children: List.generate(steps.length * 2 - 1, (i) {
+        if (i.isOdd) {
+          // Ligne de connexion
+          final lineActive = (i ~/ 2) < activeIndex;
+          return Expanded(
+            child: Container(
+              height: 2,
+              color: lineActive ? _C.primary : _C.gray100,
+            ),
+          );
+        }
+        final idx = i ~/ 2;
+        final step = steps[idx];
+        final isActive = idx == activeIndex;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 400),
+              width: isActive ? 14 : 10,
+              height: isActive ? 14 : 10,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: step.done ? _C.primary : _C.gray100,
+                border: Border.all(
+                  color: step.done ? _C.primary : _C.gray400.withOpacity(0.4),
+                  width: isActive ? 2.5 : 1.5,
+                ),
+                boxShadow: isActive ? [
+                  BoxShadow(color: _C.primary.withOpacity(0.35), blurRadius: 8, spreadRadius: 1),
+                ] : [],
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              step.label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: step.done ? FontWeight.w700 : FontWeight.w400,
+                color: step.done ? _C.gray900 : _C.gray400,
+              ),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  /// ETA du livreur jusqu'au point de pickup
+  Widget _buildEtaRow(DriverLocation driverLoc) {
+    final distM = _haversineMeters(driverLoc.position, _pickupLatLng!);
+    final etaMin = (distM / 500).ceil(); // vitesse moyenne 30 km/h ≈ 500 m/min
+    final distLabel = distM < 1000
+        ? '${distM.round()} m'
+        : '${(distM / 1000).toStringAsFixed(1)} km';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: _C.primary.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _C.primary.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.timer_outlined, color: _C.primary, size: 20),
+            const SizedBox(width: 10),
+            Text(
+              'Arrivée dans ~$etaMin min',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _C.primary),
+            ),
+            const Spacer(),
+            Text(
+              distLabel,
+              style: const TextStyle(fontSize: 12, color: _C.gray600, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Haversine distance en mètres entre deux points
+  double _haversineMeters(LatLng a, LatLng b) {
+    const r = 6371000.0;
+    final lat1 = a.latitude * math.pi / 180;
+    final lat2 = b.latitude * math.pi / 180;
+    final dLat = (b.latitude - a.latitude) * math.pi / 180;
+    final dLng = (b.longitude - a.longitude) * math.pi / 180;
+    final sin1 = math.sin(dLat / 2);
+    final sin2 = math.sin(dLng / 2);
+    final x = sin1 * sin1 + math.cos(lat1) * math.cos(lat2) * sin2 * sin2;
+    return 2 * r * math.asin(math.sqrt(x));
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -847,6 +1030,23 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
                       style: const TextStyle(fontSize: 11, color: _C.gray400)),
                 ],
               ),
+              if (widget.driverPhone != null && widget.driverPhone!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: () => _copyDriverPhone(widget.driverPhone!),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.phone_iphone_rounded, size: 12, color: _C.gray400),
+                      const SizedBox(width: 4),
+                      Text(widget.driverPhone!,
+                          style: const TextStyle(fontSize: 12, color: _C.gray600)),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.copy_rounded, size: 13, color: _C.primary),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -889,6 +1089,20 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
         ),
       );
     }
+  }
+
+  void _copyDriverPhone(String phone) {
+    Clipboard.setData(ClipboardData(text: phone));
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Numéro copié'),
+        backgroundColor: _C.green,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   Widget _avatarInitial() {

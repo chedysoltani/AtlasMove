@@ -3,11 +3,34 @@ import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../storage/token_storage.dart';
+
+/// Devine le Content-Type d'un fichier à partir de son extension.
+/// Le serveur rejette les uploads dont le Content-Type n'est pas explicitement
+/// image/* — http.MultipartFile.fromPath() met application/octet-stream par défaut.
+MediaType? _mediaTypeForFile(String filePath) {
+  final ext = filePath.split('.').last.toLowerCase();
+  switch (ext) {
+    case 'jpg':
+    case 'jpeg':
+      return MediaType('image', 'jpeg');
+    case 'png':
+      return MediaType('image', 'png');
+    case 'gif':
+      return MediaType('image', 'gif');
+    default:
+      return null;
+  }
+}
 
 /// HTTP Client pour gérer toutes les requêtes API
 class HttpClient {
   static const String baseUrl = 'https://api.atla.business/api/v1';
+
+  /// Hôte racine (sans /api/v1) — utilisé pour résoudre les URLs relatives
+  /// renvoyées par le backend (ex: /uploads/avatars/xxx.png).
+  static const String host = 'https://api.atla.business';
 
   static const Duration _timeout = Duration(seconds: 30);
   static const Duration _receiveTimeout = Duration(seconds: 30);
@@ -96,6 +119,23 @@ class HttpClient {
   }) async {
     return _makeRequest(
       'POST',
+      endpoint,
+      headers: headers,
+      body: body,
+      queryParams: queryParams,
+      isMultipart: true,
+    );
+  }
+
+  /// PATCH Request with multipart form data
+  static Future<HttpResponse> patchMultipart(
+    String endpoint, {
+    Map<String, String>? headers,
+    Map<String, dynamic>? body,
+    Map<String, dynamic>? queryParams,
+  }) async {
+    return _makeRequest(
+      'PATCH',
       endpoint,
       headers: headers,
       body: body,
@@ -199,7 +239,11 @@ class HttpClient {
             if (value is String && value.isNotEmpty && !value.startsWith('http') && File(value).existsSync()) {
               // C'est un chemin de fichier local — l'envoyer comme fichier
               multipartRequest.files.add(
-                await http.MultipartFile.fromPath(entry.key, value),
+                await http.MultipartFile.fromPath(
+                  entry.key,
+                  value,
+                  contentType: _mediaTypeForFile(value),
+                ),
               );
             } else if (value != null) {
               multipartRequest.fields[entry.key] = value.toString();

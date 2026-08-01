@@ -1,3 +1,5 @@
+import '../services/profile_service.dart';
+
 class TripResponse {
   final bool success;
   final String message;
@@ -285,6 +287,7 @@ class BidOffer {
   final String tripId;
   final String livreurId;
   final String driverName;
+  final String? driverPhone;
   final String? driverPhoto;
   final double driverRating;
   final String driverVehicle;
@@ -296,6 +299,7 @@ class BidOffer {
     required this.tripId,
     required this.livreurId,
     required this.driverName,
+    this.driverPhone,
     this.driverPhoto,
     required this.driverRating,
     required this.driverVehicle,
@@ -304,12 +308,32 @@ class BidOffer {
   });
 
   factory BidOffer.fromJson(Map<String, dynamic> json) {
+    // Build driver name: try explicit fields first, then livreur object (API format), then driver object
+    final livreur = json['livreur'];
+    final livreurName = livreur is Map
+        ? '${livreur['first_name'] ?? ''} ${livreur['last_name'] ?? ''}'.trim()
+        : null;
+
     return BidOffer(
       id: json['id']?.toString() ?? '',
       tripId: (json['trip_id'] ?? json['tripId'])?.toString() ?? '',
       livreurId: (json['livreur_id'] ?? json['livreurId'])?.toString() ?? '',
-      driverName: (json['driver_name'] ?? json['driverName'] ?? json['driver']?['fullName'] ?? json['driver']?['name'])?.toString() ?? 'Livreur',
-      driverPhoto: (json['driver_photo'] ?? json['driverPhoto'] ?? json['driver']?['photo'])?.toString(),
+      driverName: json['driver_name']?.toString() ??
+          json['driverName']?.toString() ??
+          (livreurName?.isNotEmpty == true ? livreurName! : null) ??
+          json['driver']?['fullName']?.toString() ??
+          json['driver']?['name']?.toString() ??
+          'Livreur',
+      driverPhone: json['driver_phone']?.toString() ??
+          json['driverPhone']?.toString() ??
+          (livreur is Map ? livreur['phone']?.toString() : null) ??
+          json['driver']?['phone']?.toString(),
+      driverPhoto: ProfileService.resolveAvatarUrl(
+          json['driver_photo']?.toString() ??
+          json['driverPhoto']?.toString() ??
+          (livreur is Map ? livreur['profile_picture']?.toString() : null) ??
+          json['driver']?['profile_picture']?.toString() ??
+          json['driver']?['photo']?.toString()),
       driverRating: double.tryParse((json['driver_rating'] ?? json['driverRating'] ?? json['driver']?['rating'] ?? json['driver']?['stars'])?.toString() ?? '4.8') ?? 4.8,
       driverVehicle: (json['driver_vehicle'] ?? json['driverVehicle'] ?? json['driver']?['vehicle'] ?? json['driver']?['vehicle_type'])?.toString() ?? 'Moto standard',
       proposedFare: double.tryParse((json['proposed_fare'] ?? json['proposedFare'] ?? json['proposed_price'])?.toString() ?? '0') ?? 0.0,
