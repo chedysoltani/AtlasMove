@@ -32,6 +32,42 @@ class FareEstimate {
           ?? {},
     );
   }
+
+  // Additive multi-stop fields — `pricing_breakdown` uses `extra_stop_fee`,
+  // the flattened `/trips/estimate-fare` breakdown uses `extra_stop`.
+  double? get extraStopFee {
+    final raw = breakdown['extra_stop_fee'] ?? breakdown['extra_stop'];
+    return raw is num ? raw.toDouble() : null;
+  }
+
+  int? get stopsCount {
+    final raw = breakdown['stops_count'];
+    return raw is num ? raw.toInt() : null;
+  }
+}
+
+class TripStopInput {
+  final String address;
+  final double latitude;
+  final double longitude;
+  final double legDistanceKm;
+  final double legDurationMin;
+
+  const TripStopInput({
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+    required this.legDistanceKm,
+    required this.legDurationMin,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
+        'leg_distance_km': double.parse(legDistanceKm.toStringAsFixed(2)),
+        'leg_duration_min': double.parse(legDurationMin.toStringAsFixed(1)),
+      };
 }
 
 class TripService {
@@ -44,6 +80,7 @@ class TripService {
     required double durationMinutes,
     double? latitude,
     double? longitude,
+    List<Map<String, double>>? legs,
   }) async {
     final body = <String, dynamic>{
       'service_id': serviceId,
@@ -51,6 +88,13 @@ class TripService {
       'duration_minutes': double.parse(durationMinutes.toStringAsFixed(1)),
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
+      if (legs != null && legs.isNotEmpty)
+        'legs': legs
+            .map((l) => {
+                  'distance_km': double.parse(l['distance_km']!.toStringAsFixed(2)),
+                  'duration_min': double.parse(l['duration_min']!.toStringAsFixed(1)),
+                })
+            .toList(),
     };
 
     // Per backend spec: POST /m/trips/estimate — fallback to old endpoint if not yet deployed
@@ -92,6 +136,9 @@ class TripService {
     required String paymentType, // "card" | "cash"
     bool isNegotiable = true,
     double? offeredFare,
+    List<TripStopInput>? stops,
+    double? leg1DistanceKm,
+    double? leg1DurationMin,
   }) async {
     // LOG: Début de la fonction
     debugPrint('=== TripService.createTrip() START ===');
@@ -111,6 +158,12 @@ class TripService {
         'payment_type': paymentType,
         'is_negotiable': isNegotiable,
         if (offeredFare != null) 'offered_fare': offeredFare,
+        if (stops != null && stops.isNotEmpty)
+          'stops': stops.map((s) => s.toJson()).toList(),
+        if (leg1DistanceKm != null)
+          'leg1_distance_km': double.parse(leg1DistanceKm.toStringAsFixed(2)),
+        if (leg1DurationMin != null)
+          'leg1_duration_min': double.parse(leg1DurationMin.toStringAsFixed(1)),
       };
       
       debugPrint('Données envoyées: $requestData');

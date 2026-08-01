@@ -124,6 +124,19 @@ class _AppTextStyles {
   );
 }
 
+// ─── Extra destination (multi-stop) ───────────────────────────────────────────
+class _ExtraStop {
+  final String address;
+  final LatLng coordinates;
+  double? legDistanceKm;
+  double? legDurationMin;
+
+  _ExtraStop({
+    required this.address,
+    required this.coordinates,
+  });
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 class CreateRideScreen extends ConsumerStatefulWidget {
   const CreateRideScreen({super.key});
@@ -166,15 +179,30 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   FareEstimate? _fareEstimate;
   bool _isFetchingEstimate = false;
 
+  // Multi-destination (stops[]) — max 2 extra stops, 3 destinations au total
+  List<_ExtraStop> _extraStops = [];
+  double? _leg1DistanceKm;
+  double? _leg1DurationMin;
+  bool _isRecalculatingStops = false;
+  bool _stopsRouteDirty = false; // true tant que la dernière modif n'est pas re-pricée avec succès
+
+  // true dès que le catalogue a été chargé avec une position GPS valide —
+  // évite de refetch en boucle si la position initiale était déjà bonne.
+  bool _catalogueLoadedWithPosition = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(mapProvider.notifier).initializeMap();
       LocationService().getCurrentPosition().then((pos) {
+        // Fraîche si possible, sinon dernière position connue plutôt que rien —
+        // le backend résout la devise/tarif par zone GPS quand elle est fournie.
+        final best = pos ?? LocationService().currentPosition;
+        _catalogueLoadedWithPosition = best != null;
         ref.read(catalogueProvider.notifier).fetchCatalogue(
-          latitude: pos?.latitude,
-          longitude: pos?.longitude,
+          latitude: best?.latitude,
+          longitude: best?.longitude,
         );
       });
       
@@ -203,6 +231,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       n.clearPolylines();
       n.removeMarker('pickup');
       n.removeMarker('destination');
+      n.removeMarker('stop_0');
+      n.removeMarker('stop_1');
     } catch (_) {}
   }
 
@@ -327,12 +357,26 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     try {
       final durationMin = _parseDurationToMinutes(_estimatedDuration!).toDouble();
       final pickupCoords = _estimatedPickupCoords;
+
+      List<Map<String, double>>? legs;
+      if (_extraStops.isNotEmpty &&
+          _leg1DistanceKm != null &&
+          _leg1DurationMin != null &&
+          _extraStops.every((s) => s.legDistanceKm != null && s.legDurationMin != null)) {
+        legs = [
+          {'distance_km': _leg1DistanceKm!, 'duration_min': _leg1DurationMin!},
+          for (final s in _extraStops)
+            {'distance_km': s.legDistanceKm!, 'duration_min': s.legDurationMin!},
+        ];
+      }
+
       final estimate = await TripService.estimateFare(
         serviceId: _selectedService!.id,
         distanceKm: _estimatedDistance!,
         durationMinutes: durationMin,
         latitude: pickupCoords?.latitude,
         longitude: pickupCoords?.longitude,
+        legs: legs,
       );
       if (mounted) {
         setState(() {
@@ -362,14 +406,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
       if (routeResult != null) {
         distanceKm = routeResult.distanceKm;
-        final minutes = (routeResult.durationSeconds / 60).round();
-        if (minutes < 60) {
-          duration = '$minutes min';
-        } else {
-          final hours = minutes ~/ 60;
-          final remaining = minutes % 60;
-          duration = '${hours}h ${remaining}min';
-        }
+        duration = _formatDurationMinutes((routeResult.durationSeconds / 60).round());
         routePoints = routeResult.points;
       } else {
         // Fallback haversine si OSRM indisponible
@@ -401,12 +438,20 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   }
 
   Future<void> _fitMapToBounds(LatLng start, LatLng end) async {
+    await _fitBoundsForPoints([start, end]);
+  }
+
+  Future<void> _fitBoundsForPoints(List<LatLng> points) async {
     final mapState = ref.read(mapProvider);
-    if (mapState.mapController == null) return;
-    final minLat = math.min(start.latitude, end.latitude);
-    final maxLat = math.max(start.latitude, end.latitude);
-    final minLng = math.min(start.longitude, end.longitude);
-    final maxLng = math.max(start.longitude, end.longitude);
+    if (mapState.mapController == null || points.isEmpty) return;
+    var minLat = points.first.latitude, maxLat = points.first.latitude;
+    var minLng = points.first.longitude, maxLng = points.first.longitude;
+    for (final p in points) {
+      minLat = math.min(minLat, p.latitude);
+      maxLat = math.max(maxLat, p.latitude);
+      minLng = math.min(minLng, p.longitude);
+      maxLng = math.max(maxLng, p.longitude);
+    }
     final latPadding = (maxLat - minLat) * 0.2;
     final lngPadding = (maxLng - minLng) * 0.2;
     final bounds = LatLngBounds(
@@ -416,6 +461,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     await mapState.mapController!.animateCamera(
       CameraUpdate.newLatLngBounds(bounds, 100.0),
     );
+  }
+
+  String _formatDurationMinutes(int minutes) {
+    if (minutes < 60) return '$minutes min';
+    final hours = minutes ~/ 60;
+    final remaining = minutes % 60;
+    return '${hours}h ${remaining}min';
   }
 
   double _calculateDistance(LatLng start, LatLng end) {
@@ -482,6 +534,318 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     mapNotifier.addPolyline(routePolyline);
   }
 
+  // ── Multi-destination (stops[]) ────────────────────────────────────────────
+
+  /// Recalcule l'itinéraire complet (pickup → destination → arrêts éventuels).
+  /// Sans arrêt : délègue au calcul classique 2 points (comportement inchangé).
+  /// Avec arrêts : un seul appel OSRM multi-waypoints, aucune estimation
+  /// approximative (haversine) n'est utilisée pour les legs facturés.
+  Future<bool> _recalculateStopsRoute() async {
+    final mapState = ref.read(mapProvider);
+    final start = mapState.currentPosition;
+    if (start == null || _destinationCoordinates == null) return false;
+
+    if (_extraStops.isEmpty) {
+      _leg1DistanceKm = null;
+      _leg1DurationMin = null;
+      if (mounted) setState(() => _stopsRouteDirty = false);
+      await _calculateRoute(start, _destinationCoordinates!);
+      return true;
+    }
+
+    setState(() => _isRecalculatingStops = true);
+    bool success = false;
+    try {
+      final waypoints = <LatLng>[
+        start,
+        _destinationCoordinates!,
+        for (final stop in _extraStops) stop.coordinates,
+      ];
+      final result = await RouteService.getMultiWaypointRoute(waypoints);
+      if (result == null || result.legs.length != waypoints.length - 1) {
+        throw Exception('multi_stop_route_failed');
+      }
+
+      _leg1DistanceKm = result.legs[0].distanceKm;
+      _leg1DurationMin = result.legs[0].durationSeconds / 60.0;
+      for (var i = 0; i < _extraStops.length; i++) {
+        final leg = result.legs[i + 1];
+        _extraStops[i].legDistanceKm = leg.distanceKm;
+        _extraStops[i].legDurationMin = leg.durationSeconds / 60.0;
+      }
+
+      final totalDurationMin = (result.totalDurationSeconds / 60).round();
+      if (mounted) {
+        setState(() {
+          _estimatedDistance = result.totalDistanceKm;
+          _estimatedDuration = _formatDurationMinutes(totalDurationMin);
+          _showRouteInfo = true;
+          _showRouteEstimation = true;
+          _stopsRouteDirty = false;
+        });
+      }
+      _estimatedPickupCoords = start;
+      _addMultiStopRouteElements(start, result.points);
+      await _fetchFareEstimate();
+      await _fitBoundsForPoints(waypoints);
+      success = true;
+    } catch (e) {
+      debugPrint('❌ Erreur calcul itinéraire multi-arrêts: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('booking.route_calc_error'.tr())),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRecalculatingStops = false);
+    }
+    return success;
+  }
+
+  void _addMultiStopRouteElements(LatLng start, List<LatLng> routePoints) {
+    final mapNotifier = ref.read(mapProvider.notifier);
+    mapNotifier.clearPolylines();
+    mapNotifier.removeMarker('pickup');
+    mapNotifier.removeMarker('destination');
+    mapNotifier.removeMarker('stop_0');
+    mapNotifier.removeMarker('stop_1');
+
+    mapNotifier.addMarker(Marker(
+      markerId: const MarkerId('pickup'),
+      position: start,
+      infoWindow: InfoWindow(title: 'booking.departure'.tr()),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+    ));
+
+    final hasExtraStops = _extraStops.isNotEmpty;
+    mapNotifier.addMarker(Marker(
+      markerId: const MarkerId('destination'),
+      position: _destinationCoordinates!,
+      infoWindow: InfoWindow(
+        title: hasExtraStops
+            ? 'booking.stop_number'.tr(namedArgs: {'number': '1'})
+            : 'booking.destination'.tr(),
+      ),
+      icon: BitmapDescriptor.defaultMarkerWithHue(
+        hasExtraStops ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueRed,
+      ),
+    ));
+
+    for (var i = 0; i < _extraStops.length; i++) {
+      final isLast = i == _extraStops.length - 1;
+      mapNotifier.addMarker(Marker(
+        markerId: MarkerId('stop_$i'),
+        position: _extraStops[i].coordinates,
+        infoWindow: InfoWindow(
+          title: 'booking.stop_number'.tr(namedArgs: {'number': '${i + 2}'}),
+        ),
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+          isLast ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
+        ),
+      ));
+    }
+
+    final routeOutline = Polyline(
+      polylineId: const PolylineId('route_outline'),
+      points: routePoints,
+      color: const Color(0xFF1A3A5C),
+      width: 7,
+      jointType: JointType.round,
+      endCap: Cap.roundCap,
+      startCap: Cap.roundCap,
+    );
+    final routePolyline = Polyline(
+      polylineId: const PolylineId('route'),
+      points: routePoints,
+      color: const Color(0xFF2563EB),
+      width: 5,
+      jointType: JointType.round,
+      endCap: Cap.roundCap,
+      startCap: Cap.roundCap,
+    );
+    mapNotifier.addPolyline(routeOutline);
+    mapNotifier.addPolyline(routePolyline);
+  }
+
+  Future<void> _addExtraStop(String address, LatLng coords) async {
+    if (_extraStops.length >= 2) return;
+    final stop = _ExtraStop(address: address, coordinates: coords);
+    setState(() {
+      _extraStops.add(stop);
+      _stopsRouteDirty = true;
+    });
+    final success = await _recalculateStopsRoute();
+    if (!success && mounted) {
+      setState(() => _extraStops.remove(stop));
+      await _recalculateStopsRoute();
+    }
+  }
+
+  Future<void> _removeExtraStop(int index) async {
+    setState(() {
+      _extraStops.removeAt(index);
+      _stopsRouteDirty = true;
+    });
+    await _recalculateStopsRoute();
+  }
+
+  void _showAddStopSheet() {
+    final controller = TextEditingController();
+    List<String> suggestions = [];
+    bool isSearching = false;
+    Timer? debounce;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            Future<void> runSearch(String query) async {
+              setSheetState(() => isSearching = true);
+              try {
+                final mapState = ref.read(mapProvider);
+                final results = await GeocodingService.searchAddressSuggestions(
+                  query,
+                  userLocation: mapState.currentPosition,
+                  radiusKm: 100,
+                );
+                setSheetState(() {
+                  suggestions = results;
+                  isSearching = false;
+                });
+              } catch (_) {
+                setSheetState(() => isSearching = false);
+              }
+            }
+
+            void onChanged(String value) {
+              debounce?.cancel();
+              if (value.length < 2) {
+                setSheetState(() => suggestions = []);
+                return;
+              }
+              debounce = Timer(const Duration(milliseconds: 500), () => runSearch(value));
+            }
+
+            Future<void> selectSuggestion(String address) async {
+              Navigator.pop(sheetContext);
+              final coords = await GeocodingService.getAddressCoordinates(address);
+              if (coords == null) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('booking.address_not_found'.tr())),
+                  );
+                }
+                return;
+              }
+              await _addExtraStop(address, LatLng(coords.latitude, coords.longitude));
+            }
+
+            return Container(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(sheetContext).viewInsets.bottom + 20),
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: _AppColors.gray200,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'booking.add_stop_title'.tr(),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: _AppColors.gray900,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: _AppColors.gray50,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _AppColors.gray200),
+                    ),
+                    child: TextField(
+                      controller: controller,
+                      autofocus: true,
+                      onChanged: onChanged,
+                      style: const TextStyle(fontSize: 14, color: _AppColors.gray900),
+                      decoration: InputDecoration(
+                        hintText: 'booking.destination_hint'.tr(),
+                        hintStyle: const TextStyle(fontSize: 14, color: _AppColors.gray400),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        suffixIcon: isSearching
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation(_AppColors.primary),
+                                  ),
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: suggestions.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1, color: _AppColors.gray100),
+                      itemBuilder: (ctx, i) {
+                        final s = suggestions[i];
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: _AppColors.accentLight,
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: const Icon(Icons.location_on_rounded, size: 15, color: _AppColors.accent),
+                          ),
+                          title: Text(
+                            s,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: _AppColors.gray900),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () => selectSuggestion(s),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() => debounce?.cancel());
+  }
+
   void _createRide() async {
     if (_isCreatingTrip) return;
 
@@ -524,8 +888,33 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         return;
       }
 
+      // 3.5. Validation des arrêts supplémentaires — bloque tant que le dernier
+      // ajout/retrait n'a pas été re-pricé avec succès (évite d'envoyer un leg1
+      // manquant ou périmé, qui fausserait la facturation per_minute/combined).
+      if (_extraStops.isNotEmpty &&
+          (_stopsRouteDirty || _leg1DistanceKm == null || _leg1DurationMin == null)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('booking.calculating_route'.tr()), backgroundColor: _AppColors.red),
+          );
+        }
+        return;
+      }
+
       // 4. Appel API — snapshot pickup position before the async gap
       _pickupCoordinates = mapState.currentPosition;
+      List<TripStopInput>? stopsPayload;
+      if (_extraStops.isNotEmpty) {
+        stopsPayload = _extraStops
+            .map((s) => TripStopInput(
+                  address: s.address,
+                  latitude: s.coordinates.latitude,
+                  longitude: s.coordinates.longitude,
+                  legDistanceKm: s.legDistanceKm!,
+                  legDurationMin: s.legDurationMin!,
+                ))
+            .toList();
+      }
       final response = await TripService.createTrip(
         serviceId: _selectedService!.id,
         pickupAddress: 'booking.current_position'.tr(),
@@ -539,6 +928,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         paymentType: _paymentType,
         isNegotiable: _isNegotiable,
         offeredFare: _customOfferedFare,
+        stops: stopsPayload,
+        leg1DistanceKm: stopsPayload != null ? _leg1DistanceKm : null,
+        leg1DurationMin: stopsPayload != null ? _leg1DurationMin : null,
       );
 
       if (mounted) {
@@ -741,6 +1133,20 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   Widget build(BuildContext context) {
     final mapState = ref.watch(mapProvider);
 
+    // Le catalogue peut avoir été chargé sans position GPS valide (permission
+    // pas encore accordée au démarrage) — dès qu'une position réelle arrive,
+    // on le recharge une fois pour que le tarif/devise affichés correspondent
+    // à la même zone que l'estimation de course.
+    ref.listen<MapState>(mapProvider, (previous, next) {
+      if (!_catalogueLoadedWithPosition && next.currentPosition != null) {
+        _catalogueLoadedWithPosition = true;
+        ref.read(catalogueProvider.notifier).fetchCatalogue(
+          latitude: next.currentPosition!.latitude,
+          longitude: next.currentPosition!.longitude,
+        );
+      }
+    });
+
     return Scaffold(
       backgroundColor: _AppColors.white,
       body: Stack(
@@ -882,11 +1288,17 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                         _estimatedDuration = null;
                         _destinationCoordinates = null;
                         _destinationController.clear();
+                        _extraStops = [];
+                        _leg1DistanceKm = null;
+                        _leg1DurationMin = null;
+                        _stopsRouteDirty = false;
                       });
                       final n = ref.read(mapProvider.notifier);
                       n.clearPolylines();
                       n.removeMarker('pickup');
                       n.removeMarker('destination');
+                      n.removeMarker('stop_0');
+                      n.removeMarker('stop_1');
                     },
                     child: const Icon(
                       Icons.close_rounded,
@@ -1096,8 +1508,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           // Destination + route info intégrés
           _buildDestinationSummary(),
 
+          const SizedBox(height: 10),
+
+          // Arrêts supplémentaires (multi-destination)
+          _buildStopsSection(),
+
           const SizedBox(height: 24),
-          
+
           // Sélection du service
           _buildServiceSelection(catalogueAsync),
 
@@ -1195,11 +1612,17 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                 _selectedService = null;
                 _selectedCategory = null;
                 _serviceSectionExpanded = false;
+                _extraStops = [];
+                _leg1DistanceKm = null;
+                _leg1DurationMin = null;
+                _stopsRouteDirty = false;
               });
               final n = ref.read(mapProvider.notifier);
               n.clearPolylines();
               n.removeMarker('pickup');
               n.removeMarker('destination');
+              n.removeMarker('stop_0');
+              n.removeMarker('stop_1');
             },
             child: Container(
               padding: const EdgeInsets.all(6),
@@ -1208,6 +1631,118 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.edit_outlined, size: 15, color: _AppColors.accent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Stops Section (multi-destination) ──────────────────────────────────────
+  Widget _buildStopsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < _extraStops.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _buildStopRow(i),
+          ),
+        if (_isRecalculatingStops)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    valueColor: AlwaysStoppedAnimation(_AppColors.primary),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'booking.calculating_route'.tr(),
+                  style: const TextStyle(fontSize: 11, color: _AppColors.gray400),
+                ),
+              ],
+            ),
+          ),
+        if (_extraStops.length < 2 && !_isRecalculatingStops)
+          GestureDetector(
+            onTap: _showAddStopSheet,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: _AppColors.accentLight,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _AppColors.accent.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.add_circle_outline_rounded, size: 16, color: _AppColors.accent),
+                  const SizedBox(width: 8),
+                  Text(
+                    'booking.add_stop'.tr(),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _AppColors.accentMid,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildStopRow(int index) {
+    final stop = _extraStops[index];
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: _AppColors.gray50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _AppColors.gray100),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 22,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(color: _AppColors.accentLight, shape: BoxShape.circle),
+            child: Text(
+              '${index + 2}',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: _AppColors.accentMid,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              stop.address,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: _AppColors.gray900,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _removeExtraStop(index),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: _AppColors.gray100, borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.close_rounded, size: 14, color: _AppColors.gray600),
             ),
           ),
         ],
@@ -2285,34 +2820,44 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               ),
             ),
           ),
-          error: (error, stack) => SizedBox(
-            height: 90,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline_rounded,
-                      color: _AppColors.gray300, size: 28),
-                  const SizedBox(height: 6),
-                  Text(
-                    'common.error'.tr(),
-                    style: const TextStyle(fontSize: 12, color: _AppColors.gray400),
-                  ),
-                  TextButton(
-                    onPressed: () =>
-                        LocationService().getCurrentPosition().then((pos) {
-                          ref.read(catalogueProvider.notifier).fetchCatalogue(
-                            latitude: pos?.latitude,
-                            longitude: pos?.longitude,
-                          );
-                        }),
-                    child: Text('common.retry'.tr(),
-                        style: const TextStyle(fontSize: 12, color: _AppColors.accent)),
-                  ),
-                ],
+          error: (error, stack) {
+            debugPrint('❌ catalogueProvider fetchCatalogue error: $error');
+            return SizedBox(
+              height: 100,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline_rounded,
+                        color: _AppColors.gray300, size: 28),
+                    const SizedBox(height: 6),
+                    Text(
+                      'common.error'.tr(),
+                      style: const TextStyle(fontSize: 12, color: _AppColors.gray400),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      ),
+                      onPressed: () =>
+                          LocationService().getCurrentPosition().then((pos) {
+                            final best = pos ?? LocationService().currentPosition;
+                            ref.read(catalogueProvider.notifier).fetchCatalogue(
+                              latitude: best?.latitude,
+                              longitude: best?.longitude,
+                            );
+                          }),
+                      child: Text('common.retry'.tr(),
+                          style: const TextStyle(fontSize: 12, color: _AppColors.accent)),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
           data: (catalogue) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2331,7 +2876,11 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   Widget _buildNegotiationSection() {
     if (_selectedService == null) return const SizedBox.shrink();
     final defaultPrice = _selectedService!.basePrice ?? 0.0;
-    final currency = _selectedService!.currency;
+    // Le montant affiché ci-dessous vient de _customOfferedFare, lui-même dérivé
+    // de _fareEstimate.estimatedFare — la devise doit donc suivre la même source,
+    // jamais celle (statique, catalogue) du service, sous peine d'afficher un
+    // montant dans une devise avec le libellé d'une autre.
+    final currency = _fareEstimate?.currency ?? _selectedService!.currency ?? 'TND';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -2504,6 +3053,29 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                 ),
               ],
             ),
+            if (_extraStops.isNotEmpty &&
+                (_fareEstimate?.extraStopFee ?? 0) > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.add_road_rounded, size: 12, color: _AppColors.accentMid),
+                    const SizedBox(width: 4),
+                    Text(
+                      'booking.extra_stops_fee'.tr(namedArgs: {
+                        'amount': _fareEstimate!.extraStopFee!.toStringAsFixed(2),
+                        'currency': _fareEstimate!.currency,
+                      }),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _AppColors.accentMid,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // Indicateur de chargement de l'estimation tarifaire API
             if (_isFetchingEstimate)
               const Padding(
@@ -3002,10 +3574,12 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   // ── CTA Button ─────────────────────────────────────────────────────────────
   Widget _buildCtaButton() {
     final hasService = _selectedService != null;
-    final canCreate = hasService && 
-        _destinationCoordinates != null && 
-        _estimatedDistance != null && 
-        _estimatedDuration != null;
+    final canCreate = hasService &&
+        _destinationCoordinates != null &&
+        _estimatedDistance != null &&
+        _estimatedDuration != null &&
+        !_isRecalculatingStops &&
+        !_stopsRouteDirty;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(

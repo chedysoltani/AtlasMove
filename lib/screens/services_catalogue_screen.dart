@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/service_models.dart';
 import '../services/service_api.dart';
 import '../services/location_service.dart';
@@ -25,12 +26,17 @@ class _ServicesCatalogueScreenState
   final Set<int> _expanded = {};
 
   Future<void> _fetchWithGps(CatalogueNotifier notifier) async {
+    // Le backend résout la devise/tarif par zone GPS quand lat/lng sont fournis —
+    // on tente une position fraîche, puis la dernière connue, avant de laisser
+    // le backend retomber sur son fallback téléphone/profil.
+    Position? pos;
     try {
-      final pos = await LocationService().getCurrentPosition();
-      notifier.fetchCatalogue(latitude: pos?.latitude, longitude: pos?.longitude);
+      pos = await LocationService().getCurrentPosition();
     } catch (_) {
-      notifier.fetchCatalogue();
+      // ignore — on retombe sur la position en cache ci-dessous
     }
+    pos ??= LocationService().currentPosition;
+    notifier.fetchCatalogue(latitude: pos?.latitude, longitude: pos?.longitude);
   }
 
   @override
@@ -494,7 +500,7 @@ class _ServicesCatalogueScreenState
             ),
             const SizedBox(height: 20),
             GestureDetector(
-              onTap: () => notifier.fetchCatalogue(),
+              onTap: () => _fetchWithGps(notifier),
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),

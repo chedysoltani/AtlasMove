@@ -790,7 +790,39 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
             ],
           ),
         ),
+        if (_isTaxiProfile) ...[
+          const SizedBox(height: 10),
+          _buildMonthlyPaymentNote(f),
+        ],
       ],
+    );
+  }
+
+  Widget _buildMonthlyPaymentNote(PrivilegeFinancials f) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _orange.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _orange.withOpacity(0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded, color: _orange, size: 15),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Chaque mois, vous payez ${_commissionRateLabel(f.commissionRate)} de commission sur vos courses + un abonnement de 90 USD.',
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 11.5,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -832,11 +864,11 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
   // ── Annual Revenue Share ───────────────────────────────────────────────────
 
   Widget _buildAnnualRevenueSection(PrivilegeFinancials f) {
-    final annualShare = f.totalDriverEarnings * 0.03;
+    final annualShare = f.totalDriverEarnings * 0.02;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionLabel('3% Chiffre d\'Affaires Annuel'),
+        _sectionLabel('2% Chiffre d\'Affaires Annuel'),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(18),
@@ -875,7 +907,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '3% de votre CA annuel',
+                          '2% de votre CA annuel',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 15,
@@ -950,7 +982,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text(
-                        '× 3%',
+                        '× 2%',
                         style: TextStyle(
                           color: Color(0xFF10B981),
                           fontSize: 13,
