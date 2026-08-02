@@ -502,6 +502,69 @@ class TripService {
     }
   }
 
+  /// Met à jour l'offered_fare d'un trip encore PENDING pour le remettre en
+  /// visibilité auprès des livreurs à un tarif plus élevé ("Raise fare").
+  /// Endpoint pas encore déployé côté backend au moment de l'écriture —
+  /// l'appelant doit gérer l'échec gracieusement (ne pas prétendre au succès).
+  static Future<void> updateOfferedFare(String tripId, double newFare) async {
+    debugPrint('=== TripService.updateOfferedFare() START ===');
+    try {
+      final response = await HttpClient.patch(
+        '/m/trips/$tripId/fare',
+        body: {'offered_fare': double.parse(newFare.toStringAsFixed(3))},
+      );
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      if (!response.isSuccess) {
+        throw TripException(
+          message: response.json['message'] ?? 'Failed to update fare',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur lors de la mise à jour du tarif: $e');
+      if (e is TripException) rethrow;
+      throw TripException(message: e.toString(), statusCode: null);
+    } finally {
+      debugPrint('=== TripService.updateOfferedFare() END ===');
+    }
+  }
+
+  /// Active/désactive l'auto-accept d'une offre <= maxFare venant d'un
+  /// livreur à <= maxDriverEtaMinutes de distance. Doit fonctionner même
+  /// app fermée, donc entièrement porté côté backend — endpoint pas encore
+  /// déployé au moment de l'écriture, l'appelant doit gérer l'échec.
+  static Future<void> setAutoAccept(
+    String tripId, {
+    required bool enabled,
+    double? maxFare,
+    int? maxDriverEtaMinutes,
+  }) async {
+    debugPrint('=== TripService.setAutoAccept() START ===');
+    try {
+      final response = await HttpClient.patch(
+        '/m/trips/$tripId/auto-accept',
+        body: {
+          'enabled': enabled,
+          if (maxFare != null) 'max_fare': double.parse(maxFare.toStringAsFixed(3)),
+          if (maxDriverEtaMinutes != null) 'max_driver_eta_minutes': maxDriverEtaMinutes,
+        },
+      );
+      debugPrint('📊 Response Status: ${response.statusCode}');
+      if (!response.isSuccess) {
+        throw TripException(
+          message: response.json['message'] ?? 'Failed to update auto-accept',
+          statusCode: response.statusCode,
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur lors de la mise à jour de l\'auto-accept: $e');
+      if (e is TripException) rethrow;
+      throw TripException(message: e.toString(), statusCode: null);
+    } finally {
+      debugPrint('=== TripService.setAutoAccept() END ===');
+    }
+  }
+
   static Future<ClientDashboardStats> getClientDashboardStats() async {
     debugPrint('=== TripService.getClientDashboardStats() START ===');
     try {

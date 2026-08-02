@@ -145,7 +145,8 @@ class CreateRideScreen extends ConsumerStatefulWidget {
   ConsumerState<CreateRideScreen> createState() => _CreateRideScreenState();
 }
 
-class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
+class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
+    with SingleTickerProviderStateMixin {
   bool _isMapReady = false;
   ServiceCategoryWithServices? _selectedCategory;
   Service? _selectedService;
@@ -190,9 +191,29 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   // évite de refetch en boucle si la position initiale était déjà bonne.
   bool _catalogueLoadedWithPosition = false;
 
+  // ── Écran d'attente (recherche de chauffeur) style InDrive ─────────────────
+  static const int _belowAverageCycleSeconds = 15;
+  static const int _autoAcceptEtaMinutes = 5;
+
+  DateTime? _waitingSince;
+  bool _darkStyleApplied = false;
+  Timer? _belowAverageTimer;
+  int _belowAverageCountdown = _belowAverageCycleSeconds;
+  bool _autoAcceptEnabled = false;
+  bool _isUpdatingFare = false;
+  bool _isUpdatingAutoAccept = false;
+  bool _isCancellingTrip = false;
+  late final AnimationController _radarController;
+
+  bool get _isWaitingForDriver => _tripResponse?.data != null;
+
   @override
   void initState() {
     super.initState();
+    _radarController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(mapProvider.notifier).initializeMap();
       LocationService().getCurrentPosition().then((pos) {
@@ -241,6 +262,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     NotificationService.onTripCancelledReceived = null;
     _offersTimer?.cancel();
     _debounceTimer?.cancel();
+    _belowAverageTimer?.cancel();
+    _radarController.dispose();
     // Clear map before super.dispose() while ref is still valid
     _clearMapRoute();
     _destinationController.removeListener(_onDestinationChanged);
@@ -937,8 +960,17 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         setState(() {
           _tripResponse = response;
           _driverOffers = [];
+          _waitingSince = DateTime.now();
+          _autoAcceptEnabled = false;
         });
         _startBidsPolling(response.data!.id);
+        _startBelowAverageTimer();
+        final pickup = _pickupCoordinates;
+        if (pickup != null) {
+          ref.read(mapProvider).mapController?.animateCamera(
+                CameraUpdate.newCameraPosition(CameraPosition(target: pickup, zoom: 16)),
+              );
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(response.message), backgroundColor: _AppColors.green),
         );
@@ -956,6 +988,132 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
         setState(() => _isCreatingTrip = false);
       }
       debugPrint('=== _createRide() END ===');
+    }
+  }
+
+  // ── Écran d'attente : timer, tarif, auto-accept, annulation ────────────────
+
+  void _startBelowAverageTimer() {
+    _belowAverageTimer?.cancel();
+    _belowAverageCountdown = _belowAverageCycleSeconds;
+    _belowAverageTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || !_isWaitingForDriver) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _belowAverageCountdown--;
+        if (_belowAverageCountdown <= 0) {
+          _belowAverageCountdown = _belowAverageCycleSeconds;
+        }
+      });
+    });
+  }
+
+  /// Estimation cliente du nombre de chauffeurs ayant "vu" la demande — le
+  /// backend n'expose pas encore cette donnée (voir demande backend).
+  /// Toujours >= au nombre réel d'offres reçues, augmente lentement et
+  /// plafonne, pour ne jamais afficher un chiffre fantaisiste.
+  int _approxViewedCount() {
+    final since = _waitingSince;
+    if (since == null) return _driverOffers.length;
+    final elapsed = DateTime.now().difference(since).inSeconds;
+    final bonus = (elapsed ~/ 6).clamp(0, 12);
+    return _driverOffers.length + bonus;
+  }
+
+  void _stepOfferedFare(double delta) {
+    final estimate = _fareEstimate;
+    if (estimate == null) return;
+    final current = _customOfferedFare ?? estimate.estimatedFare;
+    final next = double.parse(
+      (current + delta).clamp(estimate.minBid, estimate.maxBid).toStringAsFixed(2),
+    );
+    setState(() => _customOfferedFare = next);
+  }
+
+  Future<void> _raiseFare() async {
+    final estimate = _fareEstimate;
+    final tripId = _tripResponse?.data?.id;
+    if (estimate == null || tripId == null || _isUpdatingFare) return;
+
+    final previous = _customOfferedFare ?? estimate.estimatedFare;
+    final next = double.parse(
+      (previous + 1).clamp(estimate.minBid, estimate.maxBid).toStringAsFixed(2),
+    );
+    setState(() {
+      _isUpdatingFare = true;
+      _customOfferedFare = next;
+    });
+    try {
+      await TripService.updateOfferedFare(tripId, next);
+      if (mounted) setState(() => _belowAverageCountdown = _belowAverageCycleSeconds);
+    } catch (e) {
+      debugPrint('❌ updateOfferedFare failed: $e');
+      if (mounted) {
+        // Le serveur n'a pas été mis à jour — ne pas laisser croire au client
+        // que les chauffeurs voient déjà le nouveau tarif.
+        setState(() => _customOfferedFare = previous);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('booking.fare_update_unavailable'.tr())),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdatingFare = false);
+    }
+  }
+
+  Future<void> _toggleAutoAccept(bool value) async {
+    final tripId = _tripResponse?.data?.id;
+    if (tripId == null || _isUpdatingAutoAccept) return;
+
+    setState(() => _isUpdatingAutoAccept = true);
+    try {
+      await TripService.setAutoAccept(
+        tripId,
+        enabled: value,
+        maxFare: _customOfferedFare ?? _fareEstimate?.estimatedFare,
+        maxDriverEtaMinutes: _autoAcceptEtaMinutes,
+      );
+      if (mounted) setState(() => _autoAcceptEnabled = value);
+    } catch (e) {
+      debugPrint('❌ setAutoAccept failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('booking.auto_accept_unavailable'.tr())),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUpdatingAutoAccept = false);
+    }
+  }
+
+  Future<void> _cancelWaitingTrip() async {
+    final tripId = _tripResponse?.data?.id;
+    if (tripId == null || _isCancellingTrip) return;
+
+    setState(() => _isCancellingTrip = true);
+    try {
+      await TripService.cancelClientTrip(tripId, 'client_cancelled_while_waiting');
+      _offersTimer?.cancel();
+      _belowAverageTimer?.cancel();
+      NotificationService.onTripCancelledReceived = null;
+      if (mounted) {
+        setState(() {
+          _tripResponse = null;
+          _driverOffers = [];
+          _autoAcceptEnabled = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ cancelClientTrip (waiting) failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('common.unknown_error'.tr()), backgroundColor: _AppColors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCancellingTrip = false);
     }
   }
 
@@ -1091,10 +1249,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           _estimatedDistance = tripItem.estimatedDistanceKm;
           _estimatedDuration = '${tripItem.estimatedDurationMin} min';
           _destinationController.text = tripItem.destinationAddress;
+          _waitingSince = tripItem.createdAt;
+          _autoAcceptEnabled = false;
         });
-        
+
         // 3. Lancer le polling temps réel
         _startBidsPolling(tripId);
+        _startBelowAverageTimer();
       }
     } catch (e) {
       debugPrint('Error resuming active trip session: $e');
@@ -1147,11 +1308,30 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       }
     });
 
+    if (mapState.mapController != null) {
+      _syncMapStyleForWaitingState(mapState.mapController!);
+    }
+
     return Scaffold(
       backgroundColor: _AppColors.white,
       body: Stack(
         children: [
           _buildGoogleMap(mapState),
+          if (_isWaitingForDriver)
+            Positioned(
+              top: 120,
+              bottom: 200,
+              left: 0,
+              right: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: AnimatedBuilder(
+                    animation: _radarController,
+                    builder: (context, _) => _RadarPulse(progress: _radarController.value),
+                  ),
+                ),
+              ),
+            ),
           _buildHeader(),
           // Route estimation card removed — info integrated in destination summary
           if (mapState.status == MapStatus.loading) const MapLoadingWidget(),
@@ -1159,13 +1339,34 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               mapState.status == MapStatus.permissionDenied ||
               mapState.status == MapStatus.locationDisabled)
             _buildErrorWidget(mapState),
-          if (_isMapReady && mapState.status == MapStatus.ready)
+          if (_isMapReady && mapState.status == MapStatus.ready && !_isWaitingForDriver)
             _buildFloatingButtons(mapState),
           if (_isMapReady && mapState.status == MapStatus.ready)
             _buildBottomSheet(),
         ],
       ),
     );
+  }
+
+  // ── Style sombre pendant la recherche de chauffeur ──────────────────────────
+  static const String _darkWaitingMapStyle = '''[
+    {"elementType":"geometry","stylers":[{"color":"#0f172a"}]},
+    {"elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+    {"elementType":"labels.text.fill","stylers":[{"color":"#8ea0c9"}]},
+    {"elementType":"labels.text.stroke","stylers":[{"color":"#0f172a"}]},
+    {"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#1e293b"}]},
+    {"featureType":"poi","stylers":[{"visibility":"off"}]},
+    {"featureType":"road","elementType":"geometry","stylers":[{"color":"#1e293b"}]},
+    {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#0f172a"}]},
+    {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#334155"}]},
+    {"featureType":"transit","stylers":[{"visibility":"off"}]},
+    {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0b1220"}]}
+  ]''';
+
+  void _syncMapStyleForWaitingState(GoogleMapController controller) {
+    if (_darkStyleApplied == _isWaitingForDriver) return;
+    _darkStyleApplied = _isWaitingForDriver;
+    controller.setMapStyle(_isWaitingForDriver ? _darkWaitingMapStyle : null);
   }
 
   // ── Map ────────────────────────────────────────────────────────────────────
@@ -1189,6 +1390,13 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       indoorViewEnabled: false,
       mapType: MapType.normal,
       padding: const EdgeInsets.only(top: 120, bottom: 200),
+      // Caméra verrouillée sur le point de départ pendant la recherche —
+      // garantit que le marqueur pickup reste au centre visuel exact
+      // (nécessaire pour que le radar overlay soit bien centré dessus).
+      scrollGesturesEnabled: !_isWaitingForDriver,
+      zoomGesturesEnabled: !_isWaitingForDriver,
+      rotateGesturesEnabled: !_isWaitingForDriver,
+      tiltGesturesEnabled: !_isWaitingForDriver,
     );
   }
 
@@ -1753,7 +1961,12 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   // ── Trip Waiting Card ─────────────────────────────────────────────────────
   Widget _buildTripWaitingCard() {
     final tripData = _tripResponse!.data!;
-    
+    final elapsed = _waitingSince != null
+        ? DateTime.now().difference(_waitingSince!)
+        : Duration.zero;
+    final elapsedLabel =
+        elapsed.inMinutes > 0 ? '${elapsed.inMinutes} min' : '${elapsed.inSeconds}s';
+
     return Positioned(
       bottom: 0,
       left: 0,
@@ -1761,57 +1974,39 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       child: Container(
         margin: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
         decoration: const BoxDecoration(
-          color: _AppColors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          gradient: LinearGradient(
+            colors: [_AppColors.gray900, Color(0xFF1E293B)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           boxShadow: [
-            BoxShadow(
-              color: Color(0x14000000),
-              blurRadius: 24,
-              offset: Offset(0, -6),
-            ),
+            BoxShadow(color: Color(0x40000000), blurRadius: 30, offset: Offset(0, -8)),
           ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Compact Premium Brand Header with Elegant Dark Mode Gradient
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    _AppColors.gray900,
-                    Color(0xFF1E293B),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
+            // Statut de recherche + annulation
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 4),
               child: Row(
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: _AppColors.primary.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: _AppColors.primary, width: 1.5),
-                    ),
-                    child: const Icon(
-                      Icons.check_circle_rounded,
-                      color: _AppColors.primary,
-                      size: 22,
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(_getStatusColor(tripData.status)),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'booking.ride_completed'.tr(),
+                          _getStatusText(tripData.status),
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -1820,74 +2015,83 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'booking.thanks_message'.tr(),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: _AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          'booking.searching_since'.tr(namedArgs: {'time': elapsedLabel}),
+                          style: const TextStyle(fontSize: 11, color: Colors.white54),
                         ),
                       ],
                     ),
+                  ),
+                  TextButton(
+                    onPressed: _isCancellingTrip ? null : _cancelWaitingTrip,
+                    child: _isCancellingTrip
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white54),
+                            ),
+                          )
+                        : Text(
+                            'common.cancel'.tr(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white54,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                 ],
               ),
             ),
-            
-            // Trip details
+
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Fare section - Elegant compact horizontal row
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: _AppColors.accentLight.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _AppColors.primary.withOpacity(0.12)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'booking.confirm_booking'.tr(),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: _AppColors.gray600,
-                            fontWeight: FontWeight.w600,
-                          ),
+                  _buildViewedRow(),
+                  const SizedBox(height: 14),
+
+                  if (_isNegotiable) ...[
+                    _buildFareStepperCard(),
+                    const SizedBox(height: 10),
+                    _buildAutoAcceptRow(),
+                    const SizedBox(height: 14),
+                  ] else
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              tripData.estimatedFare.toStringAsFixed(2),
+                              'booking.confirm_booking'.tr(),
                               style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: _AppColors.accentMid,
+                                fontSize: 12,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(width: 2),
                             Text(
-                              tripData.currency,
+                              '${tripData.estimatedFare.toStringAsFixed(2)} ${tripData.currency}',
                               style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: _AppColors.accentMid,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
                               ),
                             ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                  
-                  const SizedBox(height: 10),
-                  
+
                   // Trip info - Compact layout
                   Row(
                     children: [
@@ -1916,99 +2120,231 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                       ),
                     ],
                   ),
-                  
-                  const SizedBox(height: 10),
-                  
-                  // Status Bar - Tighter design
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(tripData.status).withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _getStatusColor(tripData.status).withOpacity(0.2),
-                        width: 1,
+
+                  if (tripData.estimatedArrivalMinutes != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      '~${tripData.estimatedArrivalMinutes} min',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white54,
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(tripData.status),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _getStatusText(tripData.status),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: _getStatusColor(tripData.status),
-                          ),
-                        ),
-                        const Spacer(),
-                        if (tripData.estimatedArrivalMinutes != null)
-                          Text(
-                            '~${tripData.estimatedArrivalMinutes} min',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: _AppColors.gray600,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  
+                  ],
+
                   if (_isNegotiable) ...[
                     const SizedBox(height: 14),
                     _buildDriverOffersSection(),
                   ],
-                  
-                  const SizedBox(height: 14),
-                  
-                  // Centered, sleek, and compact Pill button
-                  Center(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushReplacementNamed(context, '/client_trip_history');
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        elevation: 3,
-                        shadowColor: _AppColors.primary.withOpacity(0.3),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.map_rounded, size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            'client.trip_history'.tr(),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Ligne "N chauffeurs ont vu votre demande" — voir _approxViewedCount()
+  /// pour la note sur le caractère provisoire de ce chiffre.
+  Widget _buildViewedRow() {
+    final count = _approxViewedCount();
+    if (count <= 0) return const SizedBox.shrink();
+    final avatars = _driverOffers.take(4).toList();
+    final genericCount = (count - avatars.length).clamp(0, 3);
+    final bubbleCount = avatars.length + genericCount;
+
+    return Row(
+      children: [
+        SizedBox(
+          width: bubbleCount > 0 ? 20.0 * bubbleCount + 6 : 0,
+          height: 26,
+          child: Stack(
+            children: [
+              for (var i = 0; i < avatars.length; i++)
+                Positioned(
+                  left: i * 20.0,
+                  child: _AvatarBubble(photoUrl: avatars[i].driverPhoto),
+                ),
+              for (var i = 0; i < genericCount; i++)
+                Positioned(
+                  left: (avatars.length + i) * 20.0,
+                  child: const _AvatarBubble(photoUrl: null),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'booking.drivers_viewed'.tr(namedArgs: {'count': '$count'}),
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white70,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Carte tarif : stepper -1/+1, nudge "tarif bas" + countdown, "Raise fare".
+  Widget _buildFareStepperCard() {
+    final currency = _fareEstimate?.currency ?? _tripResponse?.data?.currency ?? 'TND';
+    final current = _customOfferedFare ?? _tripResponse?.data?.estimatedFare ?? 0.0;
+    final belowAverage = _fareEstimate != null && current < _fareEstimate!.estimatedFare;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (belowAverage) ...[
+            Row(
+              children: [
+                const Icon(Icons.trending_down_rounded, size: 14, color: Color(0xFFFBBF24)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'booking.fare_below_average'.tr(),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFFFBBF24),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Text(
+                  '0:${_belowAverageCountdown.toString().padLeft(2, '0')}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFFBBF24),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
+          Row(
+            children: [
+              _CircleButton(
+                size: 38,
+                color: Colors.white.withOpacity(0.08),
+                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                onTap: _isUpdatingFare ? null : () => _stepOfferedFare(-1),
+                child: const Icon(Icons.remove, color: Colors.white, size: 18),
+              ),
+              Expanded(
+                child: Center(
+                  child: Text(
+                    '$currency ${current.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              _CircleButton(
+                size: 38,
+                color: Colors.white.withOpacity(0.08),
+                border: Border.all(color: Colors.white.withOpacity(0.15)),
+                onTap: _isUpdatingFare ? null : () => _stepOfferedFare(1),
+                child: const Icon(Icons.add, color: Colors.white, size: 18),
+              ),
+            ],
+          ),
+          if (belowAverage) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _isUpdatingFare ? null : _raiseFare,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _AppColors.primary,
+                  side: const BorderSide(color: _AppColors.primary),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isUpdatingFare
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(_AppColors.primary),
+                        ),
+                      )
+                    : Text(
+                        'booking.raise_fare'.tr(),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Ligne "auto-accept une offre <= X à <= 5 min" — nécessite le nouvel
+  /// endpoint backend PATCH /m/trips/:id/auto-accept (voir demande backend).
+  Widget _buildAutoAcceptRow() {
+    final currency = _fareEstimate?.currency ?? _tripResponse?.data?.currency ?? 'TND';
+    final current = _customOfferedFare ?? _tripResponse?.data?.estimatedFare ?? 0.0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.flash_on_rounded, size: 16, color: _AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'booking.auto_accept_hint'.tr(namedArgs: {
+                'amount': current.toStringAsFixed(2),
+                'currency': currency,
+                'minutes': '$_autoAcceptEtaMinutes',
+              }),
+              style: const TextStyle(
+                fontSize: 11,
+                color: Colors.white70,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          _isUpdatingAutoAccept
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation(_AppColors.primary),
+                    ),
+                  ),
+                )
+              : Switch.adaptive(
+                  value: _autoAcceptEnabled,
+                  activeColor: _AppColors.primary,
+                  onChanged: _toggleAutoAccept,
+                ),
+        ],
       ),
     );
   }
@@ -2436,6 +2772,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     );
   }
   
+  // Utilisé dans la carte d'attente (fond sombre) — voir _buildTripWaitingCard.
   Widget _buildTripInfoItem({
     required IconData icon,
     required String label,
@@ -2444,7 +2781,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
       decoration: BoxDecoration(
-        color: _AppColors.gray50,
+        color: Colors.white.withOpacity(0.06),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -2452,14 +2789,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
           Icon(
             icon,
             size: 18,
-            color: _AppColors.accent,
+            color: _AppColors.primary,
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: const TextStyle(
               fontSize: 10,
-              color: _AppColors.gray400,
+              color: Colors.white54,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -2469,7 +2806,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: _AppColors.gray900,
+              color: Colors.white,
             ),
           ),
         ],
@@ -3411,9 +3748,11 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
   void _showTripExpiredDialog() {
     // Clear any active trip state
+    _belowAverageTimer?.cancel();
     setState(() {
       _tripResponse = null;
       _driverOffers = [];
+      _autoAcceptEnabled = false;
     });
     showDialog(
       context: context,
@@ -3673,6 +4012,87 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 }
 
 // ─── Reusable UI Components ────────────────────────────────────────────────────
+
+/// Cercle radar pulsant centré sur le point de départ pendant la recherche.
+class _RadarPulse extends StatelessWidget {
+  final double progress; // 0.0 → 1.0, boucle
+
+  const _RadarPulse({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      height: 220,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          for (var i = 0; i < 3; i++) _ring(i),
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              color: _AppColors.primary,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(color: _AppColors.primary.withOpacity(0.6), blurRadius: 10),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _ring(int index) {
+    final t = (progress + index / 3) % 1.0;
+    final size = 24 + t * 190;
+    final opacity = (1 - t).clamp(0.0, 1.0) * 0.45;
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: _AppColors.primary.withOpacity(0.25),
+          border: Border.all(color: _AppColors.primary.withOpacity(0.5), width: 1),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bulle d'avatar générique pour la pile "N chauffeurs" (photo réelle si connue).
+class _AvatarBubble extends StatelessWidget {
+  final String? photoUrl;
+
+  const _AvatarBubble({this.photoUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 26,
+      height: 26,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF334155),
+        border: Border.all(color: const Color(0xFF0F172A), width: 2),
+      ),
+      child: (photoUrl != null && photoUrl!.isNotEmpty)
+          ? ClipOval(
+              child: Image.network(
+                photoUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Icons.person, color: Colors.white70, size: 14),
+              ),
+            )
+          : const Icon(Icons.person, color: Colors.white70, size: 14),
+    );
+  }
+}
 
 /// Frosted glass card with subtle shadow
 class _GlassCard extends StatelessWidget {
