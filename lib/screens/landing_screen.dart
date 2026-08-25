@@ -155,88 +155,103 @@ class _LandingScreenState extends State<LandingScreen>
           // Main hero content
           SafeArea(
             child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Pulsing icon badge
-                  AnimatedBuilder(
-                    animation: _pulseCtrl,
-                    builder: (_, __) {
-                      final glow = 18.0 + _pulseCtrl.value * 12;
-                      final scale = 1.0 + _pulseCtrl.value * 0.04;
-                      return Transform.scale(
-                        scale: scale,
-                        child: Container(
-                          width: 86,
-                          height: 86,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              colors: [_orange, _orangeLight],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _orange.withOpacity(0.45),
-                                blurRadius: glow,
-                                spreadRadius: 2,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 16),
+                    
+                    // Pulsing icon badge
+                    AnimatedBuilder(
+                      animation: _pulseCtrl,
+                      builder: (_, __) {
+                        final glow = 18.0 + _pulseCtrl.value * 12;
+                        final scale = 1.0 + _pulseCtrl.value * 0.04;
+                        return Transform.scale(
+                          scale: scale,
+                          child: Container(
+                            width: 86,
+                            height: 86,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                colors: [_orange, _orangeLight],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: Image.asset(
-                              'assets/images/new_logo_mobile.png',
-                              width: 86,
-                              height: 86,
-                              fit: BoxFit.cover,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _orange.withOpacity(0.45),
+                                  blurRadius: glow,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: Image.asset(
+                                'assets/images/new_logo_mobile.png',
+                                width: 86,
+                                height: 86,
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 22),
-
-                  // Brand name
-                  Text(
-                    'AtlasMove',
-                    style: GoogleFonts.poppins(
-                      fontSize: 40,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: -1,
+                        );
+                      },
                     ),
-                  ),
 
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 18),
 
-                  // Tagline with accent lines
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _accentLine(),
-                      const SizedBox(width: 10),
-                      Text(
-                        'landing.tagline'.tr(),
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.white.withOpacity(0.55),
-                          letterSpacing: 1.4,
-                        ),
+                    // Brand name
+                    Text(
+                      'AtlasMove',
+                      style: GoogleFonts.poppins(
+                        fontSize: 36,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -1,
                       ),
-                      const SizedBox(width: 10),
-                      _accentLine(),
-                    ],
-                  ),
+                    ),
 
-                  const SizedBox(height: 22),
+                    const SizedBox(height: 6),
 
-                  // Stats row
-                  _buildHeroStats(),
-                ],
+                    // Tagline with accent lines
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _accentLine(),
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: Text(
+                              'landing.tagline'.tr(),
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: Colors.white.withOpacity(0.55),
+                                letterSpacing: 1.4,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          _accentLine(),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Stats row
+                    _buildHeroStats(),
+                    
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
           ),

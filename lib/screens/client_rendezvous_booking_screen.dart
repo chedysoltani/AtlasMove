@@ -50,6 +50,19 @@ class _ServiceData {
 
   bool get isHourly => pricingModel == 'hourly';
   bool get isFixed => pricingModel == 'fixed';
+
+  _ServiceData withCurrency(String c) => _ServiceData(
+        id: id,
+        name: name,
+        transportType: transportType,
+        pricingModel: pricingModel,
+        basePrice: basePrice,
+        pricePerKm: pricePerKm,
+        pricePerMinute: pricePerMinute,
+        minimumFare: minimumFare,
+        currency: c,
+        imageUrl: imageUrl,
+      );
 }
 
 class ClientRendezvousBookingScreen extends StatefulWidget {
@@ -176,20 +189,86 @@ class _ClientRendezvousBookingScreenState
     double? latitude;
     double? longitude;
     try {
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.always ||
-          permission == LocationPermission.whileInUse) {
-        final pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.low,
-          timeLimit: const Duration(seconds: 5),
-        );
-        latitude = pos.latitude;
-        longitude = pos.longitude;
+      // Fast path: last known position (works immediately on simulator)
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) {
+        latitude = last.latitude;
+        longitude = last.longitude;
+      } else {
+        // Slow path: request permission + current position
+        var permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission == LocationPermission.always ||
+            permission == LocationPermission.whileInUse) {
+          final pos = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.low,
+            timeLimit: const Duration(seconds: 8),
+          );
+          latitude = pos.latitude;
+          longitude = pos.longitude;
+        }
       }
     } catch (_) {
-      // GPS unavailable — proceed without coordinates (backend returns default zone)
+      // GPS unavailable — proceed without coordinates
     }
     await _fetchServices(latitude: latitude, longitude: longitude);
+    if (latitude != null && longitude != null && _selectedService != null) {
+      _probeCurrency(latitude, longitude);
+    } else if (latitude == null) {
+      // GPS wasn't ready yet — try once more in background after a short delay
+      Future.delayed(const Duration(seconds: 3), _retryFetchWithGps);
+    }
+  }
+
+  Future<void> _retryFetchWithGps() async {
+    if (!mounted || _services.isEmpty) return;
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission != LocationPermission.always &&
+          permission != LocationPermission.whileInUse) return;
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.low,
+        timeLimit: const Duration(seconds: 10),
+      );
+      final lat = pos.latitude;
+      final lng = pos.longitude;
+      if (!mounted) return;
+      // Re-fetch catalogue with GPS so backend applies zone currency
+      await _fetchServices(latitude: lat, longitude: lng);
+      if (mounted && _selectedService != null) _probeCurrency(lat, lng);
+    } catch (_) {}
+  }
+
+  Future<void> _probeCurrency(double latitude, double longitude) async {
+    try {
+      final est = await RendezvousService.estimateRendezvous(
+        serviceId: _selectedService!.id,
+        distanceKm: 1.0,
+        durationMinutes: 5,
+        latitude: latitude,
+        longitude: longitude,
+      );
+      if (est != null && mounted) {
+        final c = est.currency;
+        setState(() {
+          _estimatedCurrency = c;
+          // Propagate geo-detected currency to all service objects (catalogue returns DB currency)
+          _services = _services.map((s) => s.withCurrency(c)).toList();
+          final selectedId = _selectedService?.id;
+          _selectedService = _services.firstWhere(
+            (s) => s.id == selectedId,
+            orElse: () => _services.first,
+          );
+        });
+      }
+    } catch (_) {
+      // Non-critical — keep default currency
+    }
   }
 
   Future<void> _fetchServices({double? latitude, double? longitude}) async {
@@ -477,7 +556,7 @@ class _ClientRendezvousBookingScreenState
       setState(() {
         _estimatedDistanceKm = distKm > 0 ? distKm : null;
         _estimatedFare = localFare > 0 ? localFare : null;
-        _estimatedCurrency = svc.currency;
+        // Do not overwrite _estimatedCurrency here — it is set geo-aware by _probeCurrency / estimateRendezvous
       });
     }
 
@@ -718,7 +797,7 @@ class _ClientRendezvousBookingScreenState
                   'Tarif estimé',
                   FareCalculator.formatFare(
                     rdv.estimatedFare!,
-                    _selectedService?.currency ?? 'TND',
+                    _estimatedCurrency,
                   ),
                 ),
               ],
@@ -931,7 +1010,7 @@ class _ClientRendezvousBookingScreenState
                                     pricePerMinute: _selectedService!.pricePerMinute ?? 0,
                                     minimumFare: _selectedService!.minimumFare ?? 0,
                                   ),
-                                  currency: _selectedService!.currency,
+                                  currency: _estimatedCurrency,
                                   label: 'Tarif estimé pour $_durationHours h',
                                 ),
                               ],

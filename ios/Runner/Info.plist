@@ -47,26 +47,20 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	
-	<!-- Permissions pour la localisation -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Cette application a besoin d'accéder à votre position pour vous proposer des courses</string>
+	<string>Cette application a besoin d&apos;accéder à votre position pour vous proposer des courses</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Cette application a besoin d'accéder à votre position en arrière-plan pour suivre vos courses</string>
-	
-	<!-- Microphone pour les appels audio (Agora RTC) -->
+	<string>Cette application a besoin d&apos;accéder à votre position en arrière-plan pour suivre vos courses</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Atlas a besoin d'accéder au microphone pour connecter les appels audio entre le livreur et le client.</string>
-
-	<!-- Configuration Google Maps -->
+	<string>Atlas a besoin d&apos;accéder au microphone pour connecter les appels audio entre le livreur et le client.</string>
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
-
-	<!-- Arrière-plan localisation (livreur) -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
 		<string>fetch</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Atlas a besoin d&apos;accéder à la caméra pour prendre une photo de profil ou scanner un document.</string>
 </dict>
 </plist>

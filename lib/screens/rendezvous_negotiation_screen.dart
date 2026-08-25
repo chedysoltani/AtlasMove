@@ -151,7 +151,7 @@ class _RendezvousNegotiationScreenState
     if (value == null || !mounted) return;
     setState(() => _actingIds.add(offer.id));
     try {
-      await RendezvousService.counterOffer(offer.id, value);
+      await RendezvousService.counterOffer(offer.id, value, currency: currency);
       _showSnack('rdv.counter_sent'.tr(namedArgs: {'amount': FareCalculator.formatFare(value, currency)}));
       await _load();
     } catch (e) {

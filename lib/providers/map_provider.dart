@@ -17,7 +17,7 @@ enum MapStatus {
 class MapState {
   final MapStatus status;
   final LatLng? currentPosition;
-  final GoogleMapController? mapController;
+  // ✅ RETIRÉ: mapController ne doit PAS être dans l'état immutable
   final Set<Marker> markers;
   final Set<Polyline> polylines;
   final CameraPosition? cameraPosition;
@@ -27,7 +27,6 @@ class MapState {
   const MapState({
     this.status = MapStatus.initial,
     this.currentPosition,
-    this.mapController,
     this.markers = const {},
     this.polylines = const {},
     this.cameraPosition,
@@ -38,7 +37,6 @@ class MapState {
   MapState copyWith({
     MapStatus? status,
     LatLng? currentPosition,
-    GoogleMapController? mapController,
     Set<Marker>? markers,
     Set<Polyline>? polylines,
     CameraPosition? cameraPosition,
@@ -48,7 +46,6 @@ class MapState {
     return MapState(
       status: status ?? this.status,
       currentPosition: currentPosition ?? this.currentPosition,
-      mapController: mapController ?? this.mapController,
       markers: markers ?? this.markers,
       polylines: polylines ?? this.polylines,
       cameraPosition: cameraPosition ?? this.cameraPosition,
@@ -63,7 +60,6 @@ class MapState {
     return other is MapState &&
         other.status == status &&
         other.currentPosition == currentPosition &&
-        other.mapController == mapController &&
         other.markers == markers &&
         other.polylines == polylines &&
         other.cameraPosition == cameraPosition &&
@@ -75,7 +71,6 @@ class MapState {
   int get hashCode {
     return status.hashCode ^
         currentPosition.hashCode ^
-        mapController.hashCode ^
         markers.hashCode ^
         polylines.hashCode ^
         cameraPosition.hashCode ^
@@ -87,6 +82,10 @@ class MapState {
 class MapNotifier extends StateNotifier<MapState> {
   final LocationService _locationService = LocationService();
   StreamSubscription<Position>? _positionSub;
+  GoogleMapController? _mapController;
+
+  /// Expose the live controller without polluting immutable MapState.
+  GoogleMapController? get mapController => _mapController;
 
   MapNotifier() : super(const MapState());
 
@@ -186,8 +185,8 @@ class MapNotifier extends StateNotifier<MapState> {
       );
 
       // Follow user but preserve current zoom level instead of hardcoding 15
-      if (state.isFollowingUser && state.mapController != null) {
-        state.mapController?.animateCamera(
+      if (state.isFollowingUser && _mapController != null) {
+        _mapController!.animateCamera(
           CameraUpdate.newLatLng(latLng),
         );
       }
@@ -196,13 +195,13 @@ class MapNotifier extends StateNotifier<MapState> {
 
   /// Définir le contrôleur de la carte
   void setMapController(GoogleMapController controller) {
-    state = state.copyWith(mapController: controller);
+    _mapController = controller;
   }
 
   /// Centrer la caméra sur la position actuelle
   Future<void> centerOnCurrentPosition() async {
-    if (state.currentPosition != null && state.mapController != null) {
-      await state.mapController!.animateCamera(
+    if (state.currentPosition != null && _mapController != null) {
+      await _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
             target: state.currentPosition!,
@@ -257,6 +256,7 @@ class MapNotifier extends StateNotifier<MapState> {
   @override
   void dispose() {
     _positionSub?.cancel();
+    _mapController = null;
     _locationService.dispose();
     super.dispose();
   }
@@ -265,9 +265,4 @@ class MapNotifier extends StateNotifier<MapState> {
 // Provider pour la carte
 final mapProvider = StateNotifierProvider<MapNotifier, MapState>((ref) {
   return MapNotifier();
-});
-
-// Provider pour le contrôleur de la carte
-final mapControllerProvider = Provider<GoogleMapController?>((ref) {
-  return ref.watch(mapProvider).mapController;
 });

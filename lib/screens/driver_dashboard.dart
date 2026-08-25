@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,29 +25,6 @@ import '../widgets/notification_sheet.dart';
 import 'driver_active_ride.dart';
 
 // Style de carte propre style inDrive — routes visibles, design épuré
-const String _mapStyle = '''[
-  {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
-  {"featureType":"poi","stylers":[{"visibility":"off"}]},
-  {"featureType":"transit","stylers":[{"visibility":"off"}]},
-  {"featureType":"landscape","elementType":"geometry.fill","stylers":[{"color":"#f0ede8"}]},
-  {"featureType":"landscape.man_made","elementType":"geometry.fill","stylers":[{"color":"#e8e4de"}]},
-  {"featureType":"road","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
-  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#d4cfc9"},{"weight":"1"}]},
-  {"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
-  {"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"color":"#c8c3bc"}]},
-  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#ffe082"}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#f5c518"},{"weight":"1"}]},
-  {"featureType":"road.local","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
-  {"featureType":"road.local","elementType":"geometry.stroke","stylers":[{"color":"#ddd8d0"}]},
-  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#666666"}]},
-  {"featureType":"road","elementType":"labels.text.stroke","stylers":[{"color":"#ffffff"},{"weight":"3"}]},
-  {"featureType":"water","elementType":"geometry.fill","stylers":[{"color":"#aed6f1"}]},
-  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#5b8fa8"}]},
-  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#333333"}]},
-  {"featureType":"administrative.neighborhood","elementType":"labels.text.fill","stylers":[{"color":"#777777"}]},
-  {"featureType":"building","elementType":"geometry.fill","stylers":[{"color":"#e4ddd5"}]},
-  {"featureType":"building","elementType":"geometry.stroke","stylers":[{"color":"#d4ccc4"}]}
-]''';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -141,22 +118,39 @@ class _DriverDashboardState extends State<DriverDashboard>
       if (permission == LocationPermission.denied) return;
     }
 
-    final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
+    // Use last known position immediately so the map jumps to the correct area fast
+    final last = await Geolocator.getLastKnownPosition();
+    if (last != null && mounted) {
+      final quick = LatLng(last.latitude, last.longitude);
+      setState(() {
+        _currentPosition = quick;
+        _markers.clear();
+        _markers.add(_buildDriverMarker(quick));
+      });
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(CameraPosition(target: quick, zoom: 15.5)),
+      );
+    }
 
-    final latLng = LatLng(position.latitude, position.longitude);
-    setState(() {
-      _currentPosition = latLng;
-      _markers.clear();
-      _markers.add(_buildDriverMarker(latLng));
-    });
-
-    _mapController?.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: latLng, zoom: 15.5),
-      ),
-    );
+    // Then refine with precise GPS (with timeout so it doesn't hang on emulator)
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+      final latLng = LatLng(position.latitude, position.longitude);
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = latLng;
+        _markers.clear();
+        _markers.add(_buildDriverMarker(latLng));
+      });
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(CameraPosition(target: latLng, zoom: 15.5)),
+      );
+    } catch (_) {
+      // GPS timeout or unavailable — keep last known position if available
+    }
 
     _positionSub = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
@@ -345,16 +339,21 @@ class _DriverDashboardState extends State<DriverDashboard>
         target: _currentPosition ?? const LatLng(36.8065, 10.1815),
         zoom: 15.5,
       ),
-      style: _mapStyle,
       onMapCreated: (controller) {
-        _mapController = controller;
-        if (_currentPosition != null) {
-          controller.animateCamera(
-            CameraUpdate.newCameraPosition(
-              CameraPosition(target: _currentPosition!, zoom: 15.5),
-            ),
-          );
-        }
+        setState(() => _mapController = controller);
+        // Defer setMapStyle: calling it inside onMapCreated on iOS blocks tile
+        // rendering, showing a blue background instead of map tiles.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          // No custom style: default Google Maps shows roads/streets clearly.
+          if (_currentPosition != null) {
+            controller.animateCamera(
+              CameraUpdate.newCameraPosition(
+                CameraPosition(target: _currentPosition!, zoom: 15.5),
+              ),
+            );
+          }
+        });
       },
       markers: _markers,
       myLocationEnabled: false,
@@ -987,7 +986,8 @@ class _DriverDashboardState extends State<DriverDashboard>
 
   Widget _buildMenuSheet() {
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
+        child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1066,6 +1066,7 @@ class _DriverDashboardState extends State<DriverDashboard>
             const SizedBox(height: 6),
           ],
         ),
+      ),
       ),
     );
   }

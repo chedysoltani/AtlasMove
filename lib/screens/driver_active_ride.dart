@@ -134,57 +134,94 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   }
 
   Future<BitmapDescriptor> _createCarIcon() async {
-    const double dp = 52.0, px = 3.0, size = dp * px;
+    const double dp = 60.0, px = 3.0, size = dp * px;
     final rec = ui.PictureRecorder();
     final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
     final cx = size / 2, cy = size / 2;
-    // Shadow
-    canvas.drawCircle(Offset(cx, cy + 3), size * 0.44,
-        Paint()
-          ..color = Colors.black.withOpacity(0.22)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
-    // Orange circle
-    canvas.drawCircle(Offset(cx, cy), size * 0.44, Paint()..color = const Color(0xFFF97316));
-    // White border
-    canvas.drawCircle(Offset(cx, cy), size * 0.44,
-        Paint()
-          ..color = Colors.white.withOpacity(0.25)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = px * 1.5);
-    // Car body
-    final bodyW = size * 0.30, bodyH = size * 0.52;
+    final r = size * 0.44;
+
+    // Soft drop shadow
+    canvas.drawCircle(
+      Offset(cx, cy + 5),
+      r,
+      Paint()
+        ..color = Colors.black.withOpacity(0.28)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+    );
+
+    // Orange brand disc
+    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = const Color(0xFFF97316));
+
+    // Subtle highlight ring
+    canvas.drawCircle(
+      Offset(cx, cy),
+      r,
+      Paint()
+        ..color = Colors.white.withOpacity(0.18)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = px * 2.0,
+    );
+
+    // ── Car body ─────────────────────────────────────────────────────────
+    final bodyW = size * 0.38, bodyH = size * 0.58;
     canvas.drawRRect(
-        RRect.fromRectAndRadius(
-            Rect.fromCenter(center: Offset(cx, cy), width: bodyW, height: bodyH),
-            Radius.circular(size * 0.10)),
-        Paint()..color = Colors.white);
-    // Windshield
-    final windW = size * 0.22, windH = size * 0.13;
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy), width: bodyW, height: bodyH),
+        Radius.circular(bodyW * 0.30),
+      ),
+      Paint()..color = Colors.white,
+    );
+
+    // Windshield + rear window — light blue-gray glass
+    final glassW = bodyW * 0.68, glassH = bodyH * 0.20;
+    final glassPaint = Paint()..color = const Color(0xFFB8D4F0).withOpacity(0.90);
     canvas.drawRRect(
-        RRect.fromRectAndRadius(
-            Rect.fromCenter(center: Offset(cx, cy - size * 0.13), width: windW, height: windH),
-            Radius.circular(size * 0.04)),
-        Paint()..color = const Color(0xFFF97316).withOpacity(0.55));
-    // Rear window
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy - bodyH * 0.20), width: glassW, height: glassH),
+        Radius.circular(size * 0.03),
+      ),
+      glassPaint,
+    );
     canvas.drawRRect(
-        RRect.fromRectAndRadius(
-            Rect.fromCenter(center: Offset(cx, cy + size * 0.13), width: windW, height: windH * 0.8),
-            Radius.circular(size * 0.04)),
-        Paint()..color = const Color(0xFFF97316).withOpacity(0.55));
-    // Wheels
-    final wheelPaint = Paint()..color = const Color(0xFF1A1F36);
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy + bodyH * 0.20), width: glassW, height: glassH * 0.80),
+        Radius.circular(size * 0.03),
+      ),
+      glassPaint,
+    );
+
+    // Headlights strip (front = top)
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy - bodyH * 0.455), width: bodyW * 0.65, height: size * 0.045),
+        Radius.circular(size * 0.02),
+      ),
+      Paint()..color = Colors.white.withOpacity(0.95),
+    );
+
+    // Tail lights strip (rear = bottom)
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy + bodyH * 0.455), width: bodyW * 0.65, height: size * 0.038),
+        Radius.circular(size * 0.015),
+      ),
+      Paint()..color = const Color(0xFFFF3B3B).withOpacity(0.90),
+    );
+
+    // ── Wheels — circular with rim ────────────────────────────────────────
+    final wheelR = size * 0.076;
+    final xOff = bodyW * 0.62, yOff = bodyH * 0.30;
     for (final pos in [
-      Offset(cx - bodyW * 0.62, cy - bodyH * 0.28),
-      Offset(cx + bodyW * 0.62, cy - bodyH * 0.28),
-      Offset(cx - bodyW * 0.62, cy + bodyH * 0.28),
-      Offset(cx + bodyW * 0.62, cy + bodyH * 0.28),
+      Offset(cx - xOff, cy - yOff),
+      Offset(cx + xOff, cy - yOff),
+      Offset(cx - xOff, cy + yOff),
+      Offset(cx + xOff, cy + yOff),
     ]) {
-      canvas.drawRRect(
-          RRect.fromRectAndRadius(
-              Rect.fromCenter(center: pos, width: size * 0.09, height: size * 0.14),
-              Radius.circular(size * 0.03)),
-          wheelPaint);
+      canvas.drawCircle(pos, wheelR, Paint()..color = const Color(0xFF1A1A2E));
+      canvas.drawCircle(pos, wheelR * 0.52, Paint()..color = const Color(0xFF4A4A6A));
+      canvas.drawCircle(pos, wheelR * 0.22, Paint()..color = Colors.white.withOpacity(0.55));
     }
+
     final pic = rec.endRecording();
     final img = await pic.toImage(size.toInt(), size.toInt());
     final data = await img.toByteData(format: ui.ImageByteFormat.png);
@@ -364,7 +401,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   void _smoothFollowCamera(LatLng pos) {
     final mapState = ref.read(mapProvider);
     if (!mapStateReady(mapState)) return;
-    final ctrl = mapState.mapController;
+    final ctrl = ref.read(mapProvider.notifier).mapController;
     if (ctrl == null) return;
 
     if (_currentPhase == RidePhase.arriving) {
@@ -387,12 +424,12 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       );
       ctrl.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
     } else {
-      // Navigation inDrive : zoom 19, tilt 70°, légèrement en avance
-      final ahead = _cameraAheadTarget(pos, _currentBearing, 0.25);
+      // Navigation inDrive : zoom 17, tilt 45° — lisible comme Google Maps
+      final ahead = _cameraAheadTarget(pos, _currentBearing, 0.20);
       ctrl.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
         target: ahead,
-        zoom: 19.0,
-        tilt: 70.0,
+        zoom: 17.0,
+        tilt: 45.0,
         bearing: _currentBearing,
       )));
     }
@@ -460,23 +497,25 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     return GoogleMap(
       initialCameraPosition: CameraPosition(
         target: aheadStart,
-        zoom: 19.0,
-        tilt: 70.0,
+        zoom: 17.0,
+        tilt: 45.0,
         bearing: _currentBearing,
       ),
-      style: _navMapStyle,
-      onMapCreated: (GoogleMapController controller) async {
+      onMapCreated: (GoogleMapController controller) {
         ref.read(mapProvider.notifier).setMapController(controller);
         setState(() => _isMapReady = true);
-
-        // Caméra initiale selon la phase
-        final pos = ref.read(mapProvider).currentPosition ?? startTarget;
-        _smoothFollowCamera(pos);
-
-        if (ref.read(mapProvider).currentPosition != null) {
-          _lastRouteFetchTime = null;
-          _updateRouteDetails(ref.read(mapProvider).currentPosition!);
-        }
+        // Defer setMapStyle: calling it inside onMapCreated on iOS blocks tile
+        // rendering, showing a blue background instead of map tiles.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          // No custom style: default Google Maps shows roads/network clearly.
+          final pos = ref.read(mapProvider).currentPosition ?? startTarget;
+          _smoothFollowCamera(pos);
+          if (ref.read(mapProvider).currentPosition != null) {
+            _lastRouteFetchTime = null;
+            _updateRouteDetails(ref.read(mapProvider).currentPosition!);
+          }
+        });
       },
       myLocationEnabled: false,
       myLocationButtonEnabled: false,
@@ -488,7 +527,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       markers: mapState.markers,
       polylines: mapState.polylines,
       trafficEnabled: false,
-      buildingsEnabled: true,
+      buildingsEnabled: false,
       // Padding minimal → map plein écran comme inDrive
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 90,
@@ -553,64 +592,68 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
         : const Color(0xFF0D47A1);  // bleu foncé → vers destination
     final directionLabel = isArriving ? 'driver.active_ride'.tr() : 'driver.rides_title'.tr();
 
-    return Column(
-      children: [
-        // Barre navigation principale
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + 12,
-            left: 16,
-            right: 16,
-            bottom: 12,
+    return Container(
+      margin: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 12,
+        left: 12,
+        right: 12,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: navColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
-          color: navColor,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Flèche de direction
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.arrow_upward_rounded,
-                    color: Colors.white, size: 30),
-              ),
-              const SizedBox(width: 14),
-              // Label + distance
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(directionLabel,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold)),
-                    Text(
-                      _currentDistance > 0
-                          ? '${_currentDistance.toStringAsFixed(1)} km · $_estimatedTime'
-                          : _estimatedTime,
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(0.85),
-                          fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              // Boutons action
-              if (widget.trip.clientPhone != null)
-                _navIconBtn(Icons.phone_rounded, Colors.white, _startCallToClient),
-              const SizedBox(width: 6),
-              _navIconBtn(Icons.close_rounded, Colors.red.shade300,
-                  () => _showCancelDialog()),
-            ],
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Flèche de direction
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.arrow_upward_rounded,
+                color: Colors.white, size: 26),
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          // Label + distance
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(directionLabel,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold)),
+                Text(
+                  _currentDistance > 0
+                      ? '${_currentDistance.toStringAsFixed(1)} km · $_estimatedTime'
+                      : _estimatedTime,
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.85),
+                      fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          // Boutons action
+          if (widget.trip.clientPhone != null)
+            _navIconBtn(Icons.phone_rounded, Colors.white, _startCallToClient),
+          const SizedBox(width: 6),
+          _navIconBtn(Icons.close_rounded, Colors.red.shade300,
+              () => _showCancelDialog()),
+        ],
+      ),
     );
   }
 
@@ -782,7 +825,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '${widget.trip.estimatedFare.toStringAsFixed(2)} ${widget.trip.currency}',
+                        '${(widget.trip.offeredFare ?? widget.trip.estimatedFare).toStringAsFixed(2)} ${widget.trip.currency}',
                         style: const TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
@@ -904,7 +947,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
               Container(width: 1, height: 30, color: Colors.grey.shade300),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildInfoRow('Prix estimé', '${widget.trip.estimatedFare.toStringAsFixed(2)} ${widget.trip.currency}'),
+                child: _buildInfoRow('Prix convenu', '${(widget.trip.offeredFare ?? widget.trip.estimatedFare).toStringAsFixed(2)} ${widget.trip.currency}'),
               ),
             ],
           ),
@@ -1073,7 +1116,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
               children: [
                 _summaryTile('Distance', '${widget.trip.estimatedDistanceKm.toStringAsFixed(1)} km'),
                 _summaryTile('Durée', _estimatedTime),
-                _summaryTile('nav.earnings'.tr(), '${widget.trip.estimatedFare.toStringAsFixed(2)} ${widget.trip.currency}'),
+                _summaryTile('nav.earnings'.tr(), '${(widget.trip.offeredFare ?? widget.trip.estimatedFare).toStringAsFixed(2)} ${widget.trip.currency}'),
               ],
             ),
             const SizedBox(height: 24),

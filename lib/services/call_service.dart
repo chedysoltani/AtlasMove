@@ -126,7 +126,6 @@ class CallService {
   Future<CallSession?> initiateCall(String tripId) async {
     lastError = null;
     if (!await _ensureSocketAndPermission()) {
-      lastError = 'Permission microphone refusée';
       return null;
     }
 
@@ -256,8 +255,10 @@ class CallService {
 
   Future<bool> _ensureSocketAndPermission() async {
     final status = await Permission.microphone.request();
+    debugPrint('🎤 CallService: mic permission = $status');
     if (!status.isGranted) {
-      debugPrint('❌ CallService: Permission microphone refusée');
+      lastError = 'Permission microphone refusée ($status). Sur iOS, vérifiez Réglages > AtlasMove > Microphone.';
+      debugPrint('❌ CallService: $lastError');
       return false;
     }
     if (_socket == null || !_socket!.connected) {

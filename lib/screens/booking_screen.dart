@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/painting.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
+import '../services/booking_service.dart';
 
 // Catégories principales
 enum TransportCategory {
@@ -167,23 +170,30 @@ class _BookingScreenState extends State<BookingScreen> {
   bool _isNow = true;
   String? _selectedTruckDiameter;
 
-  // Available truck diameters (from delivery trucks)
-  static const List<Map<String, String>> _truckDiameters = [
-    {'size': 'Petit (3-5m)', 'description': 'Colis et petites livraisons', 'icon': 'local_shipping'},
-    {'size': 'Moyen (6-8m)', 'description': 'Meubles et déménagement moyen', 'icon': 'moving'},
-    {'size': 'Grand (9-12m)', 'description': 'Grands volumes et marchandises', 'icon': 'local_shipping'},
-    {'size': 'Très grand (13-16m)', 'description': 'Déménagement complet et industriel', 'icon': 'local_shipping'},
-    {'size': 'Extra large (17-20m)', 'description': 'Transport de charges très lourdes', 'icon': 'local_shipping'},
-    {'size': 'Spécial (sur mesure)', 'description': 'Transport spécialisé', 'icon': 'settings'},
-  ];
+  // Available truck diameters (DYNAMIC - loaded from API)
+  List<Map<String, dynamic>> _truckDiameters = [];
+  bool _isLoadingTruckSizes = false;
   
-  // Calculated values
+  // Calculated values (DYNAMIC - from API)
   double _estimatedPrice = 0.0;
   double _distance = 0.0;
   String _estimatedTime = '0';
+  bool _isCalculatingEstimate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTruckSizes();
+    
+    // Listen to departure and destination changes to calculate estimate
+    _departureController.addListener(_onLocationChanged);
+    _destinationController.addListener(_onLocationChanged);
+  }
 
   @override
   void dispose() {
+    _departureController.removeListener(_onLocationChanged);
+    _destinationController.removeListener(_onLocationChanged);
     _departureController.dispose();
     _destinationController.dispose();
     _passengersController.dispose();
@@ -194,6 +204,86 @@ class _BookingScreenState extends State<BookingScreen> {
     _peopleController.dispose();
     _carTypeController.dispose();
     super.dispose();
+  }
+
+  // Load truck sizes from API
+  Future<void> _loadTruckSizes() async {
+    setState(() {
+      _isLoadingTruckSizes = true;
+    });
+
+    try {
+      final sizes = await BookingService.getTruckSizes();
+      setState(() {
+        _truckDiameters = sizes;
+        _isLoadingTruckSizes = false;
+      });
+    } catch (e) {
+      print('Error loading truck sizes: $e');
+      setState(() {
+        _isLoadingTruckSizes = false;
+        // Fallback to default sizes if API fails
+        _truckDiameters = [
+          {'size': 'Petit (3-5m)', 'description': 'Colis et petites livraisons', 'icon': 'local_shipping'},
+          {'size': 'Moyen (6-8m)', 'description': 'Meubles et déménagement moyen', 'icon': 'moving'},
+          {'size': 'Grand (9-12m)', 'description': 'Grands volumes et marchandises', 'icon': 'local_shipping'},
+        ];
+      });
+    }
+  }
+
+  // Calculate estimate when locations change
+  void _onLocationChanged() {
+    if (_departureController.text.isNotEmpty && 
+        _destinationController.text.isNotEmpty &&
+        _selectedCategory != null) {
+      _calculateEstimate();
+    }
+  }
+
+  // Calculate price, distance and time estimate
+  Future<void> _calculateEstimate() async {
+    if (_isCalculatingEstimate) return;
+
+    setState(() {
+      _isCalculatingEstimate = true;
+    });
+
+    try {
+      String serviceType = '';
+      if (_selectedCategory == TransportCategory.transport) {
+        serviceType = _selectedTransportService == TransportService.taxi ? 'taxi' : 'moto_taxi';
+      } else if (_selectedCategory == TransportCategory.camion) {
+        if (_selectedCamionService == CamionService.livraison) serviceType = 'delivery';
+        else if (_selectedCamionService == CamionService.demenagement) serviceType = 'moving';
+        else serviceType = 'heavy_truck';
+      } else {
+        serviceType = _selectedAutreService == AutreService.yacht ? 'yacht' : 'car';
+      }
+
+      final estimate = await BookingService.calculateEstimate(
+        departure: _departureController.text,
+        destination: _destinationController.text,
+        serviceType: serviceType,
+        passengers: int.tryParse(_passengersController.text),
+        weight: double.tryParse(_weightController.text),
+        truckSize: _selectedTruckDiameter,
+        isFragile: _isFragile,
+        needHelp: _needHelp,
+      );
+
+      setState(() {
+        _estimatedPrice = estimate['price']?.toDouble() ?? 0.0;
+        _distance = estimate['distance']?.toDouble() ?? 0.0;
+        _estimatedTime = estimate['estimated_time']?.toString() ?? '0';
+        _isCalculatingEstimate = false;
+      });
+    } catch (e) {
+      print('Error calculating estimate: $e');
+      setState(() {
+        _isCalculatingEstimate = false;
+      });
+    }
   }
 
   @override
@@ -1009,70 +1099,86 @@ class _BookingScreenState extends State<BookingScreen> {
         ),
         const SizedBox(height: 12),
         // Dropdown pour le diamètre du camion
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedTruckDiameter,
-              isExpanded: true,
-              hint: const Text(
-                'Sélectionner le diamètre du camion',
-                style: TextStyle(color: Colors.grey),
-              ),
-              icon: const Icon(Icons.arrow_drop_down),
-              items: _truckDiameters.map((Map<String, String> truck) {
-                return DropdownMenuItem<String>(
-                  value: truck['size'],
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _getIconForTruck(truck['icon']!),
-                          color: AppTheme.primaryColor,
-                          size: 20,
+        _isLoadingTruckSizes
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            : _truckDiameters.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text(
+                      'Aucune taille de camion disponible',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  )
+                : Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedTruckDiameter,
+                        isExpanded: true,
+                        hint: const Text(
+                          'Sélectionner le diamètre du camion',
+                          style: TextStyle(color: Colors.grey),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                truck['size']!,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                        icon: const Icon(Icons.arrow_drop_down),
+                        items: _truckDiameters.map((Map<String, dynamic> truck) {
+                          return DropdownMenuItem<String>(
+                            value: truck['size'],
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _getIconForTruck(truck['icon'] ?? 'local_shipping'),
+                                    color: AppTheme.primaryColor,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          truck['size'] ?? '',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          truck['description'] ?? '',
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.grey,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                truck['description']!,
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _selectedTruckDiameter = newValue;
+                          });
+                          _calculateEstimate(); // Recalculate when truck size changes
+                        },
+                      ),
                     ),
                   ),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedTruckDiameter = newValue;
-                });
-              },
-            ),
-          ),
-        ),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -1182,71 +1288,78 @@ class _BookingScreenState extends State<BookingScreen> {
         color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          Column(
-            children: [
-              const Text(
-                'Distance',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                ),
+      child: _isCalculatingEstimate
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: CircularProgressIndicator(),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '${_distance.toStringAsFixed(1)} km',
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Column(
+                  children: [
+                    const Text(
+                      'Distance',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_distance.toStringAsFixed(1)} km',
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          Column(
-            children: [
-              const Text(
-                'Durée estimée',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
+                Column(
+                  children: [
+                    const Text(
+                      'Durée estimée',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$_estimatedTime min',
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '$_estimatedTime min',
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                Column(
+                  children: [
+                    const Text(
+                      'Prix estimé',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_estimatedPrice.toStringAsFixed(2)} MAD',
+                      style: const TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          Column(
-            children: [
-              const Text(
-                'Prix estimé',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${_estimatedPrice.toStringAsFixed(2)} MAD',
-                style: const TextStyle(
-                  color: AppTheme.primaryColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+              ],
+            ),
     );
   }
 

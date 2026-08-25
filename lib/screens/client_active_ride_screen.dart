@@ -212,76 +212,100 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   }
 
   Future<BitmapDescriptor> _buildCarIcon() async {
-    const double dp = 52.0, px = 3.0, size = dp * px;
+    const double dp = 60.0, px = 3.0, size = dp * px;
     final rec = ui.PictureRecorder();
     final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
     final cx = size / 2, cy = size / 2;
+    final r = size * 0.44;
 
-    // Shadow
-    canvas.drawCircle(Offset(cx, cy + 3), size * 0.44,
-        Paint()
-          ..color = Colors.black.withOpacity(0.22)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
-
-    // Orange circle background
-    canvas.drawCircle(Offset(cx, cy), size * 0.44,
-        Paint()..color = const Color(0xFFF97316));
-
-    // White border
-    canvas.drawCircle(Offset(cx, cy), size * 0.44,
-        Paint()
-          ..color = Colors.white.withOpacity(0.25)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = px * 1.5);
-
-    // ── Car body (top-down view) ──
-    final bodyW = size * 0.30, bodyH = size * 0.52;
-    final bodyRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy), width: bodyW, height: bodyH),
-      Radius.circular(size * 0.10),
+    // Soft drop shadow
+    canvas.drawCircle(
+      Offset(cx, cy + 5),
+      r,
+      Paint()
+        ..color = Colors.black.withOpacity(0.28)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
     );
-    canvas.drawRRect(bodyRect, Paint()..color = Colors.white);
 
-    // Windshield (top)
-    final windW = size * 0.22, windH = size * 0.13;
-    final windRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy - size * 0.13), width: windW, height: windH),
-      Radius.circular(size * 0.04),
+    // Orange brand disc
+    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = const Color(0xFFF97316));
+
+    // Subtle highlight ring
+    canvas.drawCircle(
+      Offset(cx, cy),
+      r,
+      Paint()
+        ..color = Colors.white.withOpacity(0.18)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = px * 2.0,
     );
-    canvas.drawRRect(windRect,
-        Paint()..color = const Color(0xFFF97316).withOpacity(0.55));
 
-    // Rear window (bottom)
-    final rearRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy + size * 0.13), width: windW, height: windH * 0.8),
-      Radius.circular(size * 0.04),
+    // ── Car body ─────────────────────────────────────────────────────────
+    final bodyW = size * 0.38, bodyH = size * 0.58;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy), width: bodyW, height: bodyH),
+        Radius.circular(bodyW * 0.30),
+      ),
+      Paint()..color = Colors.white,
     );
-    canvas.drawRRect(rearRect,
-        Paint()..color = const Color(0xFFF97316).withOpacity(0.55));
 
-    // Wheels (4 corners)
-    final wheelW = size * 0.09, wheelH = size * 0.14;
-    final wheelPaint = Paint()..color = const Color(0xFF1A1F36);
+    // Windshield + rear window — light blue-gray glass
+    final glassW = bodyW * 0.68, glassH = bodyH * 0.20;
+    final glassPaint = Paint()..color = const Color(0xFFB8D4F0).withOpacity(0.90);
+    // Front windshield (top of car)
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy - bodyH * 0.20), width: glassW, height: glassH),
+        Radius.circular(size * 0.03),
+      ),
+      glassPaint,
+    );
+    // Rear window (bottom of car)
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy + bodyH * 0.20), width: glassW, height: glassH * 0.80),
+        Radius.circular(size * 0.03),
+      ),
+      glassPaint,
+    );
+
+    // Headlights strip (front = top)
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy - bodyH * 0.455), width: bodyW * 0.65, height: size * 0.045),
+        Radius.circular(size * 0.02),
+      ),
+      Paint()..color = Colors.white.withOpacity(0.95),
+    );
+
+    // Tail lights strip (rear = bottom) — red
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy + bodyH * 0.455), width: bodyW * 0.65, height: size * 0.038),
+        Radius.circular(size * 0.015),
+      ),
+      Paint()..color = const Color(0xFFFF3B3B).withOpacity(0.90),
+    );
+
+    // ── Wheels — circular with rim ────────────────────────────────────────
+    final wheelR = size * 0.076;
+    final xOff = bodyW * 0.62, yOff = bodyH * 0.30;
     for (final pos in [
-      Offset(cx - bodyW * 0.62, cy - bodyH * 0.28),
-      Offset(cx + bodyW * 0.62, cy - bodyH * 0.28),
-      Offset(cx - bodyW * 0.62, cy + bodyH * 0.28),
-      Offset(cx + bodyW * 0.62, cy + bodyH * 0.28),
+      Offset(cx - xOff, cy - yOff),
+      Offset(cx + xOff, cy - yOff),
+      Offset(cx - xOff, cy + yOff),
+      Offset(cx + xOff, cy + yOff),
     ]) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: pos, width: wheelW, height: wheelH),
-          Radius.circular(size * 0.03),
-        ),
-        wheelPaint,
-      );
+      canvas.drawCircle(pos, wheelR, Paint()..color = const Color(0xFF1A1A2E));
+      canvas.drawCircle(pos, wheelR * 0.52, Paint()..color = const Color(0xFF4A4A6A));
+      canvas.drawCircle(pos, wheelR * 0.22, Paint()..color = Colors.white.withOpacity(0.55));
     }
 
     final pic = rec.endRecording();
     final img = await pic.toImage(size.toInt(), size.toInt());
     final data = await img.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(),
-        size: const Size(dp, dp));
+    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(), size: const Size(dp, dp));
   }
 
   Future<BitmapDescriptor> _buildPickupIcon() async {
@@ -600,12 +624,17 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
 
     return GoogleMap(
       initialCameraPosition: CameraPosition(target: initialTarget, zoom: 15),
-      onMapCreated: (ctrl) async {
+      onMapCreated: (ctrl) {
         _mapController = ctrl;
-        await ctrl.setMapStyle(_mapStyle);
         setState(() => _isMapReady = true);
-        final driverLoc = ref.read(activeRideProvider).driverLocation;
-        if (driverLoc != null) _frameBothPoints(driverLoc.position);
+        // Defer setMapStyle: calling it inside onMapCreated on iOS blocks tile
+        // rendering, showing a blue background instead of map tiles.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          // No custom style: default Google Maps shows roads/network clearly.
+          final driverLoc = ref.read(activeRideProvider).driverLocation;
+          if (driverLoc != null) _frameBothPoints(driverLoc.position);
+        });
       },
       markers: markers,
       polylines: _polylines,

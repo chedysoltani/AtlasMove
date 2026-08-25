@@ -172,6 +172,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
   bool _isNegotiable = true;
   double? _customOfferedFare;
   List<BidOffer> _driverOffers = [];
+  int? _driversViewedCount;
   Timer? _offersTimer;
 
   bool _isDestinationFocused = false;
@@ -345,16 +346,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
           _destinationCoordinates = latLng;
           _isSearching = false;
         });
-        final mapState = ref.read(mapProvider);
-        if (mapState.mapController != null) {
-          mapState.mapController!.animateCamera(
-            CameraUpdate.newCameraPosition(
-              CameraPosition(target: latLng, zoom: 15),
-            ),
-          );
-        }
-        if (mapState.currentPosition != null) {
-          await _calculateRoute(mapState.currentPosition!, latLng);
+        ref.read(mapProvider.notifier).mapController?.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: latLng, zoom: 15),
+          ),
+        );
+        final currentPos = ref.read(mapProvider).currentPosition;
+        if (currentPos != null) {
+          await _calculateRoute(currentPos, latLng);
         }
       } else if (mounted) {
         setState(() => _isSearching = false);
@@ -465,8 +464,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
   }
 
   Future<void> _fitBoundsForPoints(List<LatLng> points) async {
-    final mapState = ref.read(mapProvider);
-    if (mapState.mapController == null || points.isEmpty) return;
+    final ctrl = ref.read(mapProvider.notifier).mapController;
+    if (ctrl == null || points.isEmpty) return;
     var minLat = points.first.latitude, maxLat = points.first.latitude;
     var minLng = points.first.longitude, maxLng = points.first.longitude;
     for (final p in points) {
@@ -481,7 +480,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
       southwest: LatLng(minLat - latPadding, minLng - lngPadding),
       northeast: LatLng(maxLat + latPadding, maxLng + lngPadding),
     );
-    await mapState.mapController!.animateCamera(
+    await ctrl.animateCamera(
       CameraUpdate.newLatLngBounds(bounds, 100.0),
     );
   }
@@ -951,6 +950,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
         paymentType: _paymentType,
         isNegotiable: _isNegotiable,
         offeredFare: _customOfferedFare,
+        currency: _fareEstimate?.currency ?? _selectedService?.currency,
         stops: stopsPayload,
         leg1DistanceKm: stopsPayload != null ? _leg1DistanceKm : null,
         leg1DurationMin: stopsPayload != null ? _leg1DurationMin : null,
@@ -960,6 +960,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
         setState(() {
           _tripResponse = response;
           _driverOffers = [];
+          _driversViewedCount = response.data?.driversViewedCount;
           _waitingSince = DateTime.now();
           _autoAcceptEnabled = false;
         });
@@ -967,7 +968,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
         _startBelowAverageTimer();
         final pickup = _pickupCoordinates;
         if (pickup != null) {
-          ref.read(mapProvider).mapController?.animateCamera(
+          ref.read(mapProvider.notifier).mapController?.animateCamera(
                 CameraUpdate.newCameraPosition(CameraPosition(target: pickup, zoom: 16)),
               );
         }
@@ -1010,16 +1011,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
     });
   }
 
-  /// Estimation cliente du nombre de chauffeurs ayant "vu" la demande — le
-  /// backend n'expose pas encore cette donnée (voir demande backend).
-  /// Toujours >= au nombre réel d'offres reçues, augmente lentement et
-  /// plafonne, pour ne jamais afficher un chiffre fantaisiste.
-  int _approxViewedCount() {
-    final since = _waitingSince;
-    if (since == null) return _driverOffers.length;
-    final elapsed = DateTime.now().difference(since).inSeconds;
-    final bonus = (elapsed ~/ 6).clamp(0, 12);
-    return _driverOffers.length + bonus;
+  int _driversViewedDisplayCount() {
+    final backendCount = _driversViewedCount;
+    if (backendCount == null) return _driverOffers.length;
+    return math.max(backendCount, _driverOffers.length);
   }
 
   void _stepOfferedFare(double delta) {
@@ -1102,6 +1097,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
         setState(() {
           _tripResponse = null;
           _driverOffers = [];
+          _driversViewedCount = null;
           _autoAcceptEnabled = false;
         });
       }
@@ -1135,7 +1131,12 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
       }
 
       try {
-        final status = await TripService.getClientTripStatus(tripId);
+        final snapshot = await TripService.getClientTripSnapshot(tripId);
+        final status = snapshot?.status;
+        final viewedCount = snapshot?.driversViewedCount;
+        if (mounted && viewedCount != null) {
+          setState(() => _driversViewedCount = viewedCount);
+        }
         if (status != null) {
           // Annulé / expiré → afficher dialog
           const cancelledStatuses = {
@@ -1205,7 +1206,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
       // 1. Charger les offres existantes
       final offers = await TripService.getTripOffers(tripId);
       
-      // 2. Charger l'historique pour trouver les détails exacts de la course active
+      // 2. Charger le snapshot live + l'historique pour trouver les détails exacts de la course active
+      final snapshot = await TripService.getClientTripSnapshot(tripId);
       final history = await TripService.getClientTripHistory(page: 1, limit: 5);
       TripHistoryItem? activeTrip;
       
@@ -1234,9 +1236,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
         message: 'Course récupérée',
         data: TripData(
           id: tripId,
-          status: tripItem.status,
+          status: snapshot?.status ?? tripItem.status,
           estimatedFare: tripItem.estimatedFare,
           currency: tripItem.currency,
+          driversViewedCount: snapshot?.driversViewedCount,
         ),
       );
       
@@ -1244,6 +1247,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
         setState(() {
           _tripResponse = response;
           _driverOffers = offers;
+          _driversViewedCount = snapshot?.driversViewedCount;
           _isNegotiable = true;
           _paymentType = 'cash'; // Valeur par défaut résiliente
           _estimatedDistance = tripItem.estimatedDistanceKm;
@@ -1308,8 +1312,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
       }
     });
 
-    if (mapState.mapController != null) {
-      _syncMapStyleForWaitingState(mapState.mapController!);
+    final _mapCtrl = ref.read(mapProvider.notifier).mapController;
+    if (_mapCtrl != null) {
+      _syncMapStyleForWaitingState(_mapCtrl);
     }
 
     return Scaffold(
@@ -2146,10 +2151,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
     );
   }
 
-  /// Ligne "N chauffeurs ont vu votre demande" — voir _approxViewedCount()
-  /// pour la note sur le caractère provisoire de ce chiffre.
+  /// Ligne "N chauffeurs ont vu votre demande".
   Widget _buildViewedRow() {
-    final count = _approxViewedCount();
+    final count = _driversViewedDisplayCount();
     if (count <= 0) return const SizedBox.shrink();
     final avatars = _driverOffers.take(4).toList();
     final genericCount = (count - avatars.length).clamp(0, 3);
@@ -3752,6 +3756,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
     setState(() {
       _tripResponse = null;
       _driverOffers = [];
+      _driversViewedCount = null;
       _autoAcceptEnabled = false;
     });
     showDialog(

@@ -46,6 +46,16 @@ class FareEstimate {
   }
 }
 
+class TripClientSnapshot {
+  final String? status;
+  final int? driversViewedCount;
+
+  const TripClientSnapshot({
+    required this.status,
+    required this.driversViewedCount,
+  });
+}
+
 class TripStopInput {
   final String address;
   final double latitude;
@@ -136,13 +146,14 @@ class TripService {
     required String paymentType, // "card" | "cash"
     bool isNegotiable = true,
     double? offeredFare,
+    String? currency,
     List<TripStopInput>? stops,
     double? leg1DistanceKm,
     double? leg1DurationMin,
   }) async {
     // LOG: Début de la fonction
     debugPrint('=== TripService.createTrip() START ===');
-    
+
     try {
       // LOG: Préparation des données
       final requestData = {
@@ -158,6 +169,7 @@ class TripService {
         'payment_type': paymentType,
         'is_negotiable': isNegotiable,
         if (offeredFare != null) 'offered_fare': offeredFare,
+        if (currency != null) 'currency': currency,
         if (stops != null && stops.isNotEmpty)
           'stops': stops.map((s) => s.toJson()).toList(),
         if (leg1DistanceKm != null)
@@ -764,16 +776,42 @@ class TripService {
   /// Fetch trip status from the CLIENT side (no driver role required).
   /// Backend: GET /m/trips/{id}
   static Future<String?> getClientTripStatus(String tripId) async {
+    final snapshot = await getClientTripSnapshot(tripId);
+    return snapshot?.status;
+  }
+
+  /// Fetch live client-side trip counters and status.
+  /// Backend: GET /m/trips/{id}
+  static Future<TripClientSnapshot?> getClientTripSnapshot(String tripId) async {
     try {
       final response = await HttpClient.get('/m/trips/$tripId');
       if (response.isSuccess) {
         final data = response.json['data']?['data'] ?? response.json['data'] ?? response.json;
-        return data['status'] as String?;
+        if (data is! Map) return null;
+        return TripClientSnapshot(
+          status: data['status']?.toString(),
+          driversViewedCount: _parseOptionalInt(
+            data['drivers_viewed_count'] ??
+                data['driversViewedCount'] ??
+                data['viewed_count'] ??
+                data['viewedCount'] ??
+                data['seen_count'] ??
+                data['seenCount'] ??
+                data['notified_drivers_count'] ??
+                data['notifiedDriversCount'],
+          ),
+        );
       }
     } catch (e) {
-      debugPrint('❌ TripService.getClientTripStatus: $e');
+      debugPrint('❌ TripService.getClientTripSnapshot: $e');
     }
     return null;
+  }
+
+  static int? _parseOptionalInt(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
   }
 
   /// Fetch full trip detail for client when a driver accepted directly (no bid).

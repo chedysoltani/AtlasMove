@@ -807,6 +807,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
           ),
         ),
         SafeArea(
+          bottom: false,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 22),
             child: Column(

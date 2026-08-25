@@ -40,6 +40,7 @@ class TripData {
   final String? driverPhone;
   final String? driverVehicle;
   final int? estimatedArrivalMinutes;
+  final int? driversViewedCount;
   
   TripData({
     required this.id,
@@ -50,6 +51,7 @@ class TripData {
     this.driverPhone,
     this.driverVehicle,
     this.estimatedArrivalMinutes,
+    this.driversViewedCount,
   });
   
   factory TripData.fromJson(Map<String, dynamic> json) {
@@ -79,7 +81,23 @@ class TripData {
       driverPhone: json['driver_phone'],
       driverVehicle: json['driver_vehicle'],
       estimatedArrivalMinutes: json['estimated_arrival_minutes'],
+      driversViewedCount: _parseOptionalInt(
+        json['drivers_viewed_count'] ??
+            json['driversViewedCount'] ??
+            json['viewed_count'] ??
+            json['viewedCount'] ??
+            json['seen_count'] ??
+            json['seenCount'] ??
+            json['notified_drivers_count'] ??
+            json['notifiedDriversCount'],
+      ),
     );
+  }
+
+  static int? _parseOptionalInt(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
   }
 }
 
