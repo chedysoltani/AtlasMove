@@ -52,10 +52,13 @@ class _ServicesCatalogueScreenState
     return Scaffold(
       backgroundColor: _bg,
       appBar: _buildAppBar(notifier),
-      body: catalogueAsync.when(
-        loading: _loadingState,
-        error: (e, _) => _errorState(e.toString(), notifier),
-        data: (catalogue) => _buildCatalogue(context, catalogue),
+      body: SafeArea(
+        top: false,
+        child: catalogueAsync.when(
+          loading: _loadingState,
+          error: (e, _) => _errorState(e.toString(), notifier),
+          data: (catalogue) => _buildCatalogue(context, catalogue),
+        ),
       ),
     );
   }

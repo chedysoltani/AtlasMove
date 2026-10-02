@@ -1,9 +1,9 @@
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'dart:async';
 import 'dart:math' as math;
 import '../utils/app_theme.dart';
 import '../widgets/custom_button.dart';
@@ -17,34 +17,14 @@ import '../services/route_service.dart';
 import '../services/call_service.dart';
 import '../screens/active_call_screen.dart';
 import 'driver_main.dart';
-import '../services/location_foreground_service.dart';
+import '../services/location_tracking_service.dart';
+import '../map/driver_marker_controller.dart';
+import '../map/map_camera.dart';
+import '../map/map_markers.dart';
+import '../map/map_widgets.dart';
+import '../map/route_overlay.dart';
 
 enum RidePhase { arriving, started, completed }
-
-// Style carte navigation chauffeur — fond clair, routes bien visibles, sans trafic
-const String _navMapStyle = '''[
-  {"featureType":"all","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
-  {"featureType":"poi","stylers":[{"visibility":"off"}]},
-  {"featureType":"transit","stylers":[{"visibility":"off"}]},
-  {"featureType":"landscape","elementType":"geometry.fill","stylers":[{"color":"#f0ede8"}]},
-  {"featureType":"landscape.man_made","elementType":"geometry.fill","stylers":[{"color":"#e8e4de"}]},
-  {"featureType":"road","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
-  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#d4cfc9"},{"weight":"1"}]},
-  {"featureType":"road.arterial","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
-  {"featureType":"road.arterial","elementType":"geometry.stroke","stylers":[{"color":"#c8c3bc"}]},
-  {"featureType":"road.highway","elementType":"geometry.fill","stylers":[{"color":"#ffe082"}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#f5c518"},{"weight":"1"}]},
-  {"featureType":"road.local","elementType":"geometry.fill","stylers":[{"color":"#ffffff"}]},
-  {"featureType":"road.local","elementType":"geometry.stroke","stylers":[{"color":"#ddd8d0"}]},
-  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#666666"}]},
-  {"featureType":"road","elementType":"labels.text.stroke","stylers":[{"color":"#ffffff"},{"weight":"3"}]},
-  {"featureType":"water","elementType":"geometry.fill","stylers":[{"color":"#aed6f1"}]},
-  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#5b8fa8"}]},
-  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#333333"}]},
-  {"featureType":"administrative.neighborhood","elementType":"labels.text.fill","stylers":[{"color":"#777777"}]},
-  {"featureType":"building","elementType":"geometry.fill","stylers":[{"color":"#e4ddd5"}]},
-  {"featureType":"building","elementType":"geometry.stroke","stylers":[{"color":"#d4ccc4"}]}
-]''';
 
 class DriverActiveRideScreen extends ConsumerStatefulWidget {
   final AvailableTrip trip;
@@ -55,7 +35,8 @@ class DriverActiveRideScreen extends ConsumerStatefulWidget {
   ConsumerState<DriverActiveRideScreen> createState() => _DriverActiveRideScreenState();
 }
 
-class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen> {
+class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
+    with TickerProviderStateMixin {
   late RidePhase _currentPhase;
   bool _showHandle = true;
 
@@ -64,10 +45,24 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   String _estimatedTime = 'Calcul...';
   bool _isFetchingRoute = false;
   DateTime? _lastRouteFetchTime;
-  double _currentBearing = 0.0;
-  BitmapDescriptor? _carIcon;
-  BitmapDescriptor? _clientMarkerIcon;
-  BitmapDescriptor? _destMarkerIcon;
+
+  // ── Carte ──────────────────────────────────────────────────────────────────
+  // UN SEUL marqueur chauffeur (id constant `driver_marker`) déplacé par
+  // interpolation ; tracé, caméra et boussole sont pilotés localement.
+  late final DriverMarkerController _driverMarker;
+  late final RouteOverlay _route;
+  final FollowCamera _follow = FollowCamera();
+  final ValueNotifier<double> _cameraBearing = ValueNotifier<double>(0);
+  CameraPosition? _cameraPos;
+  Set<Marker> _staticMarkers = const <Marker>{};
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _destIcon;
+  bool _iconsRequested = false;
+
+  LatLng get _pickupLatLng =>
+      LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude);
+  LatLng get _destinationLatLng =>
+      LatLng(widget.trip.destinationLatitude, widget.trip.destinationLongitude);
 
   @override
   void initState() {
@@ -84,163 +79,93 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       _currentPhase = RidePhase.started;
     }
 
+    // Course en cours : la position du chauffeur part vers le client (POST /trips/location, ~5 s)
+    if (widget.trip.status != 'completed' && !widget.trip.status.startsWith('cancelled')) {
+      unawaited(LocationTrackingService().setActiveTrip(widget.trip.id));
+    }
+
+    _driverMarker = DriverMarkerController(vsync: this);
+    _route = RouteOverlay(vsync: this);
+    // Le tracé suit le marqueur affiché (pas la position brute) : la partie
+    // parcourue disparaît au fil de l'animation.
+    _driverMarker.marker.addListener(_onDriverMarkerFrame);
+    _rebuildStaticMarkers();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(mapProvider.notifier).initializeMap();
+      // Pas de marqueur bleu 'current_position' (ce sont deux marqueurs pour un
+      // même chauffeur) et pas d'auto-follow du notifier : la caméra est gérée ici.
+      ref
+          .read(mapProvider.notifier)
+          .initializeMap(showUserMarker: false, autoFollowCamera: false);
     });
-    _initCarIcon();
-    _initTargetIcons();
   }
 
-  Future<void> _initCarIcon() async {
-    _carIcon = await _createCarIcon();
-    if (!mounted) return;
-    setState(() {});
-    // Force refresh pour appliquer l'icône voiture immédiatement
-    final mapState = ref.read(mapProvider);
-    if (mapState.currentPosition != null) {
-      _lastRouteFetchTime = null; // reset throttle
-      _updateRouteDetails(mapState.currentPosition!);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_iconsRequested) {
+      _iconsRequested = true;
+      _loadIcons(MediaQuery.devicePixelRatioOf(context));
     }
   }
 
-  Future<void> _initTargetIcons() async {
-    _clientMarkerIcon = await _buildCircleMarker(const Color(0xFF22C55E));
-    _destMarkerIcon   = await _buildCircleMarker(const Color(0xFFFF6600));
-    if (!mounted) return;
-    setState(() {});
-    // Force refresh des markers et de la caméra après chargement des icônes
-    _lastRouteFetchTime = null;
-    final mapState = ref.read(mapProvider);
-    if (mapState.currentPosition != null) {
-      await _updateRouteDetails(mapState.currentPosition!);
+  /// Les bitmaps sont générés une seule fois par densité (cache de la fabrique).
+  Future<void> _loadIcons(double dpr) async {
+    final factory = MapMarkerFactory.instance;
+    try {
+      final icons = await Future.wait([
+        factory.vehicle(VehicleCategory.fromLabel(widget.trip.serviceName), dpr),
+        factory.pickupPin(dpr),
+        factory.destinationPin(dpr),
+      ]);
+      if (!mounted) return;
+      _driverMarker.setIcon(icons[0]);
+      _pickupIcon = icons[1];
+      _destIcon = icons[2];
+      setState(_rebuildStaticMarkers);
+    } catch (e) {
+      debugPrint('DriverActiveRide: rendu des icônes impossible: $e');
+      if (mounted) _driverMarker.setIcon(fallbackDriverIcon());
     }
   }
 
-  Future<BitmapDescriptor> _buildCircleMarker(Color color) async {
-    const double dp = 44.0, px = 3.0, size = dp * px;
-    final rec = ui.PictureRecorder();
-    final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
-    final cx = size / 2, cy = size / 2, r = size * 0.38;
-    canvas.drawCircle(Offset(cx, cy + 2), r + 4,
-        Paint()..color = Colors.black.withOpacity(0.18)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
-    canvas.drawCircle(Offset(cx, cy), r + 5, Paint()..color = Colors.white);
-    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = color);
-    canvas.drawCircle(Offset(cx, cy), r * 0.35, Paint()..color = Colors.white);
-    final pic = rec.endRecording();
-    final img = await pic.toImage(size.toInt(), size.toInt());
-    final data = await img.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(), size: const Size(dp, dp));
-  }
-
-  Future<BitmapDescriptor> _createCarIcon() async {
-    const double dp = 60.0, px = 3.0, size = dp * px;
-    final rec = ui.PictureRecorder();
-    final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
-    final cx = size / 2, cy = size / 2;
-    final r = size * 0.44;
-
-    // Soft drop shadow
-    canvas.drawCircle(
-      Offset(cx, cy + 5),
-      r,
-      Paint()
-        ..color = Colors.black.withOpacity(0.28)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
-    );
-
-    // Orange brand disc
-    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = const Color(0xFFF97316));
-
-    // Subtle highlight ring
-    canvas.drawCircle(
-      Offset(cx, cy),
-      r,
-      Paint()
-        ..color = Colors.white.withOpacity(0.18)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = px * 2.0,
-    );
-
-    // ── Car body ─────────────────────────────────────────────────────────
-    final bodyW = size * 0.38, bodyH = size * 0.58;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy), width: bodyW, height: bodyH),
-        Radius.circular(bodyW * 0.30),
+  void _rebuildStaticMarkers() {
+    _staticMarkers = {
+      Marker(
+        markerId: const MarkerId('pickup'),
+        position: _pickupLatLng,
+        icon: _pickupIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+        anchor: MapMarkerFactory.pinAnchor,
+        zIndexInt: 2,
       ),
-      Paint()..color = Colors.white,
-    );
-
-    // Windshield + rear window — light blue-gray glass
-    final glassW = bodyW * 0.68, glassH = bodyH * 0.20;
-    final glassPaint = Paint()..color = const Color(0xFFB8D4F0).withOpacity(0.90);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy - bodyH * 0.20), width: glassW, height: glassH),
-        Radius.circular(size * 0.03),
+      Marker(
+        markerId: const MarkerId('destination'),
+        position: _destinationLatLng,
+        icon: _destIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        anchor: MapMarkerFactory.pinAnchor,
+        zIndexInt: 3,
       ),
-      glassPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy + bodyH * 0.20), width: glassW, height: glassH * 0.80),
-        Radius.circular(size * 0.03),
-      ),
-      glassPaint,
-    );
-
-    // Headlights strip (front = top)
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy - bodyH * 0.455), width: bodyW * 0.65, height: size * 0.045),
-        Radius.circular(size * 0.02),
-      ),
-      Paint()..color = Colors.white.withOpacity(0.95),
-    );
-
-    // Tail lights strip (rear = bottom)
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy + bodyH * 0.455), width: bodyW * 0.65, height: size * 0.038),
-        Radius.circular(size * 0.015),
-      ),
-      Paint()..color = const Color(0xFFFF3B3B).withOpacity(0.90),
-    );
-
-    // ── Wheels — circular with rim ────────────────────────────────────────
-    final wheelR = size * 0.076;
-    final xOff = bodyW * 0.62, yOff = bodyH * 0.30;
-    for (final pos in [
-      Offset(cx - xOff, cy - yOff),
-      Offset(cx + xOff, cy - yOff),
-      Offset(cx - xOff, cy + yOff),
-      Offset(cx + xOff, cy + yOff),
-    ]) {
-      canvas.drawCircle(pos, wheelR, Paint()..color = const Color(0xFF1A1A2E));
-      canvas.drawCircle(pos, wheelR * 0.52, Paint()..color = const Color(0xFF4A4A6A));
-      canvas.drawCircle(pos, wheelR * 0.22, Paint()..color = Colors.white.withOpacity(0.55));
-    }
-
-    final pic = rec.endRecording();
-    final img = await pic.toImage(size.toInt(), size.toInt());
-    final data = await img.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(), size: const Size(dp, dp));
+    };
   }
 
   @override
   void dispose() {
+    _driverMarker.marker.removeListener(_onDriverMarkerFrame);
+    // Le provider carte est global : sans ceci le flux GPS haute précision
+    // continue à tourner après la sortie de l'écran.
+    ref.read(mapProvider.notifier).stopTracking();
+    _driverMarker.dispose();
+    _route.dispose();
+    _follow.dispose();
+    _cameraBearing.dispose();
     super.dispose();
   }
 
-  double _calculateBearing(LatLng start, LatLng end) {
-    final lat1 = start.latitude * math.pi / 180;
-    final lat2 = end.latitude * math.pi / 180;
-    final dLon = (end.longitude - start.longitude) * math.pi / 180;
-    final y = math.sin(dLon) * math.cos(lat2);
-    final x = math.cos(lat1) * math.sin(lat2) -
-        math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
-    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+  void _onDriverMarkerFrame() {
+    final p = _driverMarker.position;
+    if (p != null) _route.updateProgress(p);
   }
 
   // Décale le point cible de la caméra vers l'avant du driver
@@ -284,16 +209,55 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     return '${hours}h ${remaining}min';
   }
 
-  Future<void> _updateRouteDetails(LatLng currentPos) async {
-    // arriving → pickup, started/completed → destination
-    final targetLatLng = _currentPhase == RidePhase.arriving
-        ? LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude)
-        : LatLng(widget.trip.destinationLatitude, widget.trip.destinationLongitude);
+  String _formatDuration(int minutes) {
+    if (minutes < 1) return '< 1 min';
+    if (minutes < 60) return '$minutes min';
+    return '${minutes ~/ 60}h ${minutes % 60}min';
+  }
 
-    // Throttle route fetching to once every 10 seconds to avoid API spam
+  // ── Position du chauffeur ───────────────────────────────────────────────────
+
+  /// Point d'entrée de chaque position GPS locale (via MapState).
+  void _onDriverPosition(LatLng pos) {
+    final gps = ref.read(mapProvider.notifier).lastPosition;
+    final accepted = _driverMarker.update(DriverFix(
+      position: pos,
+      heading: gps?.heading,
+      // Geolocator renvoie 0.0 quand la vitesse est inconnue : on laisse le
+      // contrôleur la déduire du déplacement dans ce cas.
+      speedMps: (gps != null && gps.speed > 0) ? gps.speed : null,
+      accuracyM: gps?.accuracy,
+      timestamp: gps?.timestamp ?? DateTime.now(),
+    ));
+    if (!accepted) return; // position aberrante ou sans mouvement réel
+
+    _followDriverCamera(pos);
+    _updateRouteDetails(pos);
+  }
+
+  /// Le tracé est ré-évalué chaque seconde environ ; distance/ETA restantes
+  /// sont déduites du tracé entre deux requêtes OSRM.
+  void _refreshEtaFromRoute() {
+    if (!_route.hasRoute) return;
+    final remainingKm = _route.remainingMeters / 1000.0;
+    final secs = _route.remainingSeconds;
+    _currentDistance = remainingKm;
+    if (secs != null) _estimatedTime = _formatDuration((secs / 60).ceil());
+  }
+
+  Future<void> _updateRouteDetails(LatLng currentPos, {bool force = false}) async {
+    // arriving → pickup, started/completed → destination
+    final targetLatLng =
+        _currentPhase == RidePhase.arriving ? _pickupLatLng : _destinationLatLng;
+
+    // Requêtes OSRM espacées (10 s, 4 s si le chauffeur a quitté le tracé)
     final now = DateTime.now();
+    final minGap = _route.isOffRoute ? 4 : 10;
     if (_isFetchingRoute ||
-        (_lastRouteFetchTime != null && now.difference(_lastRouteFetchTime!).inSeconds < 10)) {
+        (!force &&
+            _lastRouteFetchTime != null &&
+            now.difference(_lastRouteFetchTime!).inSeconds < minGap)) {
+      if (mounted && _route.hasRoute) setState(_refreshEtaFromRoute);
       return;
     }
 
@@ -302,89 +266,28 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
     try {
       final routeResult = await RouteService.getRoute(currentPos, targetLatLng);
-      
       if (!mounted) return;
 
-      final mapNotifier = ref.read(mapProvider.notifier);
-      
-      final isArriving = _currentPhase == RidePhase.arriving;
-      final targetIcon = isArriving
-          ? (_clientMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen))
-          : (_destMarkerIcon   ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange));
-
-      final targetMarker = Marker(
-        markerId: const MarkerId('target'),
-        position: targetLatLng,
-        icon: targetIcon,
-        anchor: const Offset(0.5, 0.5),
-        zIndex: 1,
-      );
-
-      List<LatLng> points = [currentPos, targetLatLng];
       double distance = _calculateDistance(currentPos, targetLatLng);
       String durationStr = _estimateDuration(distance);
 
       if (routeResult != null) {
-        points = routeResult.points;
         distance = routeResult.distanceKm;
-        
-        final durationMin = (routeResult.durationSeconds / 60).round();
-        if (durationMin < 1) durationStr = '< 1 min';
-        else if (durationMin < 60) durationStr = '$durationMin min';
-        else {
-          final h = durationMin ~/ 60;
-          final m = durationMin % 60;
-          durationStr = '${h}h ${m}min';
-        }
+        durationStr = _formatDuration((routeResult.durationSeconds / 60).round());
+        _route.setRoute(
+          routeResult.points,
+          durationSeconds: routeResult.durationSeconds.toDouble(),
+          head: _driverMarker.position ?? currentPos,
+        );
+      } else {
+        // Repli : ligne droite, sans animation
+        _route.setRoute(
+          [currentPos, targetLatLng],
+          head: currentPos,
+          animate: false,
+        );
       }
 
-      // Route bleue épaisse style navigation
-      final routePolyline = Polyline(
-        polylineId: const PolylineId('route'),
-        points: points,
-        color: const Color(0xFF1A73E8),
-        width: 9,
-        jointType: JointType.round,
-        endCap: Cap.roundCap,
-        startCap: Cap.roundCap,
-        patterns: [],
-      );
-
-      // Outline sous la route (effet Google Maps)
-      final routeOutline = Polyline(
-        polylineId: const PolylineId('route_outline'),
-        points: points,
-        color: const Color(0xFF0D47A1),
-        width: 13,
-        jointType: JointType.round,
-        endCap: Cap.roundCap,
-        startCap: Cap.roundCap,
-      );
-
-      // Calcul du bearing driver → target pour orienter la caméra
-      final bearing = _calculateBearing(currentPos, targetLatLng);
-      setState(() => _currentBearing = bearing);
-
-      mapNotifier.clearPolylines();
-      mapNotifier.addMarker(targetMarker);
-
-      // Remplace le marker bleu par défaut ('current_position') par l'icône voiture
-      if (_carIcon != null) {
-        mapNotifier.removeMarker('current_position');
-        mapNotifier.addMarker(Marker(
-          markerId: const MarkerId('driver_car'),
-          position: currentPos,
-          icon: _carIcon!,
-          flat: true,
-          rotation: bearing,
-          anchor: const Offset(0.5, 0.5),
-          zIndex: 2,
-        ));
-      }
-
-      mapNotifier.addPolyline(routeOutline);
-      mapNotifier.addPolyline(routePolyline);
-      
       setState(() {
         _currentDistance = distance;
         _estimatedTime = durationStr;
@@ -397,57 +300,74 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
   bool mapStateReady(MapState state) => state.status == MapStatus.ready;
 
-  // Caméra : navigation (zoom 19 tilt 70) en in_progress, bounds en arriving
-  void _smoothFollowCamera(LatLng pos) {
-    final mapState = ref.read(mapProvider);
-    if (!mapStateReady(mapState)) return;
-    final ctrl = ref.read(mapProvider.notifier).mapController;
-    if (ctrl == null) return;
+  // ── Caméra ──────────────────────────────────────────────────────────────────
 
+  /// Caméra « navigation » : le chauffeur en bas d'écran, orienté selon son cap lissé.
+  CameraUpdate _navigationCamera(LatLng pos) {
+    final ahead = _cameraAheadTarget(pos, _driverMarker.bearing, 0.20);
+    return CameraUpdate.newCameraPosition(CameraPosition(
+      target: ahead,
+      zoom: 17.0,
+      tilt: 45.0,
+      bearing: _driverMarker.bearing,
+    ));
+  }
+
+  void _followDriverCamera(LatLng pos) {
+    if (!_isMapReady || !_follow.isFollowing.value) return;
     if (_currentPhase == RidePhase.arriving) {
       // Montrer driver + client dans le même cadre
-      final targetPos = LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude);
-      // Padding minimal de 0.008° (~900m) pour forcer un zoom lisible
-      const pad = 0.008;
-      final latDiff = (pos.latitude - targetPos.latitude).abs();
-      final lngDiff = (pos.longitude - targetPos.longitude).abs();
-      final effectivePad = math.max(pad, math.max(latDiff, lngDiff) * 0.4);
-      final bounds = LatLngBounds(
-        southwest: LatLng(
-          math.min(pos.latitude,  targetPos.latitude)  - effectivePad,
-          math.min(pos.longitude, targetPos.longitude) - effectivePad,
-        ),
-        northeast: LatLng(
-          math.max(pos.latitude,  targetPos.latitude)  + effectivePad,
-          math.max(pos.longitude, targetPos.longitude) + effectivePad,
-        ),
-      );
-      ctrl.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
+      MapCamera.fitBounds(_follow.controller, [pos, _pickupLatLng], padding: 100);
     } else {
-      // Navigation inDrive : zoom 17, tilt 45° — lisible comme Google Maps
-      final ahead = _cameraAheadTarget(pos, _currentBearing, 0.20);
-      ctrl.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
-        target: ahead,
-        zoom: 17.0,
-        tilt: 45.0,
-        bearing: _currentBearing,
-      )));
+      _follow.follow(_navigationCamera(pos));
     }
+  }
+
+  /// Bouton « ma position » : réactive le suivi.
+  void _recenter() {
+    final pos = _driverMarker.position ?? ref.read(mapProvider).currentPosition;
+    if (pos == null) return;
+    if (_currentPhase == RidePhase.arriving) {
+      _follow.isFollowing.value = true;
+      MapCamera.fitBounds(_follow.controller, [pos, _pickupLatLng], padding: 100);
+    } else {
+      _follow.recenter(_navigationCamera(pos));
+    }
+  }
+
+  /// Bouton « itinéraire complet » : chauffeur + prise en charge + destination.
+  void _fitWholeTrip() {
+    final pos = _driverMarker.position ?? ref.read(mapProvider).currentPosition;
+    _follow.isFollowing.value = false;
+    MapCamera.fitBounds(
+      _follow.controller,
+      [if (pos != null) pos, _pickupLatLng, _destinationLatLng],
+      padding: 110,
+    );
+  }
+
+  void _resetNorth() {
+    final cam = _cameraPos;
+    if (cam == null) return;
+    _follow.isFollowing.value = false;
+    _follow.controller?.animateCamera(CameraUpdate.newCameraPosition(
+      CameraPosition(target: cam.target, zoom: cam.zoom, bearing: 0, tilt: 0),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
     final mapState = ref.watch(mapProvider);
 
-    // Caméra immédiate à chaque position GPS — route throttlée à 10s
+    // Le marqueur reçoit toutes les positions (même carte pas encore prête) ;
+    // seule la caméra dépend de _isMapReady.
     ref.listen<MapState>(mapProvider, (previous, next) {
-      if (next.currentPosition == null || !_isMapReady) return;
-      final posChanged = previous?.currentPosition != next.currentPosition;
-      if (posChanged) {
-        _smoothFollowCamera(next.currentPosition!); // immédiat, sans throttle
-      }
-      if (posChanged || previous?.status != next.status) {
-        _updateRouteDetails(next.currentPosition!); // throttlé 10s
+      final pos = next.currentPosition;
+      if (pos == null) return;
+      if (previous?.currentPosition != pos) {
+        _onDriverPosition(pos);
+      } else if (previous?.status != next.status) {
+        _updateRouteDetails(pos);
       }
     });
 
@@ -457,14 +377,14 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
         children: [
           // Map Background
           _buildGoogleMap(mapState),
-          
+
           if (mapState.status == MapStatus.loading) const MapLoadingWidget(),
-          
+
           if (mapState.status == MapStatus.error ||
               mapState.status == MapStatus.permissionDenied ||
               mapState.status == MapStatus.locationDisabled)
             _buildErrorWidget(mapState),
-            
+
           // Header
           Positioned(
             top: 0,
@@ -472,7 +392,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
             right: 0,
             child: _buildHeader(),
           ),
-          
+
           // Map Controls
           if (_isMapReady)
             _buildMapControls(mapState),
@@ -491,43 +411,37 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   }
 
   Widget _buildGoogleMap(MapState mapState) {
-    final startTarget = mapState.currentPosition ??
-        LatLng(widget.trip.pickupLatitude, widget.trip.pickupLongitude);
-    final aheadStart = _cameraAheadTarget(startTarget, _currentBearing, 0.25);
-    return GoogleMap(
+    final startTarget = mapState.currentPosition ?? _pickupLatLng;
+    final aheadStart = _cameraAheadTarget(startTarget, _driverMarker.bearing, 0.25);
+    return BrandedGoogleMap(
       initialCameraPosition: CameraPosition(
         target: aheadStart,
         zoom: 17.0,
         tilt: 45.0,
-        bearing: _currentBearing,
+        bearing: _driverMarker.bearing,
       ),
       onMapCreated: (GoogleMapController controller) {
         ref.read(mapProvider.notifier).setMapController(controller);
+        _follow.attach(controller);
         setState(() => _isMapReady = true);
-        // Defer setMapStyle: calling it inside onMapCreated on iOS blocks tile
-        // rendering, showing a blue background instead of map tiles.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          // No custom style: default Google Maps shows roads/network clearly.
-          final pos = ref.read(mapProvider).currentPosition ?? startTarget;
-          _smoothFollowCamera(pos);
-          if (ref.read(mapProvider).currentPosition != null) {
-            _lastRouteFetchTime = null;
-            _updateRouteDetails(ref.read(mapProvider).currentPosition!);
+          final pos = _driverMarker.position ??
+              ref.read(mapProvider).currentPosition;
+          if (pos != null) {
+            _followDriverCamera(pos);
+            _updateRouteDetails(pos, force: true);
           }
         });
       },
-      myLocationEnabled: false,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      compassEnabled: false,
-      mapToolbarEnabled: false,
-      tiltGesturesEnabled: true,
-      rotateGesturesEnabled: true,
-      markers: mapState.markers,
-      polylines: mapState.polylines,
-      trafficEnabled: false,
-      buildingsEnabled: false,
+      staticMarkers: _staticMarkers,
+      driverMarker: _driverMarker.marker,
+      routePolylines: _route.polylines,
+      onUserGesture: _follow.onUserGesture,
+      onCameraMove: (pos) {
+        _cameraPos = pos;
+        _cameraBearing.value = pos.bearing;
+      },
       // Padding minimal → map plein écran comme inDrive
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 90,
@@ -538,49 +452,28 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
   Widget _buildMapControls(MapState mapState) {
     return Positioned(
-      top: 160,
+      top: MediaQuery.of(context).padding.top + 100,
       right: 16,
-      child: Column(
-        children: [
-          _buildMapControl(
-            Icons.my_location, 
-            () => ref.read(mapProvider.notifier).centerOnCurrentPosition(),
-            color: mapState.isFollowingUser ? AppTheme.primaryColor : Colors.black,
-          ),
-          const SizedBox(height: 8),
-          _buildMapControl(
-            mapState.isFollowingUser ? Icons.gps_fixed : Icons.gps_not_fixed,
-            () {
-               ref.read(mapProvider.notifier).toggleFollowingUser();
-               ScaffoldMessenger.of(context).showSnackBar(
-                 SnackBar(content: Text(mapState.isFollowingUser ? 'Suivi GPS désactivé' : 'Suivi GPS activé')),
-               );
-            },
-            color: mapState.isFollowingUser ? AppTheme.primaryColor : Colors.black,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMapControl(IconData icon, VoidCallback onPressed, {Color color = Colors.black}) {
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: IconButton(
-        onPressed: onPressed,
-        icon: Icon(icon, color: color, size: 24),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: _follow.isFollowing,
+        builder: (context, following, _) => Column(
+          children: [
+            MapCompassButton(bearing: _cameraBearing, onTap: _resetNorth),
+            const SizedBox(height: 10),
+            MapRoundButton(
+              icon: Icons.route_rounded,
+              onTap: _fitWholeTrip,
+              tooltip: 'Itinéraire complet',
+            ),
+            const SizedBox(height: 10),
+            MapRoundButton(
+              icon: following ? Icons.gps_fixed : Icons.gps_not_fixed,
+              active: following,
+              onTap: _recenter,
+              tooltip: 'Ma position',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -724,7 +617,8 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
                 try {
                   await TripService.cancelTrip(widget.trip.id, reasonController.text);
-                  await LocationForegroundService.stop();
+                  // Course finie : cadence « sans course » (le chauffeur reste joignable pour de nouvelles courses)
+                  await LocationTrackingService().clearActiveTrip();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('common.cancelled'.tr()), backgroundColor: Colors.orange),
@@ -1014,6 +908,12 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     );
   }
 
+  void _refreshRouteForPhaseChange() {
+    _route.clear();
+    final pos = _driverMarker.position ?? ref.read(mapProvider).currentPosition;
+    if (pos != null) _updateRouteDetails(pos, force: true);
+  }
+
   Future<void> _updatePhase(RidePhase newPhase, String apiStatus) async {
     final oldPhase = _currentPhase;
     
@@ -1024,13 +924,9 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     
     HapticFeedback.mediumImpact();
 
-    // Optimistically update map if moving to next phase
-    if (newPhase == RidePhase.completed) {
-       final mapState = ref.read(mapProvider);
-       if (mapState.currentPosition != null) {
-          _updateRouteDetails(mapState.currentPosition!);
-       }
-    }
+    // Nouvelle phase = nouvelle cible (pickup → destination) : on repart d'un
+    // tracé vierge et on force le recalcul sans attendre le throttle de 10 s.
+    _refreshRouteForPhaseChange();
 
     try {
       await TripService.updateTripStatus(widget.trip.id, apiStatus);
@@ -1049,13 +945,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
           _currentPhase = oldPhase;
         });
         
-        // Revert map if needed
-        if (oldPhase == RidePhase.started) {
-           final mapState = ref.read(mapProvider);
-           if (mapState.currentPosition != null) {
-              _updateRouteDetails(mapState.currentPosition!);
-           }
-        }
+        _refreshRouteForPhaseChange();
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1070,7 +960,8 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
   Future<void> _completeRide() async {
     try {
       await TripService.updateTripStatus(widget.trip.id, 'completed');
-      await LocationForegroundService.stop();
+      // Course finie : cadence « sans course » (le chauffeur reste joignable pour de nouvelles courses)
+                  await LocationTrackingService().clearActiveTrip();
       if (!mounted) return;
       _showCompletionSummary();
     } catch (e) {

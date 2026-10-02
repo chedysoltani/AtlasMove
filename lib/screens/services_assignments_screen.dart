@@ -33,7 +33,9 @@ class _ServicesAssignmentsScreenState
     return Scaffold(
       backgroundColor: _bg,
       appBar: _buildAppBar(state),
-      body: RefreshIndicator(
+      body: SafeArea(
+        top: false,
+        child: RefreshIndicator(
         color: _orange,
         onRefresh: () async => ref.read(assignmentsProvider.notifier).refreshAll(),
         child: CustomScrollView(
@@ -51,6 +53,7 @@ class _ServicesAssignmentsScreenState
             ),
           ],
         ),
+      ),
       ),
     );
   }

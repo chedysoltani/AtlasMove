@@ -199,7 +199,9 @@ class _DriverRegisterTestScreenState extends State<DriverRegisterTestScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
@@ -483,6 +485,7 @@ class _DriverRegisterTestScreenState extends State<DriverRegisterTestScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

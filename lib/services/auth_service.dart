@@ -10,7 +10,8 @@ import '../models/responses/auth_response.dart';
 import '../models/responses/login_response.dart';
 import '../models/responses/driver_register_response.dart';
 import 'device_token_service.dart';
-import 'location_tracking_service.dart';
+import '../core/auth/auth_session.dart';
+import '../core/utils/safe_log.dart';
 
 /// Exception de validation personnalisée pour le service
 class ServiceValidationException implements Exception {
@@ -66,7 +67,9 @@ class AuthService {
             accessToken: authResponse.token,
             refreshToken: authResponse.refreshToken,
             userId: authResponse.user.id,
+            role: authResponse.user.role.name,
           );
+          AuthSession.instance.onTokensChanged();
         }
         
         return authResponse;
@@ -162,26 +165,21 @@ class AuthService {
       if (isSuccess) {
         final authResponse = AuthResponse.fromJson(responseData);
         
-        debugPrint('🔐 AuthResponse reçue dans login:');
-        debugPrint('  - Token: ${authResponse.token}');
-        debugPrint('  - User ID: ${authResponse.user.id}');
-        debugPrint('  - Is Complete: ${authResponse.isComplete}');
-        debugPrint('  - Requires OTP: ${authResponse.requiresOtp}');
+        SafeLog.d('🔐 login: complete=${authResponse.isComplete} otp=${authResponse.requiresOtp}');
         
         // Sauvegarder les tokens si l'authentification est complète
         if (authResponse.isComplete) {
-          debugPrint('💾 Sauvegarde du token dans login...');
           await TokenStorage.saveAuthTokens(
             accessToken: authResponse.token,
             refreshToken: authResponse.refreshToken,
             userId: authResponse.user.id,
             role: authResponse.user.role.name,
           );
-          debugPrint('✅ Token sauvegardé avec succès depuis login');
+          AuthSession.instance.onTokensChanged();
           // Enregistrer le token FCM après login réussi (spec: POST /users/devices)
           DeviceTokenService().registerDevice().catchError((_) {});
         } else {
-          debugPrint('⚠️ Authentification incomplète (OTP requis?), token non sauvegardé');
+          SafeLog.d('login: authentification incomplète (OTP requis), rien sauvegardé');
         }
         
         return authResponse;
@@ -197,19 +195,16 @@ class AuthService {
     }
   }
 
-  /// Déconnexion d'un utilisateur
-  static Future<void> logout() async {
-    // Arrêter tous les services de fond AVANT de supprimer le token
-    LocationTrackingService().stopLocationTracking();
-
-    try {
-      await HttpClient.post('/auth/logout');
-    } catch (e) {
-      debugPrint('Erreur lors de la déconnexion: $e');
-    } finally {
-      await TokenStorage.clearTokens();
-    }
+  /// Rôle présent tel quel dans la réponse (sans valeur par défaut).
+  static String? _explicitRole(Map<String, dynamic> json) {
+    final data = json['data'] is Map ? json['data'] as Map : json;
+    final role = data['role'] ?? (data['user'] is Map ? (data['user'] as Map)['role'] : null);
+    final text = role?.toString();
+    return (text == null || text.isEmpty) ? null : text;
   }
+
+  /// Déconnexion d'un utilisateur
+  static Future<void> logout() => AuthSession.instance.logout();
 
   /// Rafraîchir le token d'accès
   static Future<AuthResponse> refreshToken() async {
@@ -441,7 +436,11 @@ class AuthService {
             accessToken: authResponse.token,
             refreshToken: authResponse.refreshToken,
             userId: authResponse.user.id,
+            role: _explicitRole(responseData),
           );
+          AuthSession.instance.onTokensChanged();
+          // Enregistrer le token FCM comme après un login sans OTP
+          DeviceTokenService().registerDevice().catchError((_) {});
         }
         
         return authResponse;
@@ -573,7 +572,7 @@ class AuthService {
       );
 
       debugPrint('📊 Response Status: ${response.statusCode}');
-      debugPrint('📄 Response Body: ${response.body}');
+      SafeLog.body('📄 Response Body:', response.body);
 
       // Traitement de la réponse
       final responseData = response.json;
@@ -662,7 +661,7 @@ class AuthService {
       }
       
       debugPrint('🌐 API Request: POST $uri');
-      debugPrint('📋 Headers: ${request.headers}');
+      
       debugPrint('📦 Fields: ${request.fields}');
       
       // Envoyer la requête
@@ -671,7 +670,7 @@ class AuthService {
           .timeout(const Duration(seconds: 10));
       
       debugPrint('📊 Response Status: ${response.statusCode}');
-      debugPrint('📄 Response Body: ${response.body}');
+      SafeLog.body('📄 Response Body:', response.body);
       
       return HttpResponse(
         statusCode: response.statusCode,

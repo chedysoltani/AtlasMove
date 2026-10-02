@@ -1,6 +1,7 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../core/utils/permission_gate.dart';
 
 class LocationService {
   static final LocationService _instance = LocationService._internal();
@@ -32,7 +33,7 @@ class LocationService {
     }
 
     // Demander la permission
-    status = await Permission.location.request();
+    status = await PermissionGate.run(Permission.location.request, onTimeout: PermissionStatus.denied);
     
     if (status.isGranted) {
       return LocationPermission.whileInUse;
@@ -43,6 +44,24 @@ class LocationService {
     }
     
     return LocationPermission.unableToDetermine;
+  }
+
+  /// Statut actuel de la permission « toujours » (arrière-plan). Sur Android
+  /// et iOS, elle ne peut être obtenue qu'APRÈS que « pendant l'utilisation »
+  /// a déjà été accordée — sinon le système l'ignore silencieusement.
+  Future<PermissionStatus> backgroundPermissionStatus() =>
+      Permission.locationAlways.status;
+
+  /// Demande la permission « toujours ». À appeler uniquement après un écran
+  /// expliquant pourquoi (Play Store / App Store l'exigent), et seulement pour
+  /// les chauffeurs (le suivi pendant une course doit continuer app fermée).
+  Future<PermissionStatus> requestBackgroundLocationPermission() async {
+    final whileInUse = await Permission.location.status;
+    if (!whileInUse.isGranted) {
+      // Étape obligatoire côté OS : on ne peut pas sauter directement à "toujours".
+      await PermissionGate.run(Permission.location.request, onTimeout: PermissionStatus.denied);
+    }
+    return PermissionGate.run(Permission.locationAlways.request, onTimeout: PermissionStatus.denied);
   }
 
   /// Obtenir la position actuelle
@@ -58,7 +77,7 @@ class LocationService {
       // Vérifier les permissions
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await PermissionGate.run(Geolocator.requestPermission, onTimeout: LocationPermission.denied);
         if (permission == LocationPermission.denied) {
           print('DEBUG: Permission de localisation refusée');
           return null;
@@ -123,7 +142,7 @@ class LocationService {
       // Vérifier les permissions
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await PermissionGate.run(Geolocator.requestPermission, onTimeout: LocationPermission.denied);
         if (permission != LocationPermission.whileInUse && 
             permission != LocationPermission.always) {
           print('DEBUG: Permission de localisation non accordée');

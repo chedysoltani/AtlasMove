@@ -65,6 +65,8 @@ class LocationForegroundService {
         notificationTitle: title,
         notificationText: body,
       );
+      // Le service tourne déjà, mais le suivi a pu être arrêté : startLocationTracking est idempotent.
+      await LocationTrackingService().startLocationTracking();
       return;
     }
 

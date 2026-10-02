@@ -57,7 +57,9 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
         ),
         centerTitle: true,
       ),
-      body: Column(
+      body: SafeArea(
+        top: false,
+        child: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -105,6 +107,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

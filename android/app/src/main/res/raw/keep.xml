@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Empêche le resource shrinker (isShrinkResources = true, build release) de
+  supprimer ces sons : ils ne sont référencés que dynamiquement, par leur nom,
+  depuis Dart (RawResourceAndroidNotificationSound('new_ride') / ('incoming_call')
+  / ('new_rdv') dans push_notification_service.dart) — le shrinker ne peut pas
+  le voir statiquement et les retirait silencieusement de l'APK release.
+  https://developer.android.com/build/shrink-code#keep-resources
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/new_ride,@raw/incoming_call,@raw/new_rdv" />

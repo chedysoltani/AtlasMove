@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/call_models.dart';
@@ -23,10 +24,21 @@ class ActiveCallScreen extends StatefulWidget {
 
 class _ActiveCallScreenState extends State<ActiveCallScreen> {
   bool _isActive = false;
+  bool _isRinging = false; // call.ringing reçu : ça sonne réellement chez le callee
   bool _isMuted = false;
   bool _isSpeakerOn = true;
   int _seconds = 0;
   Timer? _timer;
+  final AudioPlayer _ringback = AudioPlayer();
+
+  // Références à NOS closures, pour ne jamais effacer celles d'un autre écran
+  // qui aurait déjà repris la main sur ces callbacks globaux au moment du dispose.
+  late final void Function(CallSession) _onCallAcceptedHandler;
+  late final void Function(String) _onCallRingingHandler;
+  late final void Function(String) _onCallEndedHandler;
+  late final void Function(String) _onCallRejectedHandler;
+  late final void Function(String) _onCallTimeoutHandler;
+  late final void Function(String) _onAnsweredElsewhereHandler;
 
   @override
   void initState() {
@@ -34,32 +46,100 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
 
     // If we are the callee we are already in the channel — call is immediately active
     _isActive = !widget.isOutgoing;
-    if (_isActive) _startTimer();
+    if (_isActive) {
+      _startTimer();
+    } else {
+      // Côté appelant : tonalité de retour d'appel jusqu'à la réponse
+      unawaited(_startRingback());
+    }
 
     // Caller side: watch for callee acceptance
-    CallService.onCallAccepted = (_) {
+    _onCallAcceptedHandler = (_) {
+      unawaited(_stopRingback());
       if (!mounted) return;
       setState(() => _isActive = true);
       _startTimer();
     };
+    CallService.onCallAccepted = _onCallAcceptedHandler;
+
+    // Le callee a affiché l'écran d'appel : "ça sonne" plutôt que "connexion..."
+    _onCallRingingHandler = (_) {
+      if (mounted) setState(() => _isRinging = true);
+    };
+    CallService.onCallRinging = _onCallRingingHandler;
 
     // Either party hung up
-    CallService.onCallEnded = (_) {
+    _onCallEndedHandler = (_) {
+      unawaited(_stopRingback());
       if (mounted) _handleCallOver();
     };
+    CallService.onCallEnded = _onCallEndedHandler;
 
     // Callee rejected (caller side only)
-    CallService.onCallRejected = (_) {
+    _onCallRejectedHandler = (_) {
+      unawaited(_stopRingback());
       if (mounted) _handleCallOver();
     };
+    CallService.onCallRejected = _onCallRejectedHandler;
+
+    // Personne n'a répondu dans le délai serveur
+    _onCallTimeoutHandler = (_) {
+      unawaited(_stopRingback());
+      if (mounted) _handleCallOver();
+    };
+    CallService.onCallTimeout = _onCallTimeoutHandler;
+
+    // Répondu sur un autre appareil du même compte
+    _onAnsweredElsewhereHandler = (_) {
+      unawaited(_stopRingback());
+      if (mounted) _handleCallOver();
+    };
+    CallService.onAnsweredElsewhere = _onAnsweredElsewhereHandler;
+  }
+
+  Future<void> _startRingback() async {
+    try {
+      await _ringback.setReleaseMode(ReleaseMode.loop);
+      // Tonalité de retour d'appel distincte de la sonnerie du côté appelé —
+      // volontairement plus sobre (convention téléphonique standard : celui
+      // qui reçoit l'appel doit avoir LA sonnerie qui attire l'attention,
+      // celui qui appelle entend juste que "ça sonne").
+      await _ringback.play(AssetSource('sounds/ringback.wav'));
+    } catch (_) {}
+  }
+
+  Future<void> _stopRingback() async {
+    try {
+      await _ringback.stop();
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    CallService.onCallAccepted = null;
-    CallService.onCallEnded = null;
-    CallService.onCallRejected = null;
+    _ringback.dispose();
+    unawaited(_stopRingback());
+    // N'efface chaque callback QUE s'il s'agit encore du nôtre (voir la même
+    // correction dans IncomingCallScreen — un écran de call suivant peut avoir
+    // déjà repris la main dessus avant que celui-ci ne soit démonté).
+    if (identical(CallService.onCallAccepted, _onCallAcceptedHandler)) {
+      CallService.onCallAccepted = null;
+    }
+    if (identical(CallService.onCallRinging, _onCallRingingHandler)) {
+      CallService.onCallRinging = null;
+    }
+    if (identical(CallService.onCallEnded, _onCallEndedHandler)) {
+      CallService.onCallEnded = null;
+    }
+    if (identical(CallService.onCallRejected, _onCallRejectedHandler)) {
+      CallService.onCallRejected = null;
+    }
+    if (identical(CallService.onCallTimeout, _onCallTimeoutHandler)) {
+      CallService.onCallTimeout = null;
+    }
+    if (identical(CallService.onAnsweredElsewhere, _onAnsweredElsewhereHandler)) {
+      CallService.onAnsweredElsewhere = null;
+    }
     super.dispose();
   }
 
@@ -78,6 +158,7 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
 
   Future<void> _endCall() async {
     _timer?.cancel();
+    await _stopRingback();
     await CallService().endCall();
     if (mounted) Navigator.of(context).pop();
   }
@@ -223,7 +304,7 @@ class _ActiveCallScreenState extends State<ActiveCallScreen> {
                   letterSpacing: 1.5,
                 ),
               )
-            : _PulsingLabel(text: 'call.connecting'.tr()),
+            : _PulsingLabel(text: _isRinging ? 'call.ringing'.tr() : 'call.connecting'.tr()),
       ],
     );
   }

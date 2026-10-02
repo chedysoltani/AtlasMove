@@ -11,6 +11,7 @@ import '../models/service_models.dart';
 import '../services/rendezvous_service.dart';
 import '../services/geocoding_service.dart';
 import '../utils/fare_calculator.dart';
+import '../core/utils/permission_gate.dart';
 
 String? _resolveUrl(String? url) {
   if (url == null || url.isEmpty) return null;
@@ -198,7 +199,7 @@ class _ClientRendezvousBookingScreenState
         // Slow path: request permission + current position
         var permission = await Geolocator.checkPermission();
         if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
+          permission = await PermissionGate.run(Geolocator.requestPermission, onTimeout: LocationPermission.denied);
         }
         if (permission == LocationPermission.always ||
             permission == LocationPermission.whileInUse) {
@@ -227,7 +228,7 @@ class _ClientRendezvousBookingScreenState
     try {
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await PermissionGate.run(Geolocator.requestPermission, onTimeout: LocationPermission.denied);
       }
       if (permission != LocationPermission.always &&
           permission != LocationPermission.whileInUse) return;
@@ -446,7 +447,7 @@ class _ClientRendezvousBookingScreenState
     try {
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await PermissionGate.run(Geolocator.requestPermission, onTimeout: LocationPermission.denied);
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {

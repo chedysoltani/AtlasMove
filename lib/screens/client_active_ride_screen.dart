@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +12,11 @@ import '../services/route_service.dart';
 import '../services/call_service.dart';
 import '../screens/active_call_screen.dart';
 import '../utils/app_theme.dart';
+import '../map/driver_marker_controller.dart';
+import '../map/map_camera.dart';
+import '../map/map_markers.dart';
+import '../map/map_widgets.dart';
+import '../map/route_overlay.dart';
 
 // ─── Local palette ────────────────────────────────────────────────────────────
 class _C {
@@ -73,21 +77,21 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   late final AnimationController _pulseCtrl;
   late final Animation<double>   _pulse;
 
-  // Smooth marker animation
-  late final AnimationController _markerCtrl;
-  LatLng? _markerFrom;
-  LatLng? _markerTo;
-
   // ── Map ─────────────────────────────────────────────────────────────────────
-  GoogleMapController? _mapController;
-  bool _isMapReady    = false;
-  bool _followCamera  = true;
-  Set<Polyline> _polylines = {};
+  // UN SEUL marqueur chauffeur (id constant `driver_marker`), déplacé par
+  // interpolation ; la carte seule est reconstruite pendant l'animation.
+  late final DriverMarkerController _driverMarker;
+  late final RouteOverlay _route;
+  final FollowCamera _follow = FollowCamera();
+  final ValueNotifier<double> _cameraBearing = ValueNotifier<double>(0);
+  CameraPosition? _cameraPos;
+  bool _isMapReady = false;
   DateTime?  _lastRouteFetch;
   bool       _fetchingRoute = false;
-  BitmapDescriptor? _driverIcon;
+  Set<Marker> _staticMarkers = const <Marker>{};
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _destinationIcon;
+  bool _iconsRequested = false;
 
   // ── Cancellation / navigation ────────────────────────────────────────────────
   bool _isCancelling = false;
@@ -106,18 +110,6 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
           ? LatLng(widget.destinationLatitude!, widget.destinationLongitude!)
           : null;
 
-  // Current interpolated driver position (used for marker + camera)
-  LatLng? get _smoothDriverPos {
-    if (_markerFrom == null || _markerTo == null) return _markerTo;
-    final t = _easeOut(_markerCtrl.value);
-    return LatLng(
-      _markerFrom!.latitude  + (_markerTo!.latitude  - _markerFrom!.latitude)  * t,
-      _markerFrom!.longitude + (_markerTo!.longitude - _markerFrom!.longitude) * t,
-    );
-  }
-
-  static double _easeOut(double t) => 1 - (1 - t) * (1 - t);
-
   // ── Lifecycle ────────────────────────────────────────────────────────────────
   @override
   void initState() {
@@ -132,12 +124,11 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
       CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );
 
-    _markerCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    )..addListener(() { if (mounted) setState(() {}); });
-
-    _loadIcons();
+    _driverMarker = DriverMarkerController(vsync: this);
+    _route = RouteOverlay(vsync: this);
+    // Le tracé suit le marqueur affiché : la partie parcourue passe en gris.
+    _driverMarker.marker.addListener(_onDriverMarkerFrame);
+    _rebuildStaticMarkers();
 
     // Start WebSocket + fallback polling via provider
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -147,253 +138,139 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_iconsRequested) {
+      _iconsRequested = true;
+      _loadIcons(MediaQuery.devicePixelRatioOf(context));
+    }
+  }
+
+  @override
   void dispose() {
+    _driverMarker.marker.removeListener(_onDriverMarkerFrame);
     ref.read(activeRideProvider.notifier).stopTracking();
+    _driverMarker.dispose();
+    _route.dispose();
+    _follow.dispose();
+    _cameraBearing.dispose();
     _pulseCtrl.dispose();
-    _markerCtrl.dispose();
-    _mapController?.dispose();
     super.dispose();
   }
 
-  // ── Custom icons ─────────────────────────────────────────────────────────────
-  Future<void> _loadIcons() async {
-    _driverIcon = await _buildCarIcon();
-    _pickupIcon = await _buildPickupIcon();
-    _destinationIcon = await _buildDestinationIcon();
-    if (mounted) setState(() {});
+  void _onDriverMarkerFrame() {
+    final p = _driverMarker.position;
+    if (p != null) _route.updateProgress(p);
   }
 
-  Future<BitmapDescriptor> _buildDestinationIcon() async {
-    const double dp = 44.0, px = 3.0, size = dp * px;
-    final rec = ui.PictureRecorder();
-    final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
-    final cx = size / 2, cy = size * 0.42, r = size * 0.30;
-    // Shadow
-    canvas.drawCircle(Offset(cx, cy + 4), r + 6,
-        Paint()..color = Colors.black.withOpacity(0.2)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
-    // Red fill circle
-    canvas.drawCircle(Offset(cx, cy), r + 6, Paint()..color = Colors.white);
-    canvas.drawCircle(Offset(cx, cy), r + 3, Paint()..color = const Color(0xFFEF4444));
-    // White inner dot
-    canvas.drawCircle(Offset(cx, cy), r * 0.4, Paint()..color = Colors.white);
-    // Pin tail
-    final path = Path()
-      ..moveTo(cx - r * 0.5, cy + r * 0.9)
-      ..lineTo(cx, cy + r * 2.4)
-      ..lineTo(cx + r * 0.5, cy + r * 0.9)
-      ..close();
-    canvas.drawPath(path, Paint()..color = const Color(0xFFEF4444));
-    final pic = rec.endRecording();
-    final img = await pic.toImage(size.toInt(), size.toInt());
-    final data = await img.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(), size: const Size(dp, dp));
+  // ── Icônes (générées une fois par densité, cache dans la fabrique) ──────────
+  Future<void> _loadIcons(double dpr) async {
+    final factory = MapMarkerFactory.instance;
+    try {
+      final icons = await Future.wait([
+        factory.vehicle(VehicleCategory.fromLabel(widget.driverVehicle), dpr),
+        factory.pickupPin(dpr),
+        factory.destinationPin(dpr),
+      ]);
+      if (!mounted) return;
+      _driverMarker.setIcon(icons[0]);
+      _pickupIcon = icons[1];
+      _destinationIcon = icons[2];
+      setState(_rebuildStaticMarkers);
+    } catch (e) {
+      debugPrint('ClientActiveRide: rendu des icônes impossible: $e');
+      if (mounted) _driverMarker.setIcon(fallbackDriverIcon());
+    }
   }
 
+  void _rebuildStaticMarkers() {
+    final pickup = _pickupLatLng;
+    final dest = _destinationLatLng;
+    _staticMarkers = {
+      if (pickup != null)
+        Marker(
+          markerId: const MarkerId('pickup'),
+          position: pickup,
+          infoWindow: const InfoWindow(title: 'Votre position'),
+          icon: _pickupIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          anchor: MapMarkerFactory.pinAnchor,
+          zIndexInt: 2,
+        ),
+      if (dest != null)
+        Marker(
+          markerId: const MarkerId('destination'),
+          position: dest,
+          infoWindow: InfoWindow(title: widget.destination),
+          icon: _destinationIcon ??
+              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          anchor: MapMarkerFactory.pinAnchor,
+          zIndexInt: 3,
+        ),
+    };
+  }
+
+  /// Cadre départ + destination pour la course en cours.
   void _drawRideRoute() {
     final pickup = _pickupLatLng;
     final dest = _destinationLatLng;
     if (pickup == null || dest == null || !mounted) return;
+    _route.clear();
     _fetchRoute(pickup, dest);
-    if (_isMapReady && _mapController != null) {
-      const pad = 0.003;
-      final bounds = LatLngBounds(
-        southwest: LatLng(
-          math.min(pickup.latitude, dest.latitude) - pad,
-          math.min(pickup.longitude, dest.longitude) - pad,
-        ),
-        northeast: LatLng(
-          math.max(pickup.latitude, dest.latitude) + pad,
-          math.max(pickup.longitude, dest.longitude) + pad,
-        ),
-      );
-      _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+    if (_isMapReady) {
+      MapCamera.fitBounds(_follow.controller, [pickup, dest], padding: 80);
     }
   }
-
-  Future<BitmapDescriptor> _buildCarIcon() async {
-    const double dp = 60.0, px = 3.0, size = dp * px;
-    final rec = ui.PictureRecorder();
-    final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
-    final cx = size / 2, cy = size / 2;
-    final r = size * 0.44;
-
-    // Soft drop shadow
-    canvas.drawCircle(
-      Offset(cx, cy + 5),
-      r,
-      Paint()
-        ..color = Colors.black.withOpacity(0.28)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
-    );
-
-    // Orange brand disc
-    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = const Color(0xFFF97316));
-
-    // Subtle highlight ring
-    canvas.drawCircle(
-      Offset(cx, cy),
-      r,
-      Paint()
-        ..color = Colors.white.withOpacity(0.18)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = px * 2.0,
-    );
-
-    // ── Car body ─────────────────────────────────────────────────────────
-    final bodyW = size * 0.38, bodyH = size * 0.58;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy), width: bodyW, height: bodyH),
-        Radius.circular(bodyW * 0.30),
-      ),
-      Paint()..color = Colors.white,
-    );
-
-    // Windshield + rear window — light blue-gray glass
-    final glassW = bodyW * 0.68, glassH = bodyH * 0.20;
-    final glassPaint = Paint()..color = const Color(0xFFB8D4F0).withOpacity(0.90);
-    // Front windshield (top of car)
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy - bodyH * 0.20), width: glassW, height: glassH),
-        Radius.circular(size * 0.03),
-      ),
-      glassPaint,
-    );
-    // Rear window (bottom of car)
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy + bodyH * 0.20), width: glassW, height: glassH * 0.80),
-        Radius.circular(size * 0.03),
-      ),
-      glassPaint,
-    );
-
-    // Headlights strip (front = top)
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy - bodyH * 0.455), width: bodyW * 0.65, height: size * 0.045),
-        Radius.circular(size * 0.02),
-      ),
-      Paint()..color = Colors.white.withOpacity(0.95),
-    );
-
-    // Tail lights strip (rear = bottom) — red
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(cx, cy + bodyH * 0.455), width: bodyW * 0.65, height: size * 0.038),
-        Radius.circular(size * 0.015),
-      ),
-      Paint()..color = const Color(0xFFFF3B3B).withOpacity(0.90),
-    );
-
-    // ── Wheels — circular with rim ────────────────────────────────────────
-    final wheelR = size * 0.076;
-    final xOff = bodyW * 0.62, yOff = bodyH * 0.30;
-    for (final pos in [
-      Offset(cx - xOff, cy - yOff),
-      Offset(cx + xOff, cy - yOff),
-      Offset(cx - xOff, cy + yOff),
-      Offset(cx + xOff, cy + yOff),
-    ]) {
-      canvas.drawCircle(pos, wheelR, Paint()..color = const Color(0xFF1A1A2E));
-      canvas.drawCircle(pos, wheelR * 0.52, Paint()..color = const Color(0xFF4A4A6A));
-      canvas.drawCircle(pos, wheelR * 0.22, Paint()..color = Colors.white.withOpacity(0.55));
-    }
-
-    final pic = rec.endRecording();
-    final img = await pic.toImage(size.toInt(), size.toInt());
-    final data = await img.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(), size: const Size(dp, dp));
-  }
-
-  Future<BitmapDescriptor> _buildPickupIcon() async {
-    const double dp = 44.0, px = 3.0, size = dp * px;
-    final rec = ui.PictureRecorder();
-    final canvas = Canvas(rec, Rect.fromLTWH(0, 0, size, size));
-    final cx = size / 2, cy = size / 2, r = size * 0.38;
-    // Shadow
-    canvas.drawCircle(Offset(cx, cy + 2), r + 4,
-        Paint()..color = Colors.black.withOpacity(0.18)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
-    // Outer ring white
-    canvas.drawCircle(Offset(cx, cy), r + 5, Paint()..color = Colors.white);
-    // Green fill
-    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = const Color(0xFF22C55E));
-    // White inner dot
-    canvas.drawCircle(Offset(cx, cy), r * 0.35, Paint()..color = Colors.white);
-    final pic = rec.endRecording();
-    final img = await pic.toImage(size.toInt(), size.toInt());
-    final data = await img.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List(), size: const Size(dp, dp));
-  }
-
-  // Clean map style — no POI, no transit, beige roads
-  static const String _mapStyle = '''[
-    {"featureType":"poi","stylers":[{"visibility":"off"}]},
-    {"featureType":"transit","stylers":[{"visibility":"off"}]},
-    {"featureType":"administrative","stylers":[{"visibility":"simplified"}]},
-    {"featureType":"road","elementType":"geometry","stylers":[{"color":"#ffffff"}]},
-    {"featureType":"landscape","stylers":[{"color":"#f5f0e8"}]},
-    {"featureType":"water","stylers":[{"color":"#a8d4f5"}]},
-    {"featureType":"road.arterial","elementType":"geometry","stylers":[{"color":"#f5f1eb"}]},
-    {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#e8e0d0"}]}
-  ]''';
 
   // ── Driver position update ───────────────────────────────────────────────────
-  void _onNewDriverPosition(LatLng newPos) {
-    // Start smooth animation from current interpolated position
-    _markerFrom = _smoothDriverPos ?? newPos;
-    _markerTo   = newPos;
-    _markerCtrl.forward(from: 0.0);
+  void _onNewDriverLocation(DriverLocation loc) {
+    final accepted = _driverMarker.update(DriverFix(
+      position: loc.position,
+      heading: loc.heading,
+      speedMps: loc.speed,
+      accuracyM: loc.accuracy,
+      timestamp: loc.updatedAt,
+    ));
+    if (!accepted) return; // position aberrante ou sans mouvement réel
+
+    final newPos = loc.position;
+    final status = ref.read(activeRideProvider).status;
+    final target = _routeTarget(status);
 
     // Follow camera: frame driver + destination (inProgress) or driver + pickup (arriving)
-    if (_followCamera && _isMapReady && _mapController != null) {
-      final status = ref.read(activeRideProvider).status;
-      final target = (status == RideStatus.inProgress && _destinationLatLng != null)
-          ? _destinationLatLng!
-          : (_pickupLatLng ?? newPos);
-      _frameBothPoints2(newPos, target);
+    if (_isMapReady && _follow.isFollowing.value) {
+      MapCamera.fitBounds(
+        _follow.controller,
+        [newPos, if (target != null) target],
+        padding: 100,
+      );
     }
 
-    // Throttle route re-fetch to once every 10 seconds
+    // Throttle route re-fetch to once every 10 seconds (4 s si hors tracé)
+    final minGap = _route.isOffRoute ? 4 : 10;
     final now = DateTime.now();
     if (!_fetchingRoute &&
+        target != null &&
         (_lastRouteFetch == null ||
-            now.difference(_lastRouteFetch!).inSeconds >= 10)) {
-      final status = ref.read(activeRideProvider).status;
-      if (status == RideStatus.inProgress && _destinationLatLng != null) {
-        _fetchRoute(newPos, _destinationLatLng!);
-      } else if (_pickupLatLng != null) {
-        _fetchRoute(newPos, _pickupLatLng!);
-      }
+            now.difference(_lastRouteFetch!).inSeconds >= minGap)) {
+      _fetchRoute(newPos, target);
     }
   }
 
-  void _frameBothPoints(LatLng driverPos) {
+  LatLng? _routeTarget(RideStatus status) =>
+      (status == RideStatus.inProgress && _destinationLatLng != null)
+          ? _destinationLatLng
+          : _pickupLatLng;
+
+  /// Caméra sur le chauffeur (+ départ) au chargement de la carte.
+  void _frameInitial(LatLng driverPos) {
     final pickup = _pickupLatLng;
     if (pickup == null) {
-      _mapController!.animateCamera(
+      _follow.controller?.animateCamera(
           CameraUpdate.newCameraPosition(CameraPosition(target: driverPos, zoom: 16)));
       return;
     }
-    _frameBothPoints2(driverPos, pickup);
-  }
-
-  void _frameBothPoints2(LatLng a, LatLng b) {
-    const pad = 0.002;
-    final bounds = LatLngBounds(
-      southwest: LatLng(
-        math.min(a.latitude,  b.latitude)  - pad,
-        math.min(a.longitude, b.longitude) - pad,
-      ),
-      northeast: LatLng(
-        math.max(a.latitude,  b.latitude)  + pad,
-        math.max(a.longitude, b.longitude) + pad,
-      ),
-    );
-    _mapController!.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
+    MapCamera.fitBounds(_follow.controller, [driverPos, pickup], padding: 100);
   }
 
   Future<void> _fetchRoute(LatLng from, LatLng to) async {
@@ -401,35 +278,45 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     try {
       final result = await RouteService.getRoute(from, to);
       if (!mounted) return;
-      final points = result?.points ?? [from, to];
-      setState(() {
-        _polylines = {
-          // Outline (darker blue)
-          Polyline(
-            polylineId: const PolylineId('driver_route_outline'),
-            points: points,
-            color: const Color(0xFF0D47A1),
-            width: 13,
-            jointType: JointType.round,
-            startCap: Cap.roundCap,
-            endCap: Cap.roundCap,
-          ),
-          // Main route (blue)
-          Polyline(
-            polylineId: const PolylineId('driver_route'),
-            points: points,
-            color: const Color(0xFF1A73E8),
-            width: 9,
-            jointType: JointType.round,
-            startCap: Cap.roundCap,
-            endCap: Cap.roundCap,
-          ),
-        };
-        _lastRouteFetch = DateTime.now();
-      });
+      if (result != null) {
+        _route.setRoute(
+          result.points,
+          durationSeconds: result.durationSeconds.toDouble(),
+          head: _driverMarker.position,
+        );
+      } else {
+        _route.setRoute([from, to], head: _driverMarker.position, animate: false);
+      }
+      _lastRouteFetch = DateTime.now();
+      if (mounted) setState(() {}); // ETA / distance
     } finally {
       _fetchingRoute = false;
     }
+  }
+
+  // ── Boutons carte ────────────────────────────────────────────────────────────
+  void _recenter() {
+    final pos = _driverMarker.position;
+    _follow.isFollowing.value = true;
+    if (pos != null) _frameInitial(pos);
+  }
+
+  void _fitWholeTrip() {
+    final pos = _driverMarker.position;
+    _follow.isFollowing.value = false;
+    MapCamera.fitBounds(
+      _follow.controller,
+      [if (pos != null) pos, if (_pickupLatLng != null) _pickupLatLng!, if (_destinationLatLng != null) _destinationLatLng!],
+      padding: 110,
+    );
+  }
+
+  void _resetNorth() {
+    final cam = _cameraPos;
+    if (cam == null) return;
+    _follow.controller?.animateCamera(CameraUpdate.newCameraPosition(
+      CameraPosition(target: cam.target, zoom: cam.zoom, bearing: 0, tilt: 0),
+    ));
   }
 
   // ── Status helpers ───────────────────────────────────────────────────────────
@@ -437,6 +324,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     switch (s) {
       case RideStatus.accepted:   return _C.primary;
       case RideStatus.arriving:   return _C.amber;
+      case RideStatus.arrived:    return _C.amber;
       case RideStatus.inProgress: return _C.green;
       case RideStatus.completed:  return _C.green;
       case RideStatus.cancelled:  return _C.red;
@@ -448,6 +336,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     switch (s) {
       case RideStatus.accepted:   return 'booking.ride_confirmed'.tr();
       case RideStatus.arriving:   return 'booking.driver_en_route'.tr();
+      case RideStatus.arrived:    return 'booking.driver_arrived'.tr();
       case RideStatus.inProgress: return 'booking.ride_in_progress'.tr();
       case RideStatus.completed:  return 'booking.ride_completed'.tr();
       case RideStatus.cancelled:  return 'booking.ride_cancelled'.tr();
@@ -459,6 +348,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     switch (s) {
       case RideStatus.accepted:   return Icons.check_circle_rounded;
       case RideStatus.arriving:   return Icons.directions_car_rounded;
+      case RideStatus.arrived:    return Icons.place_rounded;
       case RideStatus.inProgress: return Icons.navigation_rounded;
       case RideStatus.completed:  return Icons.flag_rounded;
       case RideStatus.cancelled:  return Icons.cancel_rounded;
@@ -509,10 +399,10 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
 
     // React to driver position changes
     ref.listen<ActiveRideState>(activeRideProvider, (prev, next) {
-      final prevPos = prev?.driverLocation?.position;
-      final nextPos = next.driverLocation?.position;
-      if (nextPos != null && nextPos != prevPos) {
-        _onNewDriverPosition(nextPos);
+      final nextLoc = next.driverLocation;
+      if (nextLoc != null &&
+          nextLoc.updatedAt != prev?.driverLocation?.updatedAt) {
+        _onNewDriverLocation(nextLoc);
       }
 
       // When ride starts (inProgress), draw route pickup → destination
@@ -556,12 +446,12 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
           child: _buildMapHeader(rideState),
         ),
 
-        // Follow-camera toggle
+        // Boussole / itinéraire complet / recentrage
         if (_isMapReady)
           Positioned(
             top: MediaQuery.of(context).padding.top + 90,
             right: 16,
-            child: _buildFollowButton(),
+            child: _buildMapControls(),
           ),
 
         // Stale location warning
@@ -583,67 +473,29 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
 
   Widget _buildGoogleMap(ActiveRideState rideState) {
     final initialTarget = _pickupLatLng!;
-    final markers = <Marker>{};
-
-    // Pickup marker — custom green circle
-    markers.add(Marker(
-      markerId: const MarkerId('pickup'),
-      position: _pickupLatLng!,
-      infoWindow: const InfoWindow(title: 'Votre position'),
-      icon: _pickupIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-      anchor: const Offset(0.5, 0.5),
-      zIndex: 1,
-    ));
-
-    // Driver marker — car icon, flat, rotating
-    final driverPos = _smoothDriverPos;
-    if (driverPos != null) {
-      markers.add(Marker(
-        markerId: const MarkerId('driver'),
-        position: driverPos,
-        icon: _driverIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-        rotation: rideState.driverLocation?.heading ?? 0,
-        flat: true,
-        anchor: const Offset(0.5, 0.5),
-        zIndex: 2,
-      ));
-    }
-
-    // Destination marker — shown when ride is in progress
-    final destLatLng = _destinationLatLng;
-    if (destLatLng != null && rideState.status == RideStatus.inProgress) {
-      markers.add(Marker(
-        markerId: const MarkerId('destination'),
-        position: destLatLng,
-        icon: _destinationIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        anchor: const Offset(0.5, 1.0),
-        infoWindow: InfoWindow(title: widget.destination),
-        zIndex: 3,
-      ));
-    }
-
-    return GoogleMap(
+    return BrandedGoogleMap(
       initialCameraPosition: CameraPosition(target: initialTarget, zoom: 15),
       onMapCreated: (ctrl) {
-        _mapController = ctrl;
+        _follow.attach(ctrl);
         setState(() => _isMapReady = true);
-        // Defer setMapStyle: calling it inside onMapCreated on iOS blocks tile
-        // rendering, showing a blue background instead of map tiles.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          // No custom style: default Google Maps shows roads/network clearly.
+          // La position a pu arriver avant la carte : on la rejoue une fois.
           final driverLoc = ref.read(activeRideProvider).driverLocation;
-          if (driverLoc != null) _frameBothPoints(driverLoc.position);
+          if (driverLoc != null) {
+            if (!_driverMarker.hasPosition) _onNewDriverLocation(driverLoc);
+            _frameInitial(driverLoc.position);
+          }
         });
       },
-      markers: markers,
-      polylines: _polylines,
-      myLocationEnabled: false,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      compassEnabled: false,
-      mapToolbarEnabled: false,
-      buildingsEnabled: false,
+      staticMarkers: _staticMarkers,
+      driverMarker: _driverMarker.marker,
+      routePolylines: _route.polylines,
+      onUserGesture: _follow.onUserGesture,
+      onCameraMove: (pos) {
+        _cameraPos = pos;
+        _cameraBearing.value = pos.bearing;
+      },
       trafficEnabled: true,
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 80,
@@ -687,29 +539,27 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     );
   }
 
-  Widget _buildFollowButton() {
-    return GestureDetector(
-      onTap: () {
-        setState(() => _followCamera = !_followCamera);
-        if (_followCamera) {
-          final pos = _smoothDriverPos;
-          if (pos != null) _frameBothPoints(pos);
-        }
-      },
-      child: Container(
-        width: 44, height: 44,
-        decoration: BoxDecoration(
-          color: _C.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Icon(
-          _followCamera ? Icons.gps_fixed : Icons.gps_not_fixed,
-          color: _followCamera ? _C.primary : _C.gray400,
-          size: 22,
-        ),
+  /// Boutons flottants : boussole, itinéraire complet, recentrage (reprise du suivi).
+  Widget _buildMapControls() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: _follow.isFollowing,
+      builder: (context, following, _) => Column(
+        children: [
+          MapCompassButton(bearing: _cameraBearing, onTap: _resetNorth),
+          const SizedBox(height: 10),
+          MapRoundButton(
+            icon: Icons.route_rounded,
+            onTap: _fitWholeTrip,
+            tooltip: 'Itinéraire complet',
+          ),
+          const SizedBox(height: 10),
+          MapRoundButton(
+            icon: following ? Icons.gps_fixed : Icons.gps_not_fixed,
+            active: following,
+            onTap: _recenter,
+            tooltip: 'Suivre le chauffeur',
+          ),
+        ],
       ),
     );
   }
@@ -738,7 +588,8 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
 
   Widget _buildBottomSheet(ActiveRideState rideState) {
     final isCancelable = rideState.status == RideStatus.accepted ||
-        rideState.status == RideStatus.arriving;
+        rideState.status == RideStatus.arriving ||
+        rideState.status == RideStatus.arrived;
     final isFinished = rideState.status == RideStatus.completed ||
         rideState.status == RideStatus.cancelled;
 
@@ -803,9 +654,11 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     final steps = [
       (label: 'Confirmé',  done: true),
       (label: 'En route',  done: rideState.status == RideStatus.arriving ||
+          rideState.status == RideStatus.arrived ||
           rideState.status == RideStatus.inProgress ||
           rideState.status == RideStatus.completed),
-      (label: 'Arrivé',   done: rideState.status == RideStatus.inProgress ||
+      (label: 'Arrivé',   done: rideState.status == RideStatus.arrived ||
+          rideState.status == RideStatus.inProgress ||
           rideState.status == RideStatus.completed),
       (label: 'Terminé',  done: rideState.status == RideStatus.completed),
     ];
@@ -860,10 +713,19 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     );
   }
 
-  /// ETA du livreur jusqu'au point de pickup
+  /// ETA / distance du livreur jusqu'au point de pickup.
+  /// Utilise l'itinéraire routier (OSRM) réduit au fil de la progression ;
+  /// repli sur la distance à vol d'oiseau tant qu'aucun tracé n'est chargé.
   Widget _buildEtaRow(DriverLocation driverLoc) {
-    final distM = _haversineMeters(driverLoc.position, _pickupLatLng!);
-    final etaMin = (distM / 500).ceil(); // vitesse moyenne 30 km/h ≈ 500 m/min
+    final double distM;
+    final int etaMin;
+    if (_route.hasRoute && _route.remainingSeconds != null) {
+      distM = _route.remainingMeters;
+      etaMin = math.max(1, (_route.remainingSeconds! / 60).ceil());
+    } else {
+      distM = _haversineMeters(driverLoc.position, _pickupLatLng!);
+      etaMin = (distM / 500).ceil(); // vitesse moyenne 30 km/h ≈ 500 m/min
+    }
     final distLabel = distM < 1000
         ? '${distM.round()} m'
         : '${(distM / 1000).toStringAsFixed(1)} km';
@@ -915,7 +777,8 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
 
   Widget _buildCardLayout(ActiveRideState rideState) {
     final isCancelable = rideState.status == RideStatus.accepted ||
-        rideState.status == RideStatus.arriving;
+        rideState.status == RideStatus.arriving ||
+        rideState.status == RideStatus.arrived;
     final isFinished = rideState.status == RideStatus.completed ||
         rideState.status == RideStatus.cancelled;
 
@@ -1273,6 +1136,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     final steps = [
       ('booking.ride_confirmed'.tr(),        RideStatus.accepted),
       ('booking.driver_en_route_short'.tr(), RideStatus.arriving),
+      ('booking.driver_arrived'.tr(),        RideStatus.arrived),
       ('booking.ride_in_progress'.tr(),      RideStatus.inProgress),
       ('booking.ride_completed'.tr(),        RideStatus.completed),
     ];

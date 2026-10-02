@@ -145,31 +145,34 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: _orange))
-          : _error != null
-              ? _buildError()
-              : RefreshIndicator(
-                  color: _orange,
-                  onRefresh: _load,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildMonthSelector(),
-                        const SizedBox(height: 16),
-                        _buildRevenueCard(),
-                        const SizedBox(height: 16),
-                        _buildCommissionCard(),
-                        const SizedBox(height: 16),
-                        _buildBreakdownSection(),
-                        const SizedBox(height: 24),
-                      ],
+      body: SafeArea(
+        top: false,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator(color: _orange))
+            : _error != null
+                ? _buildError()
+                : RefreshIndicator(
+                    color: _orange,
+                    onRefresh: _load,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildMonthSelector(),
+                          const SizedBox(height: 16),
+                          _buildRevenueCard(),
+                          const SizedBox(height: 16),
+                          _buildCommissionCard(),
+                          const SizedBox(height: 16),
+                          _buildBreakdownSection(),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+      ),
     );
   }
 

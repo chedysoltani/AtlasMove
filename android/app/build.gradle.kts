@@ -24,6 +24,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Requis par flutter_local_notifications (notifications "nouvelle course" / "appel entrant")
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -50,7 +52,7 @@ android {
     defaultConfig {
         applicationId = "com.atlasmove.app"
         minSdk = flutter.minSdkVersion
-        targetSdk = 35
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -77,4 +79,6 @@ flutter {
 
 dependencies {
     implementation("com.google.android.material:material:1.12.0")
+    // Requis par flutter_local_notifications (core library desugaring)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

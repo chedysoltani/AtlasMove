@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/user.dart';
@@ -97,6 +98,8 @@ class _SignupScreenState extends State<SignupScreen>
         referralCode: refCode.isNotEmpty ? refCode : null,
       );
       final response = await AuthService.registerClient(request);
+      // Inscription réussie : le système propose d'enregistrer le mot de passe
+      TextInput.finishAutofillContext(shouldSave: true);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('auth.welcome_user'.tr(namedArgs: {'name': response.user.fullName})),
@@ -143,6 +146,7 @@ class _SignupScreenState extends State<SignupScreen>
                 padding: const EdgeInsets.fromLTRB(22, 24, 22, 30),
                 child: Form(
                   key: _formKey,
+                  child: AutofillGroup(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -152,6 +156,7 @@ class _SignupScreenState extends State<SignupScreen>
                           ctrl: _firstNameCtrl, hint: 'auth.first_name'.tr(),
                           icon: Icons.person_rounded,
                           action: TextInputAction.next,
+                          autofillHints: const [AutofillHints.givenName],
                           validator: (v) => (v == null || v.isEmpty)
                               ? 'auth.field_required'.tr() : null,
                         )),
@@ -160,6 +165,7 @@ class _SignupScreenState extends State<SignupScreen>
                           ctrl: _lastNameCtrl, hint: 'auth.last_name'.tr(),
                           icon: Icons.person_outline_rounded,
                           action: TextInputAction.next,
+                          autofillHints: const [AutofillHints.familyName],
                           validator: (v) => (v == null || v.isEmpty)
                               ? 'auth.field_required'.tr() : null,
                         )),
@@ -170,6 +176,7 @@ class _SignupScreenState extends State<SignupScreen>
                         icon: Icons.mail_outline_rounded,
                         keyboard: TextInputType.emailAddress,
                         action: TextInputAction.next,
+                        autofillHints: const [AutofillHints.username, AutofillHints.email],
                         validator: (v) {
                           if (v == null || v.isEmpty) return 'auth.field_required'.tr();
                           if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
@@ -185,6 +192,7 @@ class _SignupScreenState extends State<SignupScreen>
                         icon: Icons.lock_outline_rounded,
                         obscure: _obscurePassword,
                         action: TextInputAction.next,
+                        autofillHints: const [AutofillHints.newPassword],
                         suffix: _eyeIcon(_obscurePassword,
                             () => setState(() => _obscurePassword = !_obscurePassword)),
                         validator: (v) {
@@ -200,6 +208,7 @@ class _SignupScreenState extends State<SignupScreen>
                         icon: Icons.lock_outline_rounded,
                         obscure: _obscureConfirm,
                         action: TextInputAction.next,
+                        autofillHints: const [AutofillHints.newPassword],
                         suffix: _eyeIcon(_obscureConfirm,
                             () => setState(() => _obscureConfirm = !_obscureConfirm)),
                         validator: (v) {
@@ -229,6 +238,7 @@ class _SignupScreenState extends State<SignupScreen>
                       const SizedBox(height: 16),
                       _a(7, _buildLoginRow()),
                     ],
+                  ),
                   ),
                 ),
               ),
@@ -348,6 +358,7 @@ class _SignupScreenState extends State<SignupScreen>
     TextInputAction action = TextInputAction.next,
     bool obscure = false,
     Widget? suffix,
+    Iterable<String>? autofillHints,
     String? Function(String?)? validator,
   }) {
     return Container(
@@ -362,6 +373,9 @@ class _SignupScreenState extends State<SignupScreen>
         keyboardType: keyboard,
         textInputAction: action,
         obscureText: obscure,
+        autofillHints: autofillHints,
+        autocorrect: !obscure && autofillHints == null,
+        enableSuggestions: !obscure && autofillHints == null,
         validator: validator,
         style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: _dark),
         decoration: InputDecoration(
@@ -458,6 +472,7 @@ class _SignupScreenState extends State<SignupScreen>
         controller: _phoneCtrl,
         keyboardType: TextInputType.phone,
         textInputAction: TextInputAction.next,
+        autofillHints: const [AutofillHints.telephoneNumberNational],
         style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500,
             color: _dark),
         validator: (v) => (v == null || v.trim().isEmpty)

@@ -48,7 +48,9 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
           ),
         ],
       ),
-      body: AnimatedBuilder(
+      body: SafeArea(
+        top: false,
+        child: AnimatedBuilder(
         animation: _subService,
         builder: (context, _) {
           if (_subService.isLoading && _subService.status == null) {
@@ -99,6 +101,7 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
             ),
           );
         },
+      ),
       ),
     );
   }

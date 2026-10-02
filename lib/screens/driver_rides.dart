@@ -221,7 +221,9 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
           ),
         ],
       ),
-      body: ValueListenableBuilder<bool>(
+      body: SafeArea(
+        top: false,
+        child: ValueListenableBuilder<bool>(
         valueListenable: DriverService.isOnlineNotifier,
         builder: (_, isOnline, __) {
           if (!isOnline) return _buildOfflineScreen();
@@ -274,9 +276,10 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
           );
         },
       ),
+      ),
     );
   }
-  
+
   Widget _buildOfflineScreen() {
     return Center(
       child: Padding(

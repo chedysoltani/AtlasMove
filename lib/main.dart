@@ -7,6 +7,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'providers/locale_provider.dart';
 import 'services/location_tracking_service.dart';
+import 'services/driver_service.dart';
+import 'services/rendezvous_alert_service.dart';
 
 import 'utils/app_theme.dart';
 import 'screens/landing_screen.dart';
@@ -54,7 +56,14 @@ import 'screens/reset_password_verify_screen.dart';
 import 'screens/support_screen.dart';
 import 'screens/legal_consent_screen.dart';
 import 'services/location_foreground_service.dart';
+import 'services/push_notification_service.dart';
 import 'core/network/http_client.dart';
+import 'core/auth/auth_session.dart';
+import 'core/storage/token_storage.dart';
+import 'models/new_ride_offer.dart';
+import 'services/ride_offer_queue.dart';
+import 'widgets/ride_offers_panel.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -65,12 +74,32 @@ void main() async {
   // Initialiser Firebase (requis pour FCM)
   try {
     await Firebase.initializeApp();
+    // Doit être enregistré tôt, avant runApp — tourne dans un isolate séparé
+    // quand l'app est en arrière-plan ou tuée (voir push_notification_service.dart).
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   } catch (e) {
     debugPrint('Firebase init error: $e');
   }
 
+  // Canaux Android + tap sur une notification "nouvelle course" / "appel entrant"
+  await PushNotificationService.initialize();
+  FirebaseMessaging.onMessage.listen(PushNotificationService.handleForegroundMessage);
+
   // Pré-configurer le foreground service (sans le démarrer)
   LocationForegroundService.init();
+
+  // Retour au premier plan : refresh du token si besoin + reconnexion des sockets
+  AuthSession.instance.init();
+
+  // Alerte "nouveau rendez-vous" (chauffeur) : sondage démarré/arrêté avec le
+  // statut en ligne — sans effet côté client, `isOnlineNotifier` n'y bouge jamais.
+  DriverService.isOnlineNotifier.addListener(() {
+    if (DriverService.isOnline) {
+      RendezvousAlertService.instance.start();
+    } else {
+      RendezvousAlertService.instance.stop();
+    }
+  });
 
   // Initialiser les données de localisation française pour DateFormat
   await initializeDateFormatting('fr', null);
@@ -101,14 +130,23 @@ void main() async {
     NotificationService().disconnect();
     CallService().disconnect();
     LocationTrackingService().stopLocationTracking();
-    navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+    navigatorKey.currentState?.pushNamedAndRemoveUntil(
+      '/login',
+      (route) => false,
+      arguments: {'sessionExpired': true},
+    );
     Future.delayed(const Duration(seconds: 3), () => _sessionExpiredNavigating = false);
   };
 
   // Token rafraîchi → reconnecter les sockets avec le nouveau token
+  // Le backend coupe lui-même la socket (auth_error) avant l'expiration ; les
+  // reconnexions relisent un token frais. On ne force donc PLUS de reconnexion
+  // à chaque refresh (elle pouvait couper la signalisation d'un appel en cours) :
+  // on s'assure seulement que les sockets existent.
   HttpClient.onTokenRefreshed = () {
-    NotificationService().reconnect();
-    CallService().reconnect();
+    NotificationService().connectWebSocket();
+    CallService().connectSocket();
+    AuthSession.instance.onTokensChanged();
   };
 
   // Configurer la réception globale des notifications in-app
@@ -130,6 +168,24 @@ void main() async {
         ),
       );
     }
+  };
+
+  // Nouvelle course proposée (socket, app au premier plan) — chauffeurs uniquement.
+  // Ajoutée à la file globale : affichée comme une carte parmi d'autres dans
+  // RideOffersPanel (voir MaterialApp.builder ci-dessous), jamais en plein
+  // écran — plusieurs offres simultanées restent toutes visibles et comparables.
+  // Le push FCM data-only sert de filet de sécurité quand le socket n'est pas là
+  // (voir push_notification_service.dart).
+  NotificationService.onNewRideOffer = (data) async {
+    if (await TokenStorage.getUserRole() != 'delivery') return;
+    RideOfferQueue.instance.add(NewRideOffer.fromJson(data));
+  };
+
+  // Offre retirée (prise par un autre chauffeur, annulée, expirée) : on enlève
+  // juste sa carte, les autres offres en attente restent affichées.
+  NotificationService.onRideOfferWithdrawn = (data) {
+    final tripId = (data['tripId'] ?? data['trip_id'])?.toString();
+    if (tripId != null) RideOfferQueue.instance.remove(tripId);
   };
 
   // Connecter le socket d'appel dès le démarrage (réessaie si pas encore authentifié)
@@ -264,6 +320,14 @@ class AtlasMoveApp extends StatelessWidget {
           localizationsDelegates: context.localizationDelegates,
           supportedLocales: context.supportedLocales,
           locale: context.locale,
+          // Panneau des offres de course, flottant par-dessus l'écran en cours
+          // (dashboard, liste des courses...) quelle que soit la page active.
+          builder: (context, child) => Stack(
+            children: [
+              if (child != null) child,
+              const RideOffersPanel(),
+            ],
+          ),
           initialRoute: '/',
           routes: {
             '/': (context) => const SplashScreen(),

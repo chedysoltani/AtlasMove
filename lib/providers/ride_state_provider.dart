@@ -6,16 +6,20 @@ import '../services/trip_service.dart';
 
 // ─── Data models ─────────────────────────────────────────────────────────────
 
-enum RideStatus { accepted, arriving, inProgress, completed, cancelled, unknown }
+enum RideStatus { accepted, arriving, arrived, inProgress, completed, cancelled, unknown }
 
 class DriverLocation {
   final LatLng position;
   final double? heading;
+  final double? speed; // m/s
+  final double? accuracy; // m
   final DateTime updatedAt;
 
   const DriverLocation({
     required this.position,
     this.heading,
+    this.speed,
+    this.accuracy,
     required this.updatedAt,
   });
 
@@ -93,9 +97,10 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
         ? Map<String, dynamic>.from(data['data'] as Map)
         : data;
 
-    // Accept camelCase or snake_case tripId; if absent, accept unconditionally
-    final eventTripId = p['tripId'] as String? ?? p['trip_id'] as String?;
-    if (eventTripId != null && eventTripId != state.tripId) return;
+    // Le backend inclut TOUJOURS tripId : un évènement sans tripId, ou pour une
+    // autre course, n'est jamais affiché (le client ne doit voir que SON chauffeur).
+    final eventTripId = (p['tripId'] ?? p['trip_id'])?.toString();
+    if (eventTripId == null || eventTripId != state.tripId) return;
 
     // Accept both latitude/longitude and lat/lng
     final lat = ((p['latitude'] ?? p['lat']) as num?)?.toDouble();
@@ -108,6 +113,8 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
       driverLocation: DriverLocation(
         position: LatLng(lat, lng),
         heading: (p['heading'] as num?)?.toDouble(),
+        speed: (p['speed'] as num?)?.toDouble(),
+        accuracy: (p['accuracy'] as num?)?.toDouble(),
         updatedAt: DateTime.now(),
       ),
     );
@@ -141,14 +148,23 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
     if (wsUp && locationFresh) return;
 
     try {
-      // Fetch driver location
-      final loc = await TripService.getDriverLocation(tripId);
+      // Fetch driver location. 404 driver_location_unavailable → null : on continue
+      // de sonder. 409 trip_not_active → la course est finie : on ARRÊTE de sonder.
+      var tripOver = false;
+      DriverLocationDto? loc;
+      try {
+        loc = await TripService.getDriverLocation(tripId);
+      } on TripNotActiveException {
+        tripOver = true;
+      }
       if (loc != null && mounted) {
         _resetStallTimer();
         state = state.copyWith(
           driverLocation: DriverLocation(
             position: LatLng(loc.latitude, loc.longitude),
             heading: loc.heading,
+            speed: loc.speed,
+            accuracy: loc.accuracy,
             updatedAt: DateTime.now(),
           ),
         );
@@ -162,6 +178,8 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
           state = state.copyWith(status: newStatus);
         }
       }
+
+      if (tripOver) _cancelTimers(); // statut final lu ci-dessus, plus rien à sonder
     } catch (_) {}
   }
 
@@ -186,6 +204,7 @@ class RideStateNotifier extends StateNotifier<ActiveRideState> {
       case 'accepted':    return RideStatus.accepted;
       case 'arriving':
       case 'livreur_en_route': return RideStatus.arriving;
+      case 'arrived':     return RideStatus.arrived;
       case 'in_progress': return RideStatus.inProgress;
       case 'completed':   return RideStatus.completed;
       case 'cancelled':

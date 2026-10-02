@@ -22,9 +22,13 @@ import '../models/service_models.dart';
 import '../core/network/http_client.dart';
 import '../core/storage/token_storage.dart';
 import '../widgets/notification_sheet.dart';
+import '../widgets/location_always_permission_sheet.dart';
 import 'driver_active_ride.dart';
-
-// Style de carte propre style inDrive — routes visibles, design épuré
+import '../map/driver_marker_controller.dart';
+import '../map/map_camera.dart';
+import '../map/map_markers.dart';
+import '../map/map_widgets.dart';
+import '../core/utils/permission_gate.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -39,7 +43,11 @@ class _DriverDashboardState extends State<DriverDashboard>
   GoogleMapController? _mapController;
   LatLng? _currentPosition;
   StreamSubscription<Position>? _positionSub;
-  final Set<Marker> _markers = {};
+  // UN SEUL marqueur chauffeur (id constant `driver_marker`), animé.
+  late final DriverMarkerController _driverMarker;
+  final FollowCamera _follow = FollowCamera();
+  double _dpr = 1.0;
+  bool _iconRequested = false;
 
   // State
   bool _isTogglingOnline = false;
@@ -66,6 +74,7 @@ class _DriverDashboardState extends State<DriverDashboard>
   @override
   void initState() {
     super.initState();
+    _driverMarker = DriverMarkerController(vsync: this);
     _onlineAnimController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -73,8 +82,12 @@ class _DriverDashboardState extends State<DriverDashboard>
 
     DriverService.isOnlineNotifier.addListener(_onAvailabilityChanged);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Permission "pendant l'utilisation" d'abord (dans la file d'attente de
+      // permissions) — l'explication "toujours" arrive ensuite, une fois cette
+      // première demande retombée, pour ne pas faire chevaucher deux dialogues.
+      await _initLocation();
+      if (mounted) unawaited(LocationAlwaysPermissionSheet.promptIfNeeded(context));
       _initializeLocationTracking();
       _resumeActiveRideIfAny();
       _subService.fetchStatus();
@@ -100,9 +113,43 @@ class _DriverDashboardState extends State<DriverDashboard>
     DriverService.isOnlineNotifier.removeListener(_onAvailabilityChanged);
     _mapController?.dispose();
     _positionSub?.cancel();
+    _driverMarker.dispose();
+    _follow.dispose();
     _onlineAnimController.dispose();
     super.dispose();
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_iconRequested) {
+      _iconRequested = true;
+      _dpr = MediaQuery.devicePixelRatioOf(context);
+      _loadDriverIcon();
+    }
+  }
+
+  /// Icone selon la categorie du chauffeur (voiture par defaut) ; rendue une
+  /// seule fois par densite grace au cache de la fabrique.
+  Future<void> _loadDriverIcon() async {
+    try {
+      final icon = await MapMarkerFactory.instance
+          .vehicle(VehicleCategory.fromLabel(_driverTransportType), _dpr);
+      if (mounted) _driverMarker.setIcon(icon);
+    } catch (e) {
+      debugPrint('DriverDashboard: rendu de icone impossible: $e');
+      if (mounted) _driverMarker.setIcon(fallbackDriverIcon());
+    }
+  }
+
+  /// Envoie une position GPS au marqueur anime (filtrage anti-aberrations inclus).
+  bool _feedDriverMarker(Position pos) => _driverMarker.update(DriverFix(
+        position: LatLng(pos.latitude, pos.longitude),
+        heading: pos.heading,
+        speedMps: pos.speed > 0 ? pos.speed : null,
+        accuracyM: pos.accuracy,
+        timestamp: pos.timestamp,
+      ));
 
   void _onAvailabilityChanged() {
     if (mounted) setState(() {});
@@ -114,7 +161,7 @@ class _DriverDashboardState extends State<DriverDashboard>
 
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await PermissionGate.run(Geolocator.requestPermission, onTimeout: LocationPermission.denied);
       if (permission == LocationPermission.denied) return;
     }
 
@@ -122,11 +169,8 @@ class _DriverDashboardState extends State<DriverDashboard>
     final last = await Geolocator.getLastKnownPosition();
     if (last != null && mounted) {
       final quick = LatLng(last.latitude, last.longitude);
-      setState(() {
-        _currentPosition = quick;
-        _markers.clear();
-        _markers.add(_buildDriverMarker(quick));
-      });
+      _feedDriverMarker(last);
+      setState(() => _currentPosition = quick);
       _mapController?.animateCamera(
         CameraUpdate.newCameraPosition(CameraPosition(target: quick, zoom: 15.5)),
       );
@@ -140,11 +184,8 @@ class _DriverDashboardState extends State<DriverDashboard>
       );
       final latLng = LatLng(position.latitude, position.longitude);
       if (!mounted) return;
-      setState(() {
-        _currentPosition = latLng;
-        _markers.clear();
-        _markers.add(_buildDriverMarker(latLng));
-      });
+      _feedDriverMarker(position);
+      setState(() => _currentPosition = latLng);
       _mapController?.animateCamera(
         CameraUpdate.newCameraPosition(CameraPosition(target: latLng, zoom: 15.5)),
       );
@@ -152,33 +193,28 @@ class _DriverDashboardState extends State<DriverDashboard>
       // GPS timeout or unavailable — keep last known position if available
     }
 
+    // Jamais deux abonnements GPS en parallele
+    await _positionSub?.cancel();
+    if (!mounted) return;
     _positionSub = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 10,
       ),
     ).listen((pos) {
+      // Positions aberrantes (precision faible, sauts) ignorees par le controleur
+      if (!_feedDriverMarker(pos)) return;
       final updated = LatLng(pos.latitude, pos.longitude);
-      setState(() {
-        _currentPosition = updated;
-        _markers.removeWhere((m) => m.markerId.value == 'driver');
-        _markers.add(_buildDriverMarker(updated));
-      });
+      _currentPosition = updated; // pas de setState : seule la carte bouge
       if (_isOnline) {
-        _mapController?.animateCamera(CameraUpdate.newLatLng(updated));
+        _follow.follow(CameraUpdate.newLatLng(updated));
       }
     });
   }
 
-  Marker _buildDriverMarker(LatLng position) {
-    return Marker(
-      markerId: const MarkerId('driver'),
-      position: position,
-      icon: BitmapDescriptor.defaultMarkerWithHue(
-        _isOnline ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueOrange,
-      ),
-      anchor: const Offset(0.5, 0.5),
-    );
+  /// Chauffeur en ligne = marqueur plein ; hors ligne = attenue.
+  void _syncMarkerOnlineState() {
+    _driverMarker.alpha = _isOnline ? 1.0 : 0.55;
   }
 
   Future<void> _initializeLocationTracking() async {
@@ -222,13 +258,7 @@ class _DriverDashboardState extends State<DriverDashboard>
     setState(() => _isTogglingOnline = true);
     try {
       await DriverService.setAvailability(newStatus);
-      // Rebuild map marker with new color
-      if (_currentPosition != null && mounted) {
-        setState(() {
-          _markers.removeWhere((m) => m.markerId.value == 'driver');
-          _markers.add(_buildDriverMarker(_currentPosition!));
-        });
-      }
+      if (mounted) _syncMarkerOnlineState();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -263,12 +293,12 @@ class _DriverDashboardState extends State<DriverDashboard>
   }
 
   void _centerOnMe() {
-    if (_currentPosition != null) {
-      _mapController?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(target: _currentPosition!, zoom: 15.5),
-        ),
-      );
+    final pos = _driverMarker.position ?? _currentPosition;
+    if (pos != null) {
+      // Reactive aussi le suivi automatique suspendu par un geste sur la carte
+      _follow.recenter(CameraUpdate.newCameraPosition(
+        CameraPosition(target: pos, zoom: 15.5),
+      ));
     }
   }
 
@@ -334,18 +364,16 @@ class _DriverDashboardState extends State<DriverDashboard>
   // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildMap() {
-    return GoogleMap(
+    return BrandedGoogleMap(
       initialCameraPosition: CameraPosition(
         target: _currentPosition ?? const LatLng(36.8065, 10.1815),
         zoom: 15.5,
       ),
       onMapCreated: (controller) {
+        _follow.attach(controller);
         setState(() => _mapController = controller);
-        // Defer setMapStyle: calling it inside onMapCreated on iOS blocks tile
-        // rendering, showing a blue background instead of map tiles.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          // No custom style: default Google Maps shows roads/streets clearly.
           if (_currentPosition != null) {
             controller.animateCamera(
               CameraUpdate.newCameraPosition(
@@ -355,12 +383,8 @@ class _DriverDashboardState extends State<DriverDashboard>
           }
         });
       },
-      markers: _markers,
-      myLocationEnabled: false,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      mapToolbarEnabled: false,
-      compassEnabled: false,
+      driverMarker: _driverMarker.marker,
+      onUserGesture: _follow.onUserGesture,
       tiltGesturesEnabled: false,
     );
   }
@@ -528,7 +552,9 @@ class _DriverDashboardState extends State<DriverDashboard>
           ),
         ],
       ),
-      child: Column(
+      child: SafeArea(
+        top: false,
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Drag handle
@@ -688,6 +714,7 @@ class _DriverDashboardState extends State<DriverDashboard>
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -960,6 +987,7 @@ class _DriverDashboardState extends State<DriverDashboard>
       final assignment = await ServiceApi.getCurrentAssignment(token: token);
       if (mounted && assignment != null) {
         setState(() => _driverTransportType = assignment.transportType);
+        _loadDriverIcon(); // icone voiture / moto / camion selon la categorie
       }
     } catch (_) {}
   }
@@ -1025,22 +1053,21 @@ class _DriverDashboardState extends State<DriverDashboard>
               Navigator.pop(context);
               Navigator.pushNamed(context, '/driver_profile');
             }),
-            if (_isTaxiDriver)
-              _buildMenuTile(Icons.card_membership_rounded, 'driver.subscription_menu'.tr(),
-                  'driver.subscription_subtitle'.tr(), () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/driver_subscription');
-              })
-            else
+            // "Mon Abonnement" et "Programme Privilège" ont déménagé dans la
+            // barre de navigation du bas — on ne les duplique plus ici.
+            // Exception : le rappel "Commission 10%" reste ici pour les
+            // chauffeurs non-taxi, qui n'ont pas d'abonnement à proprement
+            // parler (paiement par commission, pas par plan).
+            if (!_isTaxiDriver)
               _buildMenuTile(Icons.percent_rounded, 'Commission 10%',
                   'Payable chaque mois — compte désactivé sinon', () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, '/driver_earnings');
               }),
-            _buildMenuTile(Icons.star_rounded, 'driver.offers_menu'.tr(),
-                'driver.offers_subtitle'.tr(), () {
+            _buildMenuTile(Icons.work_outline_rounded, 'driver.services_menu'.tr(),
+                'driver.services_subtitle'.tr(), () {
               Navigator.pop(context);
-              Navigator.pushNamed(context, '/driver_offer');
+              Navigator.pushNamed(context, '/services_catalogue');
             }),
             _buildMenuTile(Icons.my_location_rounded, 'driver.refresh_location'.tr(),
                 'driver.refresh_location_subtitle'.tr(), () {
@@ -1121,9 +1148,9 @@ class _DriverDashboardState extends State<DriverDashboard>
 
   Future<void> _refreshLocation() async {
     try {
-      final token = Provider.of<AuthProvider>(context, listen: false).token;
-      if (token == null || token.isEmpty) return;
-      await _locationTrackingService.sendCurrentLocation(token);
+      // L'AuthProvider est vide après un démarrage à froid : la session vit dans le stockage sécurisé
+      if (!await TokenStorage.isAuthenticated()) return;
+      await _locationTrackingService.sendCurrentLocation();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

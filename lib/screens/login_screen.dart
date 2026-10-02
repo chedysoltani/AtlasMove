@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart' as provider_pkg;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/user.dart';
 import '../providers/auth_provider.dart';
@@ -10,6 +11,8 @@ import '../services/auth_service.dart';
 import '../models/responses/auth_response.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/network/http_client.dart';
+import '../core/storage/token_storage.dart';
+import '../core/utils/permission_gate.dart';
 import '../utils/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -34,6 +37,10 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscurePassword = true;
   bool _isLoading = false;
 
+  // « Se souvenir de moi » : session persistante + identifiant pré-rempli.
+  // Coché par défaut (comportement historique : l'app garde la session).
+  bool _rememberMe = true;
+
   // ── Animations ────────────────────────────────────────────────────────────
   late final AnimationController _heroCtrl;
   late final List<AnimationController> _itemCtrls;
@@ -57,6 +64,51 @@ class _LoginScreenState extends State<LoginScreen>
       });
       return c;
     });
+
+    _loadRememberedIdentifier();
+    // Arrivée ici après une session refusée par le serveur : message clair
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (mounted && args is Map && args['sessionExpired'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('auth.session_expired'.tr()),
+          backgroundColor: AppTheme.errorColor,
+          duration: const Duration(seconds: 5),
+        ));
+      }
+    });
+  }
+
+  /// Pré-remplit l'identifiant (jamais le mot de passe — c'est le rôle du
+  /// gestionnaire de mots de passe du téléphone via l'autofill).
+  Future<void> _loadRememberedIdentifier() async {
+    final remember = await TokenStorage.getRememberMe();
+    final identifier = remember ? await TokenStorage.getSavedIdentifier() : null;
+    if (!mounted) return;
+    setState(() {
+      _rememberMe = remember;
+      if (identifier != null && identifier.isNotEmpty && _emailCtrl.text.isEmpty) {
+        _emailCtrl.text = identifier;
+      }
+    });
+  }
+
+  static Future<void> _primeLocationPermission() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        await PermissionGate.run(Geolocator.requestPermission,
+            onTimeout: LocationPermission.denied);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistRememberChoice() async {
+    if (_rememberMe) {
+      await TokenStorage.saveSavedIdentifier(_emailCtrl.text.trim());
+    } else {
+      await TokenStorage.clearSavedIdentifier();
+    }
   }
 
   @override
@@ -89,10 +141,17 @@ class _LoginScreenState extends State<LoginScreen>
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
+      // Avant l'appel : le choix part au backend (en-tête X-Remember-Me) pour
+      // qu'il adapte la durée de vie du refresh token.
+      await TokenStorage.saveRememberMe(_rememberMe);
       final response = await AuthService.login(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
       );
+      // Identifiants acceptés (même si un OTP suit) : on retient l'identifiant
+      // et on déclenche « Enregistrer le mot de passe » du système.
+      await _persistRememberChoice();
+      TextInput.finishAutofillContext(shouldSave: true);
       if (response.requiresOtp) {
         if (mounted) {
           Navigator.pushNamed(context, '/otp_verification', arguments: {
@@ -106,15 +165,11 @@ class _LoginScreenState extends State<LoginScreen>
               provider_pkg.Provider.of<AuthProvider>(context, listen: false);
           authProvider.setUser(response.user);
           authProvider.setToken(response.token);
-          await _saveTokenToPreferences(response.token);
 
-          // Demander la permission localisation immédiatement après login
-          try {
-            final locPerm = await Geolocator.checkPermission();
-            if (locPerm == LocationPermission.denied) {
-              await Geolocator.requestPermission();
-            }
-          } catch (_) {}
+          // Permission localisation : demandée EN ARRIÈRE-PLAN, à la suite de celle des
+          // notifications (file d'attente). L'attendre ici bloquait le login sur le
+          // spinner quand les deux demandes se percutaient (Android n'en tolère qu'une).
+          unawaited(_primeLocationPermission());
 
           if (!mounted) return;
           if (response.user.role == UserRole.client) {
@@ -153,13 +208,6 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  Future<void> _saveTokenToPreferences(String token) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('access_token', token);
-    } catch (_) {}
-  }
-
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -189,6 +237,7 @@ class _LoginScreenState extends State<LoginScreen>
                 padding: const EdgeInsets.fromLTRB(22, 24, 22, 24),
                 child: Form(
                   key: _formKey,
+                  child: AutofillGroup(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -198,12 +247,13 @@ class _LoginScreenState extends State<LoginScreen>
                       const SizedBox(height: 12),
                       _animated(2, _buildPasswordField()),
                       const SizedBox(height: 10),
-                      _animated(2, _buildForgotPassword()),
+                      _animated(2, _buildRememberAndForgot()),
                       const SizedBox(height: 18),
                       _animated(3, _buildLoginButton()),
                       const SizedBox(height: 16),
                       _animated(4, _buildSignupRow()),
                     ],
+                  ),
                   ),
                 ),
               ),
@@ -462,6 +512,7 @@ class _LoginScreenState extends State<LoginScreen>
       icon: Icons.mail_outline_rounded,
       keyboardType: TextInputType.emailAddress,
       action: TextInputAction.next,
+      autofillHints: const [AutofillHints.username, AutofillHints.email],
       validator: (v) {
         if (v == null || v.isEmpty) return 'auth.email_required'.tr();
         if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v)) {
@@ -479,6 +530,7 @@ class _LoginScreenState extends State<LoginScreen>
       icon: Icons.lock_outline_rounded,
       obscureText: _obscurePassword,
       action: TextInputAction.done,
+      autofillHints: const [AutofillHints.password],
       onSubmitted: (_) => _handleLogin(),
       suffix: GestureDetector(
         onTap: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -504,6 +556,7 @@ class _LoginScreenState extends State<LoginScreen>
     TextInputAction action = TextInputAction.next,
     bool obscureText = false,
     Widget? suffix,
+    Iterable<String>? autofillHints,
     Function(String)? onSubmitted,
     String? Function(String?)? validator,
   }) {
@@ -522,6 +575,10 @@ class _LoginScreenState extends State<LoginScreen>
         keyboardType: keyboardType,
         textInputAction: action,
         obscureText: obscureText,
+        autofillHints: autofillHints,
+        // Pas d'autocorrection ni de suggestions sur identifiant / mot de passe
+        autocorrect: false,
+        enableSuggestions: false,
         onFieldSubmitted: onSubmitted,
         validator: validator,
         style: GoogleFonts.poppins(
@@ -568,18 +625,70 @@ class _LoginScreenState extends State<LoginScreen>
 
   // ── Forgot password ───────────────────────────────────────────────────────
 
-  Widget _buildForgotPassword() {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: GestureDetector(
-        onTap: () => Navigator.pushNamed(context, '/reset_password_request'),
-        child: Text(
-          'auth.forgot_password'.tr(),
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: _orange,
+  Widget _buildRememberAndForgot() {
+    return Row(
+      children: [
+        Flexible(
+          child: Semantics(
+            checked: _rememberMe,
+            label: 'auth.remember_me'.tr(),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _isLoading
+                  ? null
+                  : () => setState(() => _rememberMe = !_rememberMe),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: _rememberMe ? _orange : Colors.white,
+                      borderRadius: BorderRadius.circular(7),
+                      border: Border.all(
+                        color: _rememberMe ? _orange : const Color(0xFFCDD3E0),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: _rememberMe
+                        ? const Icon(Icons.check_rounded,
+                            color: Colors.white, size: 16)
+                        : null,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'auth.remember_me'.tr(),
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: _dark.withOpacity(0.75),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
+        ),
+        const SizedBox(width: 12),
+        _buildForgotPassword(),
+      ],
+    );
+  }
+
+  Widget _buildForgotPassword() {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/reset_password_request'),
+      child: Text(
+        'auth.forgot_password'.tr(),
+        style: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: _orange,
         ),
       ),
     );

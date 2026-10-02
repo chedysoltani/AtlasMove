@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:vibration/vibration.dart';
 import '../models/call_models.dart';
 import '../services/call_service.dart';
 import 'active_call_screen.dart';
@@ -19,6 +21,10 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   bool _isAnswering = false;
+  final AudioPlayer _ringtone = AudioPlayer();
+
+  // Référence à NOTRE closure, pour ne jamais effacer celle d'un autre écran.
+  late final void Function(String) _onCallEndedHandler;
 
   @override
   void initState() {
@@ -34,16 +40,51 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     );
 
     // If caller hangs up before we answer, close this screen
-    CallService.onCallEnded = (_) {
+    _onCallEndedHandler = (_) {
+      unawaited(_stopRinging());
       if (mounted) Navigator.of(context).pop();
     };
+    CallService.onCallEnded = _onCallEndedHandler;
+
+    unawaited(_startRinging());
+    // Signale à l'appelant que ça sonne réellement chez nous (call.ringing).
+    unawaited(CallService().notifyRinging(widget.session.callSessionId));
+  }
+
+  Future<void> _startRinging() async {
+    try {
+      await _ringtone.setReleaseMode(ReleaseMode.loop);
+      await _ringtone.play(AssetSource('sounds/soundreality-mobile-ringtone-542006.mp3'));
+    } catch (_) {}
+    try {
+      if (await Vibration.hasVibrator()) {
+        Vibration.vibrate(pattern: [0, 700, 400], repeat: 0);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _stopRinging() async {
+    try {
+      await _ringtone.stop();
+    } catch (_) {}
+    try {
+      Vibration.cancel();
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
-    // Only clear if this screen set the callback
-    if (CallService.onCallEnded != null) {
+    _ringtone.dispose();
+    unawaited(_stopRinging());
+    // N'efface le callback QUE s'il s'agit encore du nôtre. Avant, ce test
+    // vérifiait juste "non nul" : quand on accepte l'appel, ActiveCallScreen
+    // (poussé par pushReplacement) installe SON PROPRE onCallEnded dans son
+    // initState avant que CET écran ne soit démonté — ce dispose() écrasait
+    // alors à tort le callback tout juste posé par ActiveCallScreen, qui ne
+    // recevait donc plus jamais l'évènement "l'autre partie a raccroché"
+    // (l'appel semblait fonctionner, mais ne se terminait jamais côté appelé).
+    if (identical(CallService.onCallEnded, _onCallEndedHandler)) {
       CallService.onCallEnded = null;
     }
     super.dispose();
@@ -52,6 +93,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   Future<void> _accept() async {
     if (_isAnswering) return;
     setState(() => _isAnswering = true);
+    await _stopRinging();
 
     final ok = await CallService().acceptCall(
       widget.session.callSessionId,
@@ -87,6 +129,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   }
 
   Future<void> _reject() async {
+    await _stopRinging();
     await CallService().rejectCall(widget.session.callSessionId);
     if (mounted) Navigator.of(context).pop();
   }

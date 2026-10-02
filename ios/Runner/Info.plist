@@ -59,6 +59,7 @@
 	<array>
 		<string>location</string>
 		<string>fetch</string>
+		<string>remote-notification</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Atlas a besoin d&apos;accéder à la caméra pour prendre une photo de profil ou scanner un document.</string>

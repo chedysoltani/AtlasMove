@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../models/notification_model.dart';
 import '../core/network/http_client.dart';
-import '../core/storage/token_storage.dart';
 
 class NotificationService extends ChangeNotifier {
   // Singleton Pattern
@@ -32,6 +31,10 @@ class NotificationService extends ChangeNotifier {
   static void Function(Map<String, dynamic>)? onTripAccepted;
   // trip.created : { trip_id, pickup_address, offered_fare } — chauffeurs uniquement
   static void Function(Map<String, dynamic>)? onTripCreated;
+  // new_ride : mêmes clés que le push FCM (§2.4) + tripId — chauffeurs, app au premier plan
+  static void Function(Map<String, dynamic>)? onNewRideOffer;
+  // ride_taken / ride_cancelled : { tripId, trip_id, reason } — l'offre proposée est retirée
+  static void Function(Map<String, dynamic>)? onRideOfferWithdrawn;
   // chat.new_message : { trip_id, message_id, sender_id, content, created_at }
   static void Function(Map<String, dynamic>)? onChatMessage;
 
@@ -53,13 +56,21 @@ class NotificationService extends ChangeNotifier {
     await connectWebSocket();
   }
 
-  /// Connexion WebSocket via Socket.io
-  Future<void> connectWebSocket() async {
-    // Si déjà connecté, ignorer
-    if (_socket != null && _socket!.connected) return;
+  /// Connexion WebSocket via Socket.io.
+  /// [force] : recrée la socket même si elle se dit déjà connectée — utile au
+  /// retour au premier plan, où une socket peut rester bloquée "connectée" en
+  /// façade après une coupure réseau réelle (voir CallService.connectSocket).
+  Future<void> connectWebSocket({bool force = false}) async {
+    // Si déjà connecté, ignorer (sauf reconnexion forcée)
+    if (!force && _socket != null && _socket!.connected) return;
+
+    // Socket morte ou en cours de reconnexion avec un vieux token : on la
+    // remplace (sinon on empile des sockets et des listeners en double).
+    _socket?.dispose();
+    _socket = null;
 
     try {
-      final token = await TokenStorage.getAccessToken();
+      final token = await HttpClient.getValidAccessToken();
       if (token == null || token.isEmpty) {
         debugPrint('❌ NotificationService: Impossible de se connecter aux WebSockets. Aucun Token trouvé.');
         return;
@@ -74,7 +85,12 @@ class NotificationService extends ChangeNotifier {
         IO.OptionBuilder()
             .setTransports(['websocket'])
             .disableAutoConnect()
-            .setAuth({'token': token})
+            // Token relu (et renouvelé si besoin) à CHAQUE (re)connexion : une
+            // reconnexion automatique n'utilise jamais un token périmé.
+            .setAuthFn((cb) async {
+              final fresh = await HttpClient.getValidAccessToken();
+              cb({'token': fresh ?? ''});
+            })
             .build(),
       );
 
@@ -96,6 +112,10 @@ class NotificationService extends ChangeNotifier {
         debugPrint('⚠️ NotificationService: Erreur de connexion WebSocket: $data');
       });
 
+      // Le serveur envoie auth_error puis coupe la socket (aussi ~30 s AVANT
+      // l'expiration du token) : sans reconnexion explicite, on resterait sourd.
+      _socket!.on('auth_error', (payload) => _onAuthError(payload));
+
       // Standard notification events
       _socket!.on('new_notification', (payload) {
         debugPrint('🔔 NotificationService: Nouvelle notification reçue: $payload');
@@ -103,20 +123,18 @@ class NotificationService extends ChangeNotifier {
       });
 
       // Real-time ride tracking events
-      // Anciens noms conservés pour compatibilité
-      _socket!.on('driver_location', (payload) {
-        final data = _toMap(payload);
-        if (data != null) onDriverLocationReceived?.call(data);
-      });
-
+      // `driver_location` n'est plus écouté : le backend l'émet encore pour les
+      // anciennes versions, mais il double `location.updated` (même position deux fois).
       _socket!.on('trip_status_update', (payload) {
         final data = _toMap(payload);
         if (data != null) onTripStatusReceived?.call(data);
       });
 
-      // Spec backend — nouveaux noms d'événements
+      // Spec backend — nouveaux noms d'événements.
+      // location.updated { tripId, latitude, longitude, heading, speed, accuracy,
+      // timestamp, replay? } ; `replay: true` = dernière position connue renvoyée
+      // à la (re)connexion — affichée immédiatement comme un évènement normal.
       _socket!.on('location.updated', (payload) {
-        debugPrint('📍 location.updated raw: $payload');
         final data = _toMap(payload);
         if (data != null) onDriverLocationReceived?.call(data);
       });
@@ -137,6 +155,24 @@ class NotificationService extends ChangeNotifier {
       _socket!.on('trip.created', (payload) {
         final data = _toMap(payload);
         if (data != null) onTripCreated?.call(data);
+      });
+
+      // Contrat backend §2 : nouvelle course proposée à ce chauffeur (app au
+      // premier plan — sinon c'est le push FCM data-only qui réveille l'app).
+      _socket!.on('new_ride', (payload) {
+        final data = _toMap(payload);
+        if (data != null) onNewRideOffer?.call(data);
+      });
+
+      // L'offre affichée doit être retirée : prise par un autre chauffeur,
+      // annulée par le client, ou expirée.
+      _socket!.on('ride_taken', (payload) {
+        final data = _toMap(payload);
+        if (data != null) onRideOfferWithdrawn?.call(data);
+      });
+      _socket!.on('ride_cancelled', (payload) {
+        final data = _toMap(payload);
+        if (data != null) onRideOfferWithdrawn?.call(data);
       });
 
       _socket!.on('chat.new_message', (payload) {
@@ -175,6 +211,33 @@ class NotificationService extends ChangeNotifier {
 
     } catch (e) {
       debugPrint('💥 NotificationService: Exception de connexion WebSocket: $e');
+    }
+  }
+
+  bool _handlingAuthError = false;
+
+  /// `auth_error` { code, message } : token_expired → refresh + reconnexion ;
+  /// token_revoked / invalid_token → session terminée ; token_missing → bug client.
+  Future<void> _onAuthError(dynamic payload) async {
+    if (_handlingAuthError) return;
+    _handlingAuthError = true;
+    try {
+      final code = _toMap(payload)?['code']?.toString();
+      debugPrint('🔐 NotificationService: auth_error ($code)');
+      if (code == 'token_expired') {
+        final outcome = await HttpClient.refreshSession();
+        if (outcome == RefreshOutcome.invalid) {
+          await HttpClient.handleSessionInvalid();
+        } else {
+          // success → token frais ; transitoire → on retentera au prochain retour au premier plan
+          disconnect();
+          if (outcome == RefreshOutcome.success) await connectWebSocket();
+        }
+      } else if (code == 'token_revoked' || code == 'invalid_token') {
+        await HttpClient.handleSessionInvalid();
+      }
+    } finally {
+      _handlingAuthError = false;
     }
   }
 

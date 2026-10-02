@@ -5,6 +5,7 @@ import '../models/requests/update_profile_request.dart';
 import '../models/responses/update_profile_response.dart';
 import '../models/responses/auth_response.dart';
 import 'location_tracking_service.dart';
+import '../core/auth/auth_session.dart';
 
 /// Service pour gérer les opérations de profil utilisateur
 class ProfileService {
@@ -197,17 +198,7 @@ class ProfileService {
     await TokenStorage.clearTokens();
   }
 
-  /// Déconnecter l'utilisateur — arrêt des services + nettoyage complet du storage
-  static Future<void> logout() async {
-    // 1. Stopper le tracking de position immédiatement
-    LocationTrackingService().stopLocationTracking();
-
-    // 2. Appel API (best-effort)
-    try {
-      await HttpClient.post('/auth/logout');
-    } catch (_) {}
-
-    // 3. Effacer tous les tokens ET poser le flag explicit_logout
-    await TokenStorage.clearTokens();
-  }
+  /// Déconnecter l'utilisateur — arrêt des services, suppression du token FCM
+  /// (serveur + local), sockets fermées et nettoyage complet du storage.
+  static Future<void> logout() => AuthSession.instance.logout();
 }

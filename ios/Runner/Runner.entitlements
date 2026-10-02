@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Point de départ pour les push notifications (chemin B — alerte, sans VoIP).
+	  Ce fichier seul ne suffit PAS : il faut, dans Xcode (Mac requis) :
+	    1. Signing & Capabilities → + Capability → "Push Notifications"
+	       (relie ce fichier au projet et ajoute la clé aps-environment ci-dessous
+	       automatiquement — vérifier qu'elle correspond).
+	    2. + Capability → "Background Modes" → cocher "Remote notifications"
+	       (le tableau UIBackgroundModes dans Info.plist a déjà été complété).
+	    3. + Capability → "Time Sensitive Notifications" — nécessaire pour que
+	       `interruption-level: time-sensitive` (nouvelle course / appel) perce
+	       le mode Ne pas déranger / Concentration.
+	  -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

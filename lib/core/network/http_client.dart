@@ -4,7 +4,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import '../auth/jwt_utils.dart';
 import '../storage/token_storage.dart';
+import '../utils/safe_log.dart';
 
 /// Devine le Content-Type d'un fichier à partir de son extension.
 /// Le serveur rejette les uploads dont le Content-Type n'est pas explicitement
@@ -32,11 +34,54 @@ class HttpClient {
   /// renvoyées par le backend (ex: /uploads/avatars/xxx.png).
   static const String host = 'https://api.atla.business';
 
+  /// Version envoyée au backend (en-tête X-App-Version et champ app_version des devices).
+  static const String appVersion = '1.0.0';
+
   static const Duration _timeout = Duration(seconds: 30);
   static const Duration _receiveTimeout = Duration(seconds: 30);
 
-  // Mutex pour éviter plusieurs refresh simultanés
-  static bool _isRefreshing = false;
+  static const Duration _refreshTimeout = Duration(seconds: 12);
+
+  /// Marge avant l'expiration du JWT à partir de laquelle on rafraîchit.
+  static const Duration _expirySkew = Duration(seconds: 60);
+
+  /// Endpoints d'authentification : un 401 y signifie « identifiants invalides »
+  /// (ou session inexistante), jamais « access token expiré » → pas de refresh,
+  /// et surtout pas de déconnexion.
+  static const List<String> _noRefreshPrefixes = [
+    '/m/auth/login',
+    '/m/auth/verify-otp',
+    '/m/auth/resend-otp',
+    '/m/auth/refresh',
+    '/m/auth/forgot-password',
+    '/m/auth/reset-password',
+    '/auth/register',
+    '/auth/forgot-password',
+    '/auth/logout',
+    '/m/auth/logout',
+  ];
+
+  static bool _isAuthEndpoint(String endpoint) =>
+      _noRefreshPrefixes.any(endpoint.startsWith);
+
+  // Un seul refresh à la fois : tous les appelants concurrents attendent le
+  // même Future et reçoivent le même résultat (single-flight).
+  static Future<RefreshOutcome>? _refreshInFlight;
+
+  // Décalage horloge serveur − horloge téléphone, appris via l'en-tête `Date`.
+  // Sans cela, un téléphone en avance/retard verrait des tokens « expirés » à tort.
+  static Duration _serverClockOffset = Duration.zero;
+
+  static DateTime get _serverNowUtc =>
+      DateTime.now().toUtc().add(_serverClockOffset);
+
+  static void _syncClock(Map<String, String> headers) {
+    final date = headers['date'];
+    if (date == null) return;
+    try {
+      _serverClockOffset = HttpDate.parse(date).difference(DateTime.now().toUtc());
+    } catch (_) {}
+  }
 
   /// Appelé quand la session expire définitivement (refresh token aussi invalide).
   /// Branché dans main.dart pour naviguer vers /login et déconnecter les sockets.
@@ -51,7 +96,7 @@ class HttpClient {
   static void Function()? onLegalConsentRequired;
   
   /// Headers par défaut pour toutes les requêtes
-  static Future<Map<String, String>> _defaultHeaders() async {
+  static Future<Map<String, String>> _defaultHeaders({bool authEndpoint = false}) async {
     final deviceId = await TokenStorage.getOrCreateDeviceId();
     final platform = Platform.isIOS ? 'ios' : 'android';
 
@@ -61,19 +106,76 @@ class HttpClient {
       'User-Agent': 'AtlasMove/1.0 (Flutter)',
       'X-Device-Id': deviceId,
       'X-Platform': platform,
-      'X-App-Version': '1.0.0',
+      'X-App-Version': appVersion,
     };
 
-    // Ajouter le bearer token si disponible
-    final token = await TokenStorage.getAccessToken();
+    // Préférence « Se souvenir de moi » : le backend peut adapter la durée de
+    // vie du refresh token (login, vérification OTP, refresh).
+    if (authEndpoint) {
+      headers['X-Remember-Me'] = (await TokenStorage.getRememberMe()).toString();
+    }
+
+    // Bearer token : renouvelé ici s'il est expiré ou sur le point de l'être.
+    // Sur les endpoints d'auth on envoie tel quel (pas de refresh pendant un login).
+    final token = authEndpoint
+        ? await TokenStorage.getAccessToken()
+        : await getValidAccessToken();
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
-      debugPrint('🔑 Token trouvé et ajouté aux headers');
-    } else {
-      debugPrint('❌ Aucun token trouvé dans le stockage');
     }
 
     return headers;
+  }
+
+  /// Access token utilisable : lu du stockage, rafraîchi (single-flight) s'il
+  /// est expiré ou expire dans moins d'une minute (heure serveur).
+  ///
+  /// Un échec TRANSITOIRE du refresh (réseau, timeout, 5xx) renvoie le token
+  /// courant : la requête partira et l'app réessaiera plus tard, sans déconnexion.
+  /// Seul un refus explicite du serveur (401/403) invalide la session.
+  static Future<String?> getValidAccessToken() async {
+    final token = await TokenStorage.getAccessToken();
+    if (token == null || token.isEmpty) return token;
+
+    final exp = JwtUtils.expiry(token);
+    final needsRefresh = exp != null
+        ? !exp.isAfter(_serverNowUtc.add(_expirySkew))
+        : await TokenStorage.isAccessTokenExpiringSoon();
+    if (!needsRefresh) return token;
+
+    final outcome = await refreshSession();
+    switch (outcome) {
+      case RefreshOutcome.success:
+        return TokenStorage.getAccessToken();
+      case RefreshOutcome.invalid:
+        await handleSessionInvalid();
+        return null;
+      case RefreshOutcome.transient:
+        return token;
+    }
+  }
+
+  /// Le token est-il encore valable pour au moins la marge de sécurité ?
+  /// Un token illisible (non-JWT) est présumé valable : le serveur tranchera.
+  static bool isAccessTokenFresh(String token) {
+    final exp = JwtUtils.expiry(token);
+    if (exp == null) return true;
+    return exp.isAfter(_serverNowUtc.add(_expirySkew));
+  }
+
+  /// Le serveur a refusé le refresh token : session terminée, retour au login.
+  static Future<void> handleSessionInvalid() async {
+    await TokenStorage.clearTokens();
+    onSessionExpired?.call();
+  }
+
+  /// Rafraîchit la session. Single-flight : N appelants simultanés = 1 seul appel réseau.
+  static Future<RefreshOutcome> refreshSession() {
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) return inFlight;
+    final future = _doRefresh().whenComplete(() => _refreshInFlight = null);
+    _refreshInFlight = future;
+    return future;
   }
 
   /// GET Request
@@ -206,24 +308,19 @@ class HttpClient {
     bool skipAutoRefresh = false,
   }) async {
     try {
-      // Refresh proactif si le token est sur le point d'expirer (≥13 min)
-      if (!isRetry && await TokenStorage.isAccessTokenExpiringSoon()) {
-        debugPrint('🔄 Token proche expiration — refresh proactif...');
-        await _tryRefresh();
-      }
+      final authEndpoint = _isAuthEndpoint(endpoint);
 
       // Construction de l'URL
       final uri = _buildUri(endpoint, queryParams);
 
-      // Fusion des headers
-      final defaultHeaders = await _defaultHeaders();
+      // Fusion des headers (le refresh proactif du token se fait ici)
+      final defaultHeaders = await _defaultHeaders(authEndpoint: authEndpoint);
       final finalHeaders = {
         ...defaultHeaders,
         ...?headers,
       };
 
-      debugPrint('🌐 API Request: $method $uri');
-      debugPrint('📋 Headers: $finalHeaders');
+      SafeLog.d('🌐 API Request: $method $uri');
       
       // Configuration de la requête
       var request;
@@ -260,7 +357,7 @@ class HttpClient {
         
         if (body != null) {
           request.body = jsonEncode(body);
-          debugPrint('📦 Body: ${jsonEncode(body)}');
+          SafeLog.body('📦 Body:', request.body);
         }
       }
 
@@ -271,8 +368,9 @@ class HttpClient {
       final response = await http.Response.fromStream(streamedResponse)
           .timeout(_receiveTimeout);
       
-      debugPrint('📊 Response Status: ${response.statusCode}');
-      debugPrint('📄 Response Body: ${response.body}');
+      _syncClock(response.headers);
+      SafeLog.d('📊 Response Status: ${response.statusCode}');
+      SafeLog.body('📄 Response Body:', response.body);
       
       // Création de la réponse structurée
       final httpResponse = HttpResponse(
@@ -281,25 +379,42 @@ class HttpClient {
         headers: response.headers,
       );
       
-      // Auto-refresh sur 401 (token expiré) — ignoré pour les endpoints publics
-      if (response.statusCode == 401 && !isRetry && !skipAutoRefresh) {
-        final newToken = await _tryRefresh();
-        if (newToken != null) {
-          // Retry la requête originale avec le nouveau token
-          return _makeRequest(
-            method, endpoint,
-            headers: headers,
-            body: body,
-            queryParams: queryParams,
-            isMultipart: isMultipart,
-            isRetry: true,
-          );
-        } else {
-          // Refresh échoué → session expirée
-          await TokenStorage.clearTokens();
-          onSessionExpired?.call();
-          throw SessionExpiredException();
+      // 401 sur une route protégée : UN refresh (partagé), puis on rejoue la requête.
+      if (response.statusCode == 401 &&
+          !isRetry &&
+          !skipAutoRefresh &&
+          !authEndpoint) {
+        final sentAuth = finalHeaders['Authorization'];
+        final current = await TokenStorage.getAccessToken();
+
+        // Un autre appel a déjà renouvelé le token pendant que celui-ci était en
+        // vol : on rejoue simplement avec le token à jour, sans nouveau refresh
+        // (un second refresh consommerait inutilement un refresh token rotatif).
+        final alreadyRefreshed = current != null &&
+            current.isNotEmpty &&
+            sentAuth != 'Bearer $current';
+
+        if (!alreadyRefreshed) {
+          final outcome = await refreshSession();
+          if (outcome == RefreshOutcome.invalid) {
+            await handleSessionInvalid();
+            throw SessionExpiredException();
+          }
+          if (outcome == RefreshOutcome.transient) {
+            // Réseau/serveur indisponible : PAS de déconnexion.
+            throw NetworkException(
+                'Connexion instable. Vérifiez votre réseau, nous réessaierons automatiquement.');
+          }
         }
+
+        return _makeRequest(
+          method, endpoint,
+          headers: headers,
+          body: body,
+          queryParams: queryParams,
+          isMultipart: isMultipart,
+          isRetry: true,
+        );
       }
 
       // 403 → accords légaux non acceptés
@@ -339,43 +454,44 @@ class HttpClient {
     }
   }
 
-  /// Tente de rafraîchir le token via le refresh token stocké.
-  /// Retourne le nouveau access token ou null si impossible.
-  static Future<String?> _tryRefresh() async {
-    if (_isRefreshing) return null;
-    _isRefreshing = true;
-    try {
-      final refreshToken = await TokenStorage.getRefreshToken();
-      if (refreshToken == null || refreshToken.isEmpty) {
-        debugPrint('🔄 Refresh: aucun refresh token disponible');
-        return null;
-      }
-      debugPrint('🔄 Tentative de refresh du token...');
+  /// Appel réseau de refresh. Classe le résultat :
+  /// - success   : nouveaux tokens (access ET refresh si rotation) sauvegardés ;
+  /// - invalid   : le serveur a répondu 401/403 → refresh token expiré/révoqué ;
+  /// - transient : tout le reste (hors-ligne, timeout, 5xx, 429, réponse illisible)
+  ///               → la session est conservée, on réessaiera.
+  static Future<RefreshOutcome> _doRefresh() async {
+    final refreshToken = await TokenStorage.getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      SafeLog.d('🔄 Refresh: aucun refresh token stocké');
+      return RefreshOutcome.invalid;
+    }
 
-      final uri = Uri.parse('$baseUrl/m/auth/refresh');
+    try {
       final deviceId = await TokenStorage.getOrCreateDeviceId();
       final platform = Platform.isIOS ? 'ios' : 'android';
       final response = await http.post(
-        uri,
+        Uri.parse('$baseUrl/m/auth/refresh'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Authorization': 'Bearer $refreshToken',
           'X-Device-Id': deviceId,
           'X-Platform': platform,
-          'X-App-Version': '1.0.0',
+          'X-App-Version': appVersion,
+          'X-Remember-Me': (await TokenStorage.getRememberMe()).toString(),
         },
         body: jsonEncode({
           'refreshToken': refreshToken,
           'deviceId': deviceId,
         }),
-      ).timeout(_timeout);
+      ).timeout(_refreshTimeout);
 
-      debugPrint('🔄 Refresh status: ${response.statusCode}');
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        debugPrint('❌ Refresh échoué (${response.statusCode}): ${response.body}');
-        return null;
-      }
+      _syncClock(response.headers);
+      SafeLog.d('🔄 Refresh status: ${response.statusCode}');
+
+      final code = response.statusCode;
+      if (code == 401 || code == 403) return RefreshOutcome.invalid;
+      if (code != 200 && code != 201) return RefreshOutcome.transient;
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       final payload = (data['data'] is Map ? data['data'] : null) ?? data;
@@ -383,23 +499,22 @@ class HttpClient {
       final newAccess = payload['accessToken'] ?? payload['access_token'] ?? payload['token'];
       final newRefresh = payload['refreshToken'] ?? payload['refresh_token'];
 
-      if (newAccess != null && (newAccess as String).isNotEmpty) {
+      if (newAccess is String && newAccess.isNotEmpty) {
+        // Rotation : si le serveur renvoie un nouveau refresh token il DOIT
+        // remplacer l'ancien (réutiliser l'ancien peut révoquer toute la session).
         await TokenStorage.saveAuthTokens(
           accessToken: newAccess,
-          refreshToken: newRefresh as String?,
+          refreshToken: newRefresh is String && newRefresh.isNotEmpty ? newRefresh : null,
         );
-        debugPrint('✅ Token rafraîchi avec succès');
         onTokenRefreshed?.call();
-        return newAccess;
+        return RefreshOutcome.success;
       }
 
-      debugPrint('❌ Refresh: nouveau token absent dans la réponse: ${response.body}');
-      return null;
+      SafeLog.d('❌ Refresh: réponse 2xx sans access token');
+      return RefreshOutcome.transient;
     } catch (e) {
-      debugPrint('❌ Refresh exception: $e');
-      return null;
-    } finally {
-      _isRefreshing = false;
+      SafeLog.d('🔄 Refresh transitoire (${e.runtimeType})');
+      return RefreshOutcome.transient;
     }
   }
 
@@ -454,6 +569,9 @@ class HttpClient {
     }
   }
 }
+
+/// Résultat d'une tentative de refresh de session.
+enum RefreshOutcome { success, invalid, transient }
 
 /// Réponse HTTP structurée
 class HttpResponse {

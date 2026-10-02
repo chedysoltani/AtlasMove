@@ -1,4 +1,4 @@
-﻿{
+{
   "common": {
     "cancel": "إلغاء",
     "confirm": "تأكيد",
@@ -56,7 +56,9 @@
     "services": "الخدمات",
     "dashboard": "Dashboard",
     "history": "السجل",
-    "revenue": "الإيرادات"
+    "revenue": "الإيرادات",
+    "subscription": "الاشتراك",
+    "privilege": "الامتياز"
   },
   "lang": {
     "title": "اللغة",
@@ -76,6 +78,8 @@
     "password": "كلمة المرور",
     "password_hint": "••••••••",
     "forgot_password": "نسيت كلمة المرور ؟",
+    "remember_me": "تذكرني",
+    "session_expired": "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى.",
     "login_btn": "تسجيل الدخول",
     "register_btn": "إنشاء حساب",
     "no_account": "ليس لديك حساب ؟",
@@ -256,7 +260,9 @@
     "logout_subtitle": "إنهاء الجلسة",
     "rating": "التقييم",
     "cancellation_reason": "سبب الإلغاء",
-    "offer_submitted_short": "تم تقديم عرض بـ {amount} {currency}!"
+    "offer_submitted_short": "تم تقديم عرض بـ {amount} {currency}!",
+    "services_menu": "الخدمات",
+    "services_subtitle": "قائمة الخدمات المتوفرة"
   },
   "client": {
     "dashboard_title": "لوحتي",
@@ -295,6 +301,7 @@
     "searching_driver": "البحث عن سائق...",
     "driver_found": "تم إيجاد سائق !",
     "driver_en_route": "السائق في الطريق إليك",
+    "driver_arrived": "وصل السائق",
     "ride_in_progress": "الرحلة جارية",
     "ride_completed": "اكتملت الرحلة",
     "cancel_ride": "إلغاء الرحلة ؟",
@@ -378,7 +385,9 @@
     "cancelling": "إلغاء...",
     "ride_completed_success": "اكتملت الرحلة! 🎉",
     "amount_paid": "المبلغ المدفوع: {amount} {currency}",
-    "cancel_confirm_body": "هل أنت متأكد من الإلغاء؟ قد تُطبق رسوم."
+    "cancel_confirm_body": "هل أنت متأكد من الإلغاء؟ قد تُطبق رسوم.",
+    "choose_service": "اختر خدمة",
+    "change_service": "تغيير"
   },
   "payment": {
     "title": "الدفع",
@@ -620,7 +629,8 @@
     "speaker": "السماعة",
     "earpiece": "سماعة الأذن",
     "join_error": "تعذر الانضمام إلى المكالمة",
-    "incoming": "مكالمة واردة..."
+    "incoming": "مكالمة واردة...",
+    "ringing": "الهاتف يرن..."
   },
   "signup": {
     "step1_title": "الخطوة 1/3",
@@ -647,5 +657,22 @@
     "private": "خاص",
     "professional": "مهني",
     "validate_register": "تحقق / تسجيل"
+  },
+  "ride_offer": {
+    "title": "طلبية جديدة !",
+    "taken": "تم قبول الطلبية من طرف سائق آخر",
+    "cancelled": "تم إلغاء الطلبية من طرف العميل",
+    "expired": "انتهت صلاحية العرض",
+    "accept_error": "تعذر قبول هذه الطلبية"
+  },
+  "location_always": {
+    "title": "تتبع الموقع في الخلفية",
+    "body": "لتلقي الطلبيات ولتمكين العميل من تتبع رحلتك حتى عندما يكون التطبيق في الخلفية أو الشاشة مقفلة، يرجى السماح بالوصول للموقع « دائمًا ».",
+    "allow": "سماح",
+    "not_now": "لاحقًا",
+    "later_notice": "يمكنك تفعيله لاحقًا من إعدادات هاتفك.",
+    "settings_title": "إذن مطلوب",
+    "settings_body": "افتح إعدادات التطبيق واختر « دائمًا » لخدمة الموقع.",
+    "open_settings": "فتح الإعدادات"
   }
 }

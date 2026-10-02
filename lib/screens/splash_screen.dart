@@ -1,7 +1,9 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../utils/app_theme.dart';
-import '../core/storage/token_storage.dart';
+import '../core/auth/auth_session.dart';
+import '../main.dart' show navigatorKey;
+import '../services/push_notification_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,9 +20,14 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _textOpacity;
   late Animation<Offset> _textSlide;
 
+  // La restauration de session (lecture des tokens, refresh silencieux si
+  // l'access token est expiré) démarre tout de suite, en parallèle de l'animation.
+  late final Future<BootResult> _bootFuture;
+
   @override
   void initState() {
     super.initState();
+    _bootFuture = AuthSession.restore();
     _initializeAnimations();
     _startAnimationSequence();
   }
@@ -75,19 +82,19 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigateToLanding() async {
-    final explicitlyLoggedOut = await TokenStorage.wasExplicitlyLoggedOut();
-    final token = await TokenStorage.getAccessToken();
-    final role = await TokenStorage.getUserRole();
-
+    final boot = await _bootFuture;
     if (!mounted) return;
 
-    if (!explicitlyLoggedOut && token != null && token.isNotEmpty && role != null) {
-      // Utilisateur déjà connecté → aller directement au bon dashboard
-      final route = role == 'delivery' ? '/driver_main' : '/client_dashboard';
-      Navigator.of(context).pushReplacementNamed(route);
-    } else {
-      Navigator.of(context).pushReplacementNamed('/landing');
-    }
+    Navigator.of(context).pushReplacementNamed(
+      boot.route,
+      arguments: boot.sessionExpired ? {'sessionExpired': true} : null,
+    );
+
+    // Rejoue un tap sur une notification "nouvelle course" / "appel entrant"
+    // reçu pendant que l'app était fermée (voir push_notification_service.dart).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PushNotificationService.consumePendingAction(navigatorKey);
+    });
   }
 
   @override

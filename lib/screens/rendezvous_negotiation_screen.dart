@@ -200,7 +200,9 @@ class _RendezvousNegotiationScreenState
           ),
         ],
       ),
-      body: _loading
+      body: SafeArea(
+        top: false,
+        child: _loading
           ? const Center(child: CircularProgressIndicator(color: _orange))
           : _error != null
               ? _buildError()
@@ -237,6 +239,7 @@ class _RendezvousNegotiationScreenState
                     ],
                   ),
                 ),
+      ),
     );
   }
 

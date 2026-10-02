@@ -17,6 +17,8 @@ import '../services/trip_service.dart';
 import '../services/notification_service.dart';
 import '../services/route_service.dart';
 import 'client_active_ride_screen.dart';
+import '../map/map_markers.dart';
+import '../map/map_styles.dart';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 class _AppColors {
@@ -198,6 +200,11 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
 
   DateTime? _waitingSince;
   bool _darkStyleApplied = false;
+
+  // Pins de depart / destination aux couleurs de la marque (bitmaps mis en cache).
+  BitmapDescriptor? _pickupPin;
+  BitmapDescriptor? _destPin;
+  bool _pinsRequested = false;
   Timer? _belowAverageTimer;
   int _belowAverageCountdown = _belowAverageCycleSeconds;
   bool _autoAcceptEnabled = false;
@@ -207,6 +214,32 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
   late final AnimationController _radarController;
 
   bool get _isWaitingForDriver => _tripResponse?.data != null;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_pinsRequested) {
+      _pinsRequested = true;
+      _loadMapIcons(MediaQuery.devicePixelRatioOf(context));
+    }
+  }
+
+  Future<void> _loadMapIcons(double dpr) async {
+    try {
+      final factory = MapMarkerFactory.instance;
+      final icons = await Future.wait([
+        factory.pickupPin(dpr),
+        factory.destinationPin(dpr),
+        factory.userLocationDot(dpr),
+      ]);
+      if (!mounted) return;
+      _pickupPin = icons[0];
+      _destPin = icons[1];
+      ref.read(mapProvider.notifier).setUserMarkerIcon(icons[2]);
+    } catch (e) {
+      debugPrint('CreateRide: rendu des icones impossible: $e');
+    }
+  }
 
   @override
   void initState() {
@@ -267,6 +300,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
     _radarController.dispose();
     // Clear map before super.dispose() while ref is still valid
     _clearMapRoute();
+    // Le provider carte est global : on coupe le flux GPS a la sortie de l'ecran
+    try {
+      ref.read(mapProvider.notifier).stopTracking();
+    } catch (_) {}
     _destinationController.removeListener(_onDestinationChanged);
     _destinationController.dispose();
     _destinationFocusNode.dispose();
@@ -521,40 +558,51 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
       markerId: const MarkerId('pickup'),
       position: start,
       infoWindow: InfoWindow(title: 'booking.departure'.tr()),
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      icon: _pickupPin ??
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+      anchor: MapMarkerFactory.pinAnchor,
     );
     final destinationMarker = Marker(
       markerId: const MarkerId('destination'),
       position: end,
       infoWindow: InfoWindow(title: 'booking.destination'.tr()),
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+      icon: _destPin ??
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+      anchor: MapMarkerFactory.pinAnchor,
     );
     final points = routePoints ?? [start, end];
-    // Contour sombre sous la route pour la lisibilité
-    final routeOutline = Polyline(
-      polylineId: const PolylineId('route_outline'),
-      points: points,
-      color: const Color(0xFF1A3A5C),
-      width: 7,
-      jointType: JointType.round,
-      endCap: Cap.roundCap,
-      startCap: Cap.roundCap,
-    );
-    final routePolyline = Polyline(
-      polylineId: const PolylineId('route'),
-      points: points,
-      color: const Color(0xFF2563EB),
-      width: 5,
-      jointType: JointType.round,
-      endCap: Cap.roundCap,
-      startCap: Cap.roundCap,
-    );
+    final polylines = _brandedRoute(points);
     mapNotifier.clearPolylines();
     mapNotifier.addMarker(pickupMarker);
     mapNotifier.addMarker(destinationMarker);
-    mapNotifier.addPolyline(routeOutline);
-    mapNotifier.addPolyline(routePolyline);
+    for (final line in polylines) {
+      mapNotifier.addPolyline(line);
+    }
   }
+
+  /// Trace de l'itinéraire : bordure sombre + trait orange marque, extrémités arrondies.
+  List<Polyline> _brandedRoute(List<LatLng> points) => [
+        Polyline(
+          polylineId: const PolylineId('route_outline'),
+          points: points,
+          color: Colors.black.withOpacity(0.30),
+          width: 11,
+          jointType: JointType.round,
+          endCap: Cap.roundCap,
+          startCap: Cap.roundCap,
+          zIndex: 1,
+        ),
+        Polyline(
+          polylineId: const PolylineId('route'),
+          points: points,
+          color: MapStyles.brandOrange,
+          width: 7,
+          jointType: JointType.round,
+          endCap: Cap.roundCap,
+          startCap: Cap.roundCap,
+          zIndex: 2,
+        ),
+      ];
 
   // ── Multi-destination (stops[]) ────────────────────────────────────────────
 
@@ -636,7 +684,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
       markerId: const MarkerId('pickup'),
       position: start,
       infoWindow: InfoWindow(title: 'booking.departure'.tr()),
-      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      icon: _pickupPin ??
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+      anchor: MapMarkerFactory.pinAnchor,
     ));
 
     final hasExtraStops = _extraStops.isNotEmpty;
@@ -648,9 +698,11 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
             ? 'booking.stop_number'.tr(namedArgs: {'number': '1'})
             : 'booking.destination'.tr(),
       ),
-      icon: BitmapDescriptor.defaultMarkerWithHue(
-        hasExtraStops ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueRed,
-      ),
+      icon: (hasExtraStops ? null : _destPin) ??
+          BitmapDescriptor.defaultMarkerWithHue(
+            hasExtraStops ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueRed,
+          ),
+      anchor: MapMarkerFactory.pinAnchor,
     ));
 
     for (var i = 0; i < _extraStops.length; i++) {
@@ -661,32 +713,17 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
         infoWindow: InfoWindow(
           title: 'booking.stop_number'.tr(namedArgs: {'number': '${i + 2}'}),
         ),
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-          isLast ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
-        ),
+        icon: (isLast ? _destPin : null) ??
+            BitmapDescriptor.defaultMarkerWithHue(
+              isLast ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
+            ),
+        anchor: MapMarkerFactory.pinAnchor,
       ));
     }
 
-    final routeOutline = Polyline(
-      polylineId: const PolylineId('route_outline'),
-      points: routePoints,
-      color: const Color(0xFF1A3A5C),
-      width: 7,
-      jointType: JointType.round,
-      endCap: Cap.roundCap,
-      startCap: Cap.roundCap,
-    );
-    final routePolyline = Polyline(
-      polylineId: const PolylineId('route'),
-      points: routePoints,
-      color: const Color(0xFF2563EB),
-      width: 5,
-      jointType: JointType.round,
-      endCap: Cap.roundCap,
-      startCap: Cap.roundCap,
-    );
-    mapNotifier.addPolyline(routeOutline);
-    mapNotifier.addPolyline(routePolyline);
+    for (final line in _brandedRoute(routePoints)) {
+      mapNotifier.addPolyline(line);
+    }
   }
 
   Future<void> _addExtraStop(String address, LatLng coords) async {
@@ -1371,12 +1408,16 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
   void _syncMapStyleForWaitingState(GoogleMapController controller) {
     if (_darkStyleApplied == _isWaitingForDriver) return;
     _darkStyleApplied = _isWaitingForDriver;
-    controller.setMapStyle(_isWaitingForDriver ? _darkWaitingMapStyle : null);
+    // Hors attente : on revient au style de base de l'app (clair / sombre)
+    controller.setMapStyle(_isWaitingForDriver
+        ? _darkWaitingMapStyle
+        : MapStyles.forBrightness(Theme.of(context).brightness));
   }
 
   // ── Map ────────────────────────────────────────────────────────────────────
   Widget _buildGoogleMap(MapState mapState) {
     return GoogleMap(
+      style: MapStyles.forBrightness(Theme.of(context).brightness),
       initialCameraPosition: mapState.cameraPosition ??
           const CameraPosition(target: LatLng(33.5731, -7.5898), zoom: 12),
       onMapCreated: (GoogleMapController controller) {
@@ -1634,10 +1675,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
     final catalogueAsync = ref.watch(catalogueProvider);
     final screenHeight = MediaQuery.of(context).size.height;
 
-    // Deux états stables : étape 1 (destination) et étape 2 (service)
+    // Trois états stables : 1) destination, 2) choix du service (quasi plein
+    // écran — grille de toutes les catégories/services avec photo), 3)
+    // confirmation (résumé + prix + CTA), une fois un service choisi.
     final targetHeight = _destinationCoordinates == null
-        ? screenHeight * 0.72   // Grande zone pour la recherche + suggestions
-        : screenHeight * 0.58;  // Zone stable pour les services (scrollable)
+        ? screenHeight * 0.72
+        : _selectedService == null
+            ? screenHeight * 0.92
+            : screenHeight * 0.58;
 
     return Positioned(
       bottom: 0,
@@ -1678,8 +1723,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
                 child: _buildMainContent(catalogueAsync),
               ),
 
-              // Bouton CTA fixé en bas
-              _buildCtaButton(),
+              // Le CTA n'a de sens qu'à l'étape de confirmation — pendant le
+              // choix du service, on laisse toute la hauteur à la grille.
+              if (_destinationCoordinates == null || _selectedService != null)
+                _buildCtaButton(),
             ],
           ),
         ),
@@ -1711,9 +1758,16 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
       );
     }
 
-    // Si la destination est choisie, on affiche les services et le paiement
+    // Destination choisie mais service pas encore choisi : grille quasi
+    // plein écran de tous les services avec photo, façon catalogue d'appli
+    // de VTC/livraison — remplace l'ancienne liste horizontale de catégories.
+    if (_selectedService == null) {
+      return _buildServiceGridStep(catalogueAsync, key: const ValueKey('service_grid_step'));
+    }
+
+    // Service choisi : résumé + négociation + paiement + CTA.
     return SingleChildScrollView(
-      key: const ValueKey('service_step'),
+      key: const ValueKey('confirm_step'),
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1726,22 +1780,236 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
           // Arrêts supplémentaires (multi-destination)
           _buildStopsSection(),
 
+          const SizedBox(height: 16),
+
+          // Service choisi, avec possibilité d'en changer
+          _buildSelectedServiceSummary(),
+
           const SizedBox(height: 24),
 
-          // Sélection du service
-          _buildServiceSelection(catalogueAsync),
-
+          _buildNegotiationSection(),
           const SizedBox(height: 24),
 
-          if (_selectedService != null) ...[
-            _buildNegotiationSection(),
-            const SizedBox(height: 24),
-          ],
-          
           // Sélection du paiement
           _buildPaymentSelection(),
-          
+
           const SizedBox(height: 10),
+        ],
+      ),
+    );
+  }
+
+  /// Étape "choix du service" : grille verticale, légèrement catégorisée
+  /// (un petit titre par catégorie), 4 colonnes par ligne, chaque tuile
+  /// affichant la vraie photo du service (`service.imageUrl`, déjà fournie
+  /// par le même catalogue backend que la prise de rendez-vous) avec un
+  /// repli coloré par catégorie si la photo manque.
+  Widget _buildServiceGridStep(AsyncValue<ServiceCatalogue> catalogueAsync, {Key? key}) {
+    return catalogueAsync.when(
+      loading: () => const Center(
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          valueColor: AlwaysStoppedAnimation(_AppColors.accent),
+        ),
+      ),
+      error: (error, stack) {
+        debugPrint('❌ catalogueProvider fetchCatalogue error: $error');
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded, color: _AppColors.gray300, size: 28),
+              const SizedBox(height: 6),
+              Text('common.error'.tr(), style: const TextStyle(fontSize: 12, color: _AppColors.gray400)),
+              TextButton(
+                onPressed: () => LocationService().getCurrentPosition().then((pos) {
+                  final best = pos ?? LocationService().currentPosition;
+                  ref.read(catalogueProvider.notifier).fetchCatalogue(
+                        latitude: best?.latitude,
+                        longitude: best?.longitude,
+                      );
+                }),
+                child: Text('common.retry'.tr(), style: const TextStyle(fontSize: 12, color: _AppColors.accent)),
+              ),
+            ],
+          ),
+        );
+      },
+      data: (catalogue) {
+        // Grille unique mélangeant tous les services de toutes les catégories
+        // (pas de section par catégorie) : avec des catégories n'ayant qu'1-2
+        // services, un regroupement par catégorie laissait des lignes à
+        // moitié vides et peu présentables — un flux continu est plus dense.
+        final allServices = <(Service, ServiceCategoryWithServices)>[
+          for (final category in catalogue.data)
+            for (final service in category.services) (service, category),
+        ];
+        if (allServices.isEmpty) {
+          return Center(
+            child: Text('common.no_data'.tr(), style: const TextStyle(fontSize: 13, color: _AppColors.gray400)),
+          );
+        }
+        return ListView(
+          key: key,
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+          children: [
+            Text(
+              'booking.choose_service'.tr(),
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: _AppColors.gray900,
+                letterSpacing: -0.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildDestinationSummary(),
+            const SizedBox(height: 20),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: allServices.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 10,
+                childAspectRatio: 0.78,
+              ),
+              itemBuilder: (context, index) {
+                final (service, category) = allServices[index];
+                return _buildServicePhotoTile(service, category);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildServicePhotoTile(Service service, ServiceCategoryWithServices category) {
+    final visual = _categoryVisual(category.name);
+    final hasImage = service.imageUrl != null && service.imageUrl!.isNotEmpty;
+
+    return GestureDetector(
+      onTap: !service.isActive
+          ? null
+          : () {
+              setState(() {
+                _selectedCategory = category;
+                _selectedService = service;
+                _customOfferedFare = service.basePrice;
+                _fareEstimate = null;
+              });
+              _fetchFareEstimate();
+            },
+      child: Opacity(
+        opacity: service.isActive ? 1 : 0.45,
+        // `Expanded` (plutôt qu'`AspectRatio`) absorbe tout l'espace que la
+        // grille alloue à cette tuile MOINS la hauteur du texte — impossible
+        // d'overflow quel que soit `childAspectRatio`, contrairement à une
+        // image de taille fixe empilée au-dessus d'un texte de taille fixe.
+        child: Column(
+          children: [
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: visual.color.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: visual.color.withOpacity(0.18)),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: hasImage
+                      ? Image.network(
+                          service.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(visual.icon, size: 28, color: visual.color),
+                        )
+                      : Icon(visual.icon, size: 28, color: visual.color),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              service.name,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: _AppColors.gray900,
+                height: 1.1,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Rappel compact du service choisi à l'étape de confirmation, avec un
+  /// lien pour revenir à la grille et en changer.
+  Widget _buildSelectedServiceSummary() {
+    final service = _selectedService;
+    if (service == null) return const SizedBox.shrink();
+    final visual = _categoryVisual(_selectedCategory?.name ?? '');
+    final hasImage = service.imageUrl != null && service.imageUrl!.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: visual.color.withOpacity(0.25), width: 1.5),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 44,
+              height: 44,
+              color: visual.color.withOpacity(0.10),
+              child: hasImage
+                  ? Image.network(
+                      service.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(visual.icon, size: 22, color: visual.color),
+                    )
+                  : Icon(visual.icon, size: 22, color: visual.color),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  service.name,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _AppColors.gray900),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (service.basePrice != null)
+                  Text(
+                    '${service.basePrice!.toStringAsFixed(2)} ${service.currency ?? 'TND'}',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: visual.color),
+                  ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _selectedService = null;
+                _fareEstimate = null;
+              });
+            },
+            child: Text('booking.change_service'.tr(),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _AppColors.accent)),
+          ),
         ],
       ),
     );
@@ -3128,92 +3396,6 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
     );
   }
 
-  Widget _buildServiceSelection(AsyncValue<ServiceCatalogue> catalogueAsync) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text('services.title'.tr().toUpperCase(), style: _AppTextStyles.sectionLabel),
-            const Spacer(),
-            if (_selectedService != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: _AppColors.greenLight,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'common.active'.tr(),
-                  style: const TextStyle(fontSize: 10, color: _AppColors.green, fontWeight: FontWeight.bold),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        catalogueAsync.when(
-          loading: () => const SizedBox(
-            height: 90,
-            child: Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation(_AppColors.accent),
-              ),
-            ),
-          ),
-          error: (error, stack) {
-            debugPrint('❌ catalogueProvider fetchCatalogue error: $error');
-            return SizedBox(
-              height: 100,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline_rounded,
-                        color: _AppColors.gray300, size: 28),
-                    const SizedBox(height: 6),
-                    Text(
-                      'common.error'.tr(),
-                      style: const TextStyle(fontSize: 12, color: _AppColors.gray400),
-                    ),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      ),
-                      onPressed: () =>
-                          LocationService().getCurrentPosition().then((pos) {
-                            final best = pos ?? LocationService().currentPosition;
-                            ref.read(catalogueProvider.notifier).fetchCatalogue(
-                              latitude: best?.latitude,
-                              longitude: best?.longitude,
-                            );
-                          }),
-                      child: Text('common.retry'.tr(),
-                          style: const TextStyle(fontSize: 12, color: _AppColors.accent)),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-          data: (catalogue) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildCategoriesList(catalogue),
-              if (_servicesExpanded && _selectedCategory != null) ...[
-                const SizedBox(height: 16),
-                _buildServicesList(),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildNegotiationSection() {
     if (_selectedService == null) return const SizedBox.shrink();
     final defaultPrice = _selectedService!.basePrice ?? 0.0;
@@ -3433,150 +3615,6 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
           ],
         ],
       ),
-    );
-  }
-
-  Widget _buildCategoriesList(ServiceCatalogue catalogue) {
-    final categories = catalogue.data;
-
-    if (categories.isEmpty) {
-      return SizedBox(
-        height: 90,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.category_outlined,
-                  color: _AppColors.gray200, size: 28),
-              const SizedBox(height: 6),
-              Text(
-                'services.no_services'.tr(),
-                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      height: 110,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: categories.length,
-        padding: const EdgeInsets.only(bottom: 4),
-        itemBuilder: (context, index) {
-          final category = categories[index];
-          final isSelected = _selectedCategory?.id == category.id;
-
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                if (isSelected) {
-                  _selectedCategory = null;
-                  _selectedService = null;
-                  _servicesExpanded = false;
-                } else {
-                  _selectedCategory = category;
-                  _selectedService = null;
-                  _servicesExpanded = true;
-                }
-              });
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 90,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                color: isSelected ? _AppColors.accent : _AppColors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: isSelected ? _AppColors.accent : _AppColors.gray200,
-                  width: 1.5,
-                ),
-                boxShadow: isSelected ? [
-                  BoxShadow(
-                    color: _AppColors.accent.withOpacity(0.25),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ] : [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? Colors.white.withOpacity(0.2)
-                          : _AppColors.accentLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      _getCategoryIcon(category.name),
-                      size: 22,
-                      color: isSelected ? _AppColors.white : _AppColors.accent,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    category.name,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? _AppColors.white : _AppColors.gray900,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildServicesLabel() {
-    return Row(
-      children: [
-        Container(
-          width: 3,
-          height: 13,
-          decoration: BoxDecoration(
-            color: _AppColors.accent,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          'booking.available_services'.tr(),
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: _AppColors.gray900,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildServicesList() {
-    if (_selectedCategory == null) return const SizedBox.shrink();
-    final services = _selectedCategory!.services;
-
-    return Column(
-      children: services.map((service) => _buildServiceItem(service)).toList(),
     );
   }
 
@@ -3807,114 +3845,6 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
     );
   }
 
-  Widget _buildServiceItem(Service service) {
-    final isSelected = _selectedService?.id == service.id;
-
-    return GestureDetector(
-      onTap: service.isActive
-          ? () {
-              setState(() {
-                _selectedService = service;
-                _customOfferedFare = service.basePrice;
-                _fareEstimate = null; // Réinitialiser — va être rechargé
-              });
-              if (!_serviceSectionExpanded) {
-                setState(() {
-                  _serviceSectionExpanded = true;
-                  _sheetHeight = 0.75;
-                });
-              }
-              // Rafraîchir le tarif API si la route est déjà calculée
-              _fetchFareEstimate();
-            }
-          : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isSelected ? _AppColors.accentLight : _AppColors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: isSelected ? _AppColors.accent : _AppColors.gray100,
-            width: 1.5,
-          ),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: _AppColors.accent.withOpacity(0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            )
-          ] : [],
-        ),
-        child: Row(
-          children: [
-            // Service Icon background
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: isSelected ? _AppColors.white : _AppColors.gray50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                _getCategoryIcon(_selectedCategory?.name ?? ''),
-                size: 22,
-                color: isSelected ? _AppColors.accent : _AppColors.gray400,
-              ),
-            ),
-            const SizedBox(width: 16),
-            // Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    service.name,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: service.isActive ? _AppColors.gray900 : _AppColors.gray400,
-                    ),
-                  ),
-                  if (service.description != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      service.description!,
-                      style: _AppTextStyles.serviceDescStyle.copyWith(fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Price
-            if (service.basePrice != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${service.basePrice!.toStringAsFixed(2)} ${service.currency}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: isSelected ? _AppColors.accentMid : _AppColors.gray900,
-                    ),
-                  ),
-                  const Text(
-                    'estimé',
-                    style: TextStyle(fontSize: 10, color: _AppColors.gray400),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ── CTA Button ─────────────────────────────────────────────────────────────
   Widget _buildCtaButton() {
     final hasService = _selectedService != null;
@@ -3997,23 +3927,43 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  IconData _getCategoryIcon(String categoryName) {
+  /// Icône + couleur par catégorie (style "cartes colorées" façon inDrive) —
+  /// chaque famille de service a sa propre teinte pour rester identifiable
+  /// d'un coup d'œil dans la liste horizontale et dans le détail des services.
+  _CategoryVisual _categoryVisual(String categoryName) {
     final name = categoryName.toLowerCase();
-    if (name.contains('taxi') || name.contains('transport'))
-      return Icons.local_taxi_rounded;
-    if (name.contains('livraison') || name.contains('delivery'))
-      return Icons.delivery_dining_rounded;
-    if (name.contains('moto')) return Icons.motorcycle_rounded;
-    if (name.contains('van') || name.contains('camion'))
-      return Icons.local_shipping_rounded;
-    if (name.contains('course') || name.contains('ride'))
-      return Icons.directions_car_rounded;
-    if (name.contains('urgence') || name.contains('emergency'))
-      return Icons.emergency_rounded;
-    if (name.contains('premium') || name.contains('luxury'))
-      return Icons.star_rounded;
-    return Icons.category_rounded;
+    if (name.contains('confort') || name.contains('comfort')) {
+      return const _CategoryVisual(Icons.directions_car_filled_rounded, Color(0xFF3B82F6));
+    }
+    if (name.contains('premium') || name.contains('luxury') || name.contains('vip')) {
+      return const _CategoryVisual(Icons.star_rounded, Color(0xFF8B5CF6));
+    }
+    if (name.contains('moto') || name.contains('chap') || name.contains('scooter')) {
+      return const _CategoryVisual(Icons.two_wheeler_rounded, Color(0xFFF59E0B));
+    }
+    if (name.contains('van') || name.contains('camion') || name.contains('truck')) {
+      return const _CategoryVisual(Icons.local_shipping_rounded, Color(0xFF0EA5E9));
+    }
+    if (name.contains('livraison') || name.contains('delivery') ||
+        name.contains('colis') || name.contains('package')) {
+      return const _CategoryVisual(Icons.delivery_dining_rounded, Color(0xFF22C55E));
+    }
+    if (name.contains('urgence') || name.contains('emergency')) {
+      return const _CategoryVisual(Icons.emergency_rounded, Color(0xFFEF4444));
+    }
+    if (name.contains('taxi') || name.contains('transport') ||
+        name.contains('course') || name.contains('ride')) {
+      return _CategoryVisual(Icons.local_taxi_rounded, _AppColors.accent);
+    }
+    return _CategoryVisual(Icons.category_rounded, _AppColors.accent);
   }
+}
+
+/// Icône + couleur associées à une catégorie de service.
+class _CategoryVisual {
+  final IconData icon;
+  final Color color;
+  const _CategoryVisual(this.icon, this.color);
 }
 
 // ─── Reusable UI Components ────────────────────────────────────────────────────

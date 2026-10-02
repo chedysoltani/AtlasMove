@@ -19,6 +19,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!-- Notifications "nouvelle course" / "appel entrant" en plein écran, écran verrouillé -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD"/>
+
     <!-- Bloquer la permission MEDIA_PROJECTION injectée automatiquement par Agora SDK -->
     <!-- L'app utilise Agora uniquement pour les appels audio VoIP — pas de partage d'écran -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"
@@ -28,7 +33,9 @@
     <application
         android:label="atlasmove"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
 
         <!-- Disable Impeller on emulators (x86_64 OpenGLES instability) -->
         <meta-data android:name="io.flutter.embedding.android.EnableImpeller"

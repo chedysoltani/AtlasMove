@@ -1,4 +1,4 @@
-﻿{
+{
   "common": {
     "cancel": "Abbrechen",
     "confirm": "Bestätigen",
@@ -56,7 +56,9 @@
     "services": "Dienste",
     "dashboard": "Dashboard",
     "history": "Verlauf",
-    "revenue": "Einnahmen"
+    "revenue": "Einnahmen",
+    "subscription": "Abo",
+    "privilege": "Privileg"
   },
   "lang": {
     "title": "Sprache",
@@ -76,6 +78,8 @@
     "password": "Passwort",
     "password_hint": "••••••••",
     "forgot_password": "Passwort vergessen?",
+    "remember_me": "Angemeldet bleiben",
+    "session_expired": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
     "login_btn": "Anmelden",
     "register_btn": "Registrieren",
     "no_account": "Noch kein Konto?",
@@ -256,7 +260,9 @@
     "logout_subtitle": "Sitzung beenden",
     "rating": "Bewertung",
     "cancellation_reason": "Stornierungsgrund",
-    "offer_submitted_short": "Angebot von {amount} {currency} eingereicht!"
+    "offer_submitted_short": "Angebot von {amount} {currency} eingereicht!",
+    "services_menu": "Dienste",
+    "services_subtitle": "Verfügbare Dienste durchsuchen"
   },
   "client": {
     "dashboard_title": "Meine Übersicht",
@@ -295,6 +301,7 @@
     "searching_driver": "Fahrer wird gesucht...",
     "driver_found": "Fahrer gefunden!",
     "driver_en_route": "Fahrer ist unterwegs",
+    "driver_arrived": "Ihr Fahrer ist angekommen",
     "ride_in_progress": "Fahrt läuft",
     "ride_completed": "Fahrt abgeschlossen",
     "cancel_ride": "Fahrt stornieren?",
@@ -378,7 +385,9 @@
     "cancelling": "Stornierung...",
     "ride_completed_success": "Fahrt abgeschlossen! 🎉",
     "amount_paid": "Bezahlter Betrag: {amount} {currency}",
-    "cancel_confirm_body": "Sind Sie sicher, dass Sie stornieren möchten? Es können Gebühren anfallen."
+    "cancel_confirm_body": "Sind Sie sicher, dass Sie stornieren möchten? Es können Gebühren anfallen.",
+    "choose_service": "Service auswählen",
+    "change_service": "Ändern"
   },
   "payment": {
     "title": "Zahlung",
@@ -620,7 +629,8 @@
     "speaker": "Lautsprecher",
     "earpiece": "Ohrhörer",
     "join_error": "Beitritt zum Anruf fehlgeschlagen",
-    "incoming": "Eingehender Anruf..."
+    "incoming": "Eingehender Anruf...",
+    "ringing": "Es klingelt..."
   },
   "signup": {
     "step1_title": "Schritt 1/3",
@@ -647,5 +657,22 @@
     "private": "Privat",
     "professional": "Gewerblich",
     "validate_register": "Bestätigen / Registrieren"
+  },
+  "ride_offer": {
+    "title": "Neue Fahrt!",
+    "taken": "Fahrt wurde von einem anderen Fahrer angenommen",
+    "cancelled": "Fahrt vom Kunden storniert",
+    "expired": "Angebot abgelaufen",
+    "accept_error": "Diese Fahrt konnte nicht angenommen werden"
+  },
+  "location_always": {
+    "title": "Standortverfolgung im Hintergrund",
+    "body": "Um Fahrten zu erhalten und dem Kunden zu ermöglichen, Ihre Fahrt auch bei geschlossener App oder gesperrtem Bildschirm zu verfolgen, erlauben Sie den Standortzugriff « Immer ».",
+    "allow": "Erlauben",
+    "not_now": "Später",
+    "later_notice": "Sie können dies später in den Telefoneinstellungen aktivieren.",
+    "settings_title": "Berechtigung erforderlich",
+    "settings_body": "Öffnen Sie die App-Einstellungen und wählen Sie « Immer » für den Standort.",
+    "open_settings": "Einstellungen öffnen"
   }
 }

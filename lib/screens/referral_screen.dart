@@ -50,7 +50,9 @@ class _ReferralScreenState extends State<ReferralScreen> {
           ),
         ],
       ),
-      body: AnimatedBuilder(
+      body: SafeArea(
+        top: false,
+        child: AnimatedBuilder(
         animation: _service,
         builder: (context, _) {
           if (_service.isLoading && _service.data == null) {
@@ -93,6 +95,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
             ),
           );
         },
+      ),
       ),
     );
   }

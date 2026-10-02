@@ -306,20 +306,23 @@ class _BookingScreenState extends State<BookingScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
         ),
       ),
-      body: Column(
-        children: [
-          // Map Section
-          Expanded(
-            flex: 2,
-            child: _buildMapSection(),
-          ),
-          
-          // Form Section
-          Expanded(
-            flex: 3,
-            child: _buildFormSection(),
-          ),
-        ],
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            // Map Section
+            Expanded(
+              flex: 2,
+              child: _buildMapSection(),
+            ),
+
+            // Form Section
+            Expanded(
+              flex: 3,
+              child: _buildFormSection(),
+            ),
+          ],
+        ),
       ),
     );
   }

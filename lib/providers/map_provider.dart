@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show Offset;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -83,14 +84,35 @@ class MapNotifier extends StateNotifier<MapState> {
   final LocationService _locationService = LocationService();
   StreamSubscription<Position>? _positionSub;
   GoogleMapController? _mapController;
+  Position? _lastPosition;
+
+  // Options de la dernière initialisation (voir initializeMap).
+  bool _showUserMarker = true;
+  bool _autoFollowCamera = true;
 
   /// Expose the live controller without polluting immutable MapState.
   GoogleMapController? get mapController => _mapController;
 
+  /// Dernière position GPS complète (cap, vitesse, précision) — MapState ne
+  /// garde que le LatLng.
+  Position? get lastPosition => _lastPosition;
+
   MapNotifier() : super(const MapState());
 
-  /// Initialiser la carte et obtenir la position
-  Future<void> initializeMap() async {
+  /// Initialiser la carte et obtenir la position.
+  ///
+  /// [showUserMarker] : ajoute le marqueur bleu 'current_position'. À passer à
+  /// `false` sur les écrans qui affichent leur propre marqueur chauffeur, sinon
+  /// deux marqueurs représentent la même position.
+  /// [autoFollowCamera] : le notifier recentre lui-même la caméra à chaque
+  /// position. À passer à `false` quand l'écran pilote la caméra (sinon deux
+  /// animateCamera se disputent).
+  Future<void> initializeMap({
+    bool showUserMarker = true,
+    bool autoFollowCamera = true,
+  }) async {
+    _showUserMarker = showUserMarker;
+    _autoFollowCamera = autoFollowCamera;
     state = state.copyWith(status: MapStatus.loading);
 
     try {
@@ -130,15 +152,8 @@ class MapNotifier extends StateNotifier<MapState> {
         return;
       }
 
+      _lastPosition = position;
       final latLng = LatLng(position.latitude, position.longitude);
-      
-      // Créer le marker pour la position actuelle
-      final userMarker = Marker(
-        markerId: const MarkerId('current_position'),
-        position: latLng,
-        infoWindow: const InfoWindow(title: 'Votre position'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-      );
 
       final initialCameraPosition = CameraPosition(
         target: latLng,
@@ -148,7 +163,9 @@ class MapNotifier extends StateNotifier<MapState> {
       state = state.copyWith(
         status: MapStatus.ready,
         currentPosition: latLng,
-        markers: {userMarker},
+        // Repart d'un état propre : ce provider est global, les marqueurs d'un
+        // écran précédent ne doivent pas survivre.
+        markers: _showUserMarker ? {_userMarker(latLng)} : <Marker>{},
         cameraPosition: initialCameraPosition,
         errorMessage: null,
       );
@@ -170,27 +187,63 @@ class MapNotifier extends StateNotifier<MapState> {
     await _locationService.startLocationUpdates();
 
     _positionSub = _locationService.positionStream?.listen((Position position) {
+      _lastPosition = position;
       final latLng = LatLng(position.latitude, position.longitude);
-
-      final userMarker = Marker(
-        markerId: const MarkerId('current_position'),
-        position: latLng,
-        infoWindow: const InfoWindow(title: 'Votre position'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-      );
 
       state = state.copyWith(
         currentPosition: latLng,
-        markers: {...state.markers.where((m) => m.markerId.value != 'current_position'), userMarker},
+        markers: _showUserMarker
+            ? _replaceMarker(state.markers, _userMarker(latLng))
+            : state.markers,
       );
 
       // Follow user but preserve current zoom level instead of hardcoding 15
-      if (state.isFollowingUser && _mapController != null) {
+      if (_autoFollowCamera && state.isFollowingUser && _mapController != null) {
         _mapController!.animateCamera(
           CameraUpdate.newLatLng(latLng),
         );
       }
     });
+  }
+
+  BitmapDescriptor? _userIcon;
+
+  /// Icône personnalisée du marqueur « vous êtes ici » (sinon pin bleu par défaut).
+  void setUserMarkerIcon(BitmapDescriptor icon) {
+    _userIcon = icon;
+    final pos = state.currentPosition;
+    if (_showUserMarker && pos != null) {
+      state = state.copyWith(markers: _replaceMarker(state.markers, _userMarker(pos)));
+    }
+  }
+
+  Marker _userMarker(LatLng position) => Marker(
+        markerId: const MarkerId('current_position'),
+        position: position,
+        infoWindow: const InfoWindow(title: 'Votre position'),
+        icon: _userIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+        anchor: _userIcon != null ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0),
+      );
+
+  /// `Marker.==` compare TOUS les champs (position, rotation, icône…) alors que
+  /// `hashCode` ne dépend que du markerId : un `{...set, marker}` avec le même
+  /// id mais une autre position ajoute un doublon dans le Set au lieu de
+  /// remplacer. On remplace donc explicitement par id.
+  static Set<Marker> _replaceMarker(Set<Marker> markers, Marker marker) => {
+        for (final m in markers)
+          if (m.markerId != marker.markerId) m,
+        marker,
+      };
+
+  /// Arrête le suivi GPS et détache la carte. À appeler dans le `dispose()` de
+  /// l'écran : ce provider est global, sans cela le flux GPS haute précision
+  /// continue de tourner (et d'animer un contrôleur détruit) après la sortie
+  /// de l'écran.
+  void stopTracking() {
+    _positionSub?.cancel();
+    _positionSub = null;
+    _mapController = null;
   }
 
   /// Définir le contrôleur de la carte
@@ -220,7 +273,7 @@ class MapNotifier extends StateNotifier<MapState> {
   /// Ajouter un marker
   void addMarker(Marker marker) {
     state = state.copyWith(
-      markers: {...state.markers, marker},
+      markers: _replaceMarker(state.markers, marker),
     );
   }
 

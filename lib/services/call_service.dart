@@ -6,6 +6,7 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../core/network/http_client.dart';
 import '../core/storage/token_storage.dart';
 import '../models/call_models.dart';
+import '../core/utils/permission_gate.dart';
 
 class CallService {
   static final CallService _instance = CallService._internal();
@@ -27,6 +28,12 @@ class CallService {
   static void Function(CallSession session)? onCallAccepted;
   static void Function(String callId)? onCallEnded;
   static void Function(String callId)? onCallRejected;
+  // Callee's device a affiché l'appel : le CALLEUR reçoit call.ringing ("ça sonne").
+  static void Function(String callId)? onCallRinging;
+  // Personne n'a répondu dans le délai serveur (~40 s) : les deux parties le reçoivent.
+  static void Function(String callId)? onCallTimeout;
+  // Répondu sur un AUTRE appareil du même compte — ignoré si c'est cet appareil qui a répondu.
+  static void Function(String callId)? onAnsweredElsewhere;
 
   String? lastError;
 
@@ -36,11 +43,25 @@ class CallService {
   String? get activeCallId => _activeCallId;
 
   /// Connect to the /calling Socket.io namespace.
-  /// Safe to call multiple times — skips if already connected.
-  Future<void> connectSocket() async {
-    if (_socket != null && _socket!.connected) return;
+  /// Safe to call multiple times — skips if already connected, sauf [force].
+  ///
+  /// [force] : recrée la socket même si `_socket.connected` répond déjà
+  /// `true`. Nécessaire au retour au premier plan — après une coupure réseau,
+  /// un changement Wi-Fi/4G ou une longue mise en arrière-plan sur téléphone
+  /// physique, TCP peut rester bloqué dans un état "connecté" alors que la
+  /// liaison est morte (le serveur ne détecte la coupure qu'après son propre
+  /// délai de ping/pong, souvent bien plus tard). Sans ce paramètre, l'appelé
+  /// ne reçoit alors plus jamais `call.incoming`/`call.accepted` tant que
+  /// l'app n'est pas relancée — symptôme observé : les appels fonctionnent au
+  /// tout début puis plus du tout, surtout entre deux téléphones physiques.
+  Future<void> connectSocket({bool force = false}) async {
+    if (!force && _socket != null && _socket!.connected) return;
 
-    final token = await TokenStorage.getAccessToken();
+    // Socket morte, zombie ou en reconnexion avec un vieux token : on la remplace.
+    _socket?.dispose();
+    _socket = null;
+
+    final token = await HttpClient.getValidAccessToken();
     if (token == null || token.isEmpty) {
       debugPrint('⚠️ CallService: Pas de token, connexion différée.');
       return;
@@ -51,7 +72,10 @@ class CallService {
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
-          .setAuth({'token': token})
+          .setAuthFn((cb) async {
+            final fresh = await HttpClient.getValidAccessToken();
+            cb({'token': fresh ?? ''});
+          })
           .build(),
     );
 
@@ -70,6 +94,9 @@ class CallService {
     _socket!.onConnectError((data) {
       debugPrint('⚠️ CallService: Erreur de connexion: $data');
     });
+
+    // auth_error puis déconnexion côté serveur (aussi ~30 s avant expiration du token)
+    _socket!.on('auth_error', (payload) => _onAuthError(payload));
 
     _socket!.on('call.incoming', (payload) {
       debugPrint('📞 RAW call.incoming: $payload');
@@ -120,6 +147,60 @@ class CallService {
       _releaseAgoraEngine();
       _activeCallId = null;
     });
+
+    // Le callee a affiché l'écran d'appel (POST /calls/{id}/ringing) : côté
+    // appelant, on peut afficher « ça sonne » à la place de « connexion... ».
+    _socket!.on('call.ringing', (_) {
+      debugPrint('📳 CallService: call.ringing');
+      onCallRinging?.call(_activeCallId ?? '');
+    });
+
+    // Personne n'a répondu dans le délai serveur — les deux parties le reçoivent.
+    _socket!.on('call.timeout', (_) {
+      debugPrint('⏱️ CallService: call.timeout (appel manqué)');
+      final callId = _activeCallId ?? '';
+      onCallTimeout?.call(callId);
+      _releaseAgoraEngine();
+      _activeCallId = null;
+    });
+
+    // Répondu sur un autre appareil du même compte — ignoré si c'est CET appareil.
+    _socket!.on('call.answered_elsewhere', (payload) async {
+      final data = _toMap(payload);
+      final answeredDeviceId = data?['answeredDeviceId']?.toString();
+      final myDeviceId = await TokenStorage.getOrCreateDeviceId();
+      if (answeredDeviceId == myDeviceId) return;
+      debugPrint('📱 CallService: répondu sur un autre appareil');
+      final callId = _activeCallId ?? '';
+      onAnsweredElsewhere?.call(callId);
+      _releaseAgoraEngine();
+      _activeCallId = null;
+    });
+  }
+
+  bool _handlingAuthError = false;
+
+  Future<void> _onAuthError(dynamic payload) async {
+    if (_handlingAuthError) return;
+    _handlingAuthError = true;
+    try {
+      final code = _toMap(payload)?['code']?.toString();
+      debugPrint('🔐 CallService: auth_error ($code)');
+      if (code == 'token_expired') {
+        final outcome = await HttpClient.refreshSession();
+        if (outcome == RefreshOutcome.invalid) {
+          await HttpClient.handleSessionInvalid();
+        } else {
+          // Ne touche pas à un appel en cours : seule la socket de signalisation est recréée
+          disconnect();
+          if (outcome == RefreshOutcome.success) await connectSocket();
+        }
+      } else if (code == 'token_revoked' || code == 'invalid_token') {
+        await HttpClient.handleSessionInvalid();
+      }
+    } finally {
+      _handlingAuthError = false;
+    }
   }
 
   /// Initiate a call for the given trip. Returns the CallSession on success or null on failure.
@@ -130,16 +211,13 @@ class CallService {
     }
 
     try {
+      // HttpClient lève une exception sur tout statut >= 400 — `response` n'est
+      // JAMAIS un échec ici (le bloc "if (!response.isSuccess)" qui existait avant
+      // était mort : le vrai statut/message d'erreur remonte dans le catch ci-dessous).
       final response = await HttpClient.post(
         '/calls/initiate',
         body: {'tripId': tripId},
       );
-
-      if (!response.isSuccess) {
-        lastError = 'HTTP ${response.statusCode}: ${response.body}';
-        debugPrint('❌ CallService: initiateCall $lastError');
-        return null;
-      }
 
       final raw = response.json;
       debugPrint('📞 initiateCall response: $raw');
@@ -158,7 +236,7 @@ class CallService {
       await _initAgoraAndJoin(session.channelName, session.agoraToken);
       return session;
     } catch (e, st) {
-      lastError = e.toString();
+      lastError = _describeInitiateError(e);
       debugPrint('❌ CallService: initiateCall exception: $e\n$st');
       return null;
     }
@@ -170,7 +248,7 @@ class CallService {
     debugPrint('📞 acceptCall: id=$callId channel=$channelName tokenLen=${agoraToken.length}');
 
     // Step 1 — microphone permission
-    final micStatus = await Permission.microphone.request();
+    final micStatus = await PermissionGate.run(Permission.microphone.request, onTimeout: PermissionStatus.denied);
     debugPrint('🎤 CallService: mic permission = $micStatus');
     if (!micStatus.isGranted) {
       lastError = 'Permission microphone refusée ($micStatus)';
@@ -178,9 +256,12 @@ class CallService {
       return false;
     }
 
-    // Step 2 — notify backend
+    // Step 2 — notify backend. device_id : si ce compte répond sur un autre
+    // appareil, le backend annule celui-ci via call.answered_elsewhere.
     try {
-      final resp = await HttpClient.post('/calls/$callId/accept');
+      final resp = await HttpClient.post('/calls/$callId/accept', body: {
+        'device_id': await TokenStorage.getOrCreateDeviceId(),
+      });
       debugPrint('📞 accept response: ${resp.statusCode} ${resp.body}');
       if (!resp.isSuccess) {
         lastError = 'accept HTTP ${resp.statusCode}: ${resp.body}';
@@ -194,16 +275,48 @@ class CallService {
       return false;
     }
 
-    // Step 3 — join Agora
+    // Step 3 — join Agora. Un token vide (appel reconstruit depuis une
+    // notification système, qui n'en transporte pas) est récupéré ici.
     try {
       if (_socket == null || !_socket!.connected) await connectSocket();
-      await _initAgoraAndJoin(channelName, agoraToken);
+      var token = agoraToken;
+      if (token.isEmpty) {
+        token = await fetchAgoraToken(callId) ?? '';
+      }
+      await _initAgoraAndJoin(channelName, token);
       debugPrint('✅ CallService: Agora rejoint avec succès');
       return true;
     } catch (e, st) {
       lastError = 'Agora: $e';
       debugPrint('❌ CallService: Agora join exception: $e\n$st');
       return false;
+    }
+  }
+
+  /// À appeler dès que l'écran d'appel entrant est affiché — le backend relaie
+  /// alors `call.ringing` à l'appelant ("ça sonne"). Best effort : une erreur ici
+  /// ne doit jamais empêcher de décrocher.
+  Future<void> notifyRinging(String callId) async {
+    try {
+      await HttpClient.post('/calls/$callId/ringing');
+    } catch (e) {
+      debugPrint('⚠️ CallService: notifyRinging: ${e.runtimeType}');
+    }
+  }
+
+  /// Récupère (ou renouvelle) le token Agora de cette session — nécessaire
+  /// quand l'appel entrant vient d'une notification système (le push ne
+  /// contient pas de token) ou quand le token approche de son expiration.
+  Future<String?> fetchAgoraToken(String callId) async {
+    try {
+      final resp = await HttpClient.get('/calls/$callId/token');
+      if (!resp.isSuccess) return null;
+      final json = resp.json;
+      final data = (json['data'] is Map ? json['data'] as Map : json);
+      return (data['token'] ?? data['agoraToken'] ?? data['agora_token'])?.toString();
+    } catch (e) {
+      debugPrint('❌ CallService: fetchAgoraToken: ${e.runtimeType}');
+      return null;
     }
   }
 
@@ -254,7 +367,7 @@ class CallService {
   // ─── Private helpers ────────────────────────────────────────────────────────
 
   Future<bool> _ensureSocketAndPermission() async {
-    final status = await Permission.microphone.request();
+    final status = await PermissionGate.run(Permission.microphone.request, onTimeout: PermissionStatus.denied);
     debugPrint('🎤 CallService: mic permission = $status');
     if (!status.isGranted) {
       lastError = 'Permission microphone refusée ($status). Sur iOS, vérifiez Réglages > AtlasMove > Microphone.';
@@ -270,7 +383,7 @@ class CallService {
   Future<void> _initAgoraAndJoin(String channelName, String token) async {
     if (channelName.isEmpty) throw Exception('channelName vide — payload socket incomplet');
     if (token.isEmpty) throw Exception('agoraToken vide — token absent du payload');
-    debugPrint('🔧 Agora: channelName=$channelName token=${token.substring(0, token.length.clamp(0, 20))}...');
+    debugPrint('🔧 Agora: channelName=$channelName tokenLen=${token.length}');
 
     // Release previous engine — set null FIRST to avoid race with socket events
     final old = _rtcEngine;
@@ -344,6 +457,19 @@ class CallService {
     _isSpeakerOn = true;
     try { await engine.leaveChannel(); } catch (_) {}
     try { await engine.release(); } catch (_) {}
+  }
+
+  /// Message affiché à l'appelant quand `/calls/initiate` échoue. Un 409
+  /// (`callee_busy` — l'autre partie a déjà un appel en cours) devient un
+  /// message clair en français ; le reste garde le message du serveur, qui
+  /// est déjà lisible (ex. "trip not active", "forbidden").
+  String _describeInitiateError(Object e) {
+    if (e is ApiException && e.response?.statusCode == 409) {
+      return 'La ligne est occupée : l\'autre partie a déjà un appel en cours. '
+          'Réessayez dans un instant, ou vérifiez qu\'aucun appel précédent n\'est resté ouvert.';
+    }
+    if (e is ApiException) return e.message;
+    return e.toString();
   }
 
   Map<String, dynamic>? _toMap(dynamic payload) {

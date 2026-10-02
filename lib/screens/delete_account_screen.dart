@@ -76,7 +76,10 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
         ),
         elevation: 0,
       ),
-      body: _step == 0 ? _buildWarning() : _buildPasswordStep(),
+      body: SafeArea(
+        top: false,
+        child: _step == 0 ? _buildWarning() : _buildPasswordStep(),
+      ),
     );
   }
 

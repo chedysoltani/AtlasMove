@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/trip_models.dart';
 import '../core/network/http_client.dart';
+import 'location_tracking_service.dart';
 import 'profile_service.dart';
 
 class FareEstimate {
@@ -304,6 +306,8 @@ class TripService {
 
       if (response.isSuccess) {
         debugPrint('✅ Trip accepted successfully');
+        // Course acceptée : la position du chauffeur part en continu (cadence rapide, avec tripId)
+        unawaited(LocationTrackingService().setActiveTrip(tripId));
       } else {
         debugPrint('❌ Failed to accept trip. Status: ${response.statusCode}');
         throw Exception('Failed to accept trip: ${response.body}');
@@ -856,40 +860,78 @@ class TripService {
 
   /// Fetch current driver GPS position for a client's active trip.
   /// Backend: GET /m/trips/{id}/driver-location
+  ///
+  /// Retourne null tant que le chauffeur n'a pas de position (404
+  /// `driver_location_unavailable` : continuer à sonder). Lève
+  /// [TripNotActiveException] sur 409 `trip_not_active` : la course est
+  /// terminée, il faut ARRÊTER de sonder.
   static Future<DriverLocationDto?> getDriverLocation(String tripId) async {
     try {
       final response = await HttpClient.get('/m/trips/$tripId/driver-location');
       if (response.isSuccess) {
-        // API: { data: { message, data: { lat, lng, heading } } }
-        final outer = response.json['data'];
+        // API: { message, data: { tripId, latitude, longitude, heading, speed, accuracy, timestamp, updatedAt } }
+        final json = response.json;
+        final outer = json['data'];
         final raw = (outer is Map && outer['data'] is Map)
-            ? outer['data'] as Map<String, dynamic>
-            : (outer as Map<String, dynamic>? ?? response.json as Map<String, dynamic>);
-        final lat = (raw['lat'] ?? raw['latitude'] as num?)?.toDouble();
-        final lng = (raw['lng'] ?? raw['longitude'] as num?)?.toDouble();
+            ? Map<String, dynamic>.from(outer['data'] as Map)
+            : (outer is Map ? Map<String, dynamic>.from(outer) : json);
+        final lat = ((raw['latitude'] ?? raw['lat']) as num?)?.toDouble();
+        final lng = ((raw['longitude'] ?? raw['lng']) as num?)?.toDouble();
         if (lat == null || lng == null) return null;
         return DriverLocationDto(
           latitude: lat,
           longitude: lng,
           heading: (raw['heading'] as num?)?.toDouble(),
+          speed: (raw['speed'] as num?)?.toDouble(),
+          accuracy: (raw['accuracy'] as num?)?.toDouble(),
         );
       }
+    } on ApiException catch (e) {
+      final code = _errorCode(e);
+      if (e.response?.statusCode == 409 && code == 'trip_not_active') {
+        throw TripNotActiveException();
+      }
+      // 404 driver_location_unavailable, 400 no_driver_assigned, réseau… : on réessaiera
     } catch (e) {
-      debugPrint('❌ TripService.getDriverLocation: $e');
+      debugPrint('❌ TripService.getDriverLocation: ${e.runtimeType}');
     }
     return null;
   }
+
+  /// `error.code` (ou `code`) du corps d'erreur du backend.
+  static String? _errorCode(ApiException e) {
+    try {
+      final body = e.response?.body;
+      if (body == null || body.isEmpty) return null;
+      final json = jsonDecode(body);
+      if (json is! Map) return null;
+      final err = json['error'];
+      return ((err is Map ? err['code'] : null) ?? json['code'])?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+/// La course n'est plus active côté serveur (terminée / annulée / expirée).
+class TripNotActiveException implements Exception {
+  @override
+  String toString() => 'trip_not_active';
 }
 
 class DriverLocationDto {
   final double latitude;
   final double longitude;
   final double? heading;
+  final double? speed; // m/s
+  final double? accuracy; // m
 
   const DriverLocationDto({
     required this.latitude,
     required this.longitude,
     this.heading,
+    this.speed,
+    this.accuracy,
   });
 }
 

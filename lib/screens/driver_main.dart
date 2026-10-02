@@ -5,9 +5,7 @@ import '../utils/app_theme.dart';
 import 'driver_dashboard.dart';
 import 'driver_rides.dart';
 import 'driver_active_ride.dart';
-import 'driver_profile.dart';
 import 'driver_rendezvous_screen.dart';
-import 'services_catalogue_screen.dart';
 import '../services/trip_service.dart';
 import '../models/trip_models.dart';
 
@@ -28,6 +26,10 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
   @override
   void initState() {
     super.initState();
+    // Seuls les 3 premiers onglets restent des pages embarquées (IndexedStack) —
+    // Abonnement et Programme Privilège ont chacun leur propre AppBar avec bouton
+    // retour ; on les affiche en navigation empilée (push) pour que ce bouton
+    // fonctionne, au lieu de les intégrer dans le corps de ce Scaffold.
     _pages = [
       const DriverDashboard(),
       DriverRidesScreen(
@@ -38,8 +40,6 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
         },
       ),
       const DriverRendezvousScreen(),
-      const ServicesCatalogueScreen(),
-      const DriverProfileScreen(),
     ];
     WidgetsBinding.instance.addObserver(this);
     // Check for active trip when screen is first loaded
@@ -141,10 +141,10 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
                   label: 'nav.rides'.tr(), index: 1),
               _buildNavItem(icon: Icons.calendar_month_rounded,
                   label: 'nav.rdv'.tr(), index: 2),
-              _buildNavItem(icon: Icons.work_outline_rounded,
-                  label: 'nav.services'.tr(), index: 3),
-              _buildNavItem(icon: Icons.person_rounded,
-                  label: 'nav.profile'.tr(), index: 4),
+              _buildNavAction(icon: Icons.card_membership_rounded,
+                  label: 'nav.subscription'.tr(), route: '/driver_subscription'),
+              _buildNavAction(icon: Icons.star_rounded,
+                  label: 'nav.privilege'.tr(), route: '/driver_offer'),
             ],
           ),
         ),
@@ -184,6 +184,37 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
               color: isSelected ? orange : const Color(0xFF9BA3B4),
               fontSize: 10,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Onglet "action" : au lieu de basculer l'`IndexedStack`, empile l'écran
+  /// (celui-ci gère son propre bouton retour). Ne reste jamais "sélectionné" —
+  /// c'est un raccourci, pas un onglet persistant.
+  Widget _buildNavAction({
+    required IconData icon,
+    required String label,
+    required String route,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        Navigator.pushNamed(context, route);
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: const Color(0xFF9BA3B4), size: 22),
+            const SizedBox(height: 3),
+            Text(label, style: const TextStyle(
+              color: Color(0xFF9BA3B4),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
             )),
           ],
         ),

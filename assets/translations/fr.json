@@ -1,4 +1,4 @@
-﻿{
+{
   "common": {
     "cancel": "Annuler",
     "confirm": "Confirmer",
@@ -56,7 +56,9 @@
     "services": "Services",
     "dashboard": "Dashboard",
     "history": "Historique",
-    "revenue": "Revenus"
+    "revenue": "Revenus",
+    "subscription": "Abonnement",
+    "privilege": "Privilège"
   },
   "lang": {
     "title": "Langue",
@@ -76,6 +78,8 @@
     "password": "Mot de passe",
     "password_hint": "••••••••",
     "forgot_password": "Mot de passe oublié ?",
+    "remember_me": "Se souvenir de moi",
+    "session_expired": "Votre session a expiré. Veuillez vous reconnecter.",
     "login_btn": "Se connecter",
     "register_btn": "S'inscrire",
     "no_account": "Pas encore de compte ?",
@@ -256,7 +260,9 @@
     "logout_subtitle": "Quitter votre session",
     "rating": "Note",
     "cancellation_reason": "Raison de l'annulation",
-    "offer_submitted_short": "Offre de {amount} {currency} soumise !"
+    "offer_submitted_short": "Offre de {amount} {currency} soumise !",
+    "services_menu": "Services",
+    "services_subtitle": "Catalogue des services disponibles"
   },
   "client": {
     "dashboard_title": "Mon tableau de bord",
@@ -295,6 +301,7 @@
     "searching_driver": "Recherche d'un chauffeur...",
     "driver_found": "Chauffeur trouvé !",
     "driver_en_route": "Chauffeur en route vers vous",
+    "driver_arrived": "Votre chauffeur est arrivé",
     "ride_in_progress": "Course en cours",
     "ride_completed": "Course terminée",
     "cancel_ride": "Annuler la course ?",
@@ -378,7 +385,9 @@
     "cancelling": "Annulation...",
     "ride_completed_success": "Course terminée ! 🎉",
     "amount_paid": "Montant payé : {amount} {currency}",
-    "cancel_confirm_body": "Êtes-vous sûr de vouloir annuler ? Des frais peuvent s'appliquer."
+    "cancel_confirm_body": "Êtes-vous sûr de vouloir annuler ? Des frais peuvent s'appliquer.",
+    "choose_service": "Choisissez un service",
+    "change_service": "Changer"
   },
   "payment": {
     "title": "Paiement",
@@ -620,7 +629,8 @@
     "speaker": "Haut-parleur",
     "earpiece": "Oreillette",
     "join_error": "Impossible de rejoindre l'appel",
-    "incoming": "Appel entrant..."
+    "incoming": "Appel entrant...",
+    "ringing": "Ça sonne..."
   },
   "signup": {
     "step1_title": "Étape 1/3",
@@ -647,5 +657,22 @@
     "private": "Particulier",
     "professional": "Professionnel",
     "validate_register": "Valider / S'inscrire"
+  },
+  "ride_offer": {
+    "title": "Nouvelle course !",
+    "taken": "Course prise par un autre chauffeur",
+    "cancelled": "Course annulée par le client",
+    "expired": "Offre expirée",
+    "accept_error": "Impossible d'accepter cette course"
+  },
+  "location_always": {
+    "title": "Suivi de position en arrière-plan",
+    "body": "Pour recevoir des courses et permettre au client de suivre votre trajet même quand l'app est en arrière-plan ou l'écran verrouillé, autorisez la localisation « Toujours ».",
+    "allow": "Autoriser",
+    "not_now": "Plus tard",
+    "later_notice": "Vous pourrez l'activer plus tard depuis les réglages de votre téléphone.",
+    "settings_title": "Autorisation nécessaire",
+    "settings_body": "Ouvrez les réglages de l'application et choisissez « Toujours » pour la localisation.",
+    "open_settings": "Ouvrir les réglages"
   }
 }

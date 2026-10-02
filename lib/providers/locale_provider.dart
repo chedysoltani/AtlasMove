@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/device_token_service.dart';
 
 class LocaleProvider extends ChangeNotifier {
   static const _key = 'selected_locale';
@@ -43,6 +45,8 @@ class LocaleProvider extends ChangeNotifier {
   static Future<void> changeLocale(BuildContext context, Locale locale) async {
     await saveLocale(locale.languageCode);
     await context.setLocale(locale);
+    // Le backend localise les push selon la langue de l'appareil enregistrée
+    unawaited(DeviceTokenService().syncRegistration());
   }
 
   static bool isRtl(Locale locale) => locale.languageCode == 'ar';

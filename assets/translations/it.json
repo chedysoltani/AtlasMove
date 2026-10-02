@@ -1,4 +1,4 @@
-﻿{
+{
   "common": {
     "cancel": "Annulla",
     "confirm": "Conferma",
@@ -56,7 +56,9 @@
     "services": "Servizi",
     "dashboard": "Dashboard",
     "history": "Cronologia",
-    "revenue": "Entrate"
+    "revenue": "Entrate",
+    "subscription": "Abbonamento",
+    "privilege": "Privilegio"
   },
   "lang": {
     "title": "Lingua",
@@ -76,6 +78,8 @@
     "password": "Password",
     "password_hint": "••••••••",
     "forgot_password": "Password dimenticata?",
+    "remember_me": "Ricordami",
+    "session_expired": "La tua sessione è scaduta. Accedi di nuovo.",
     "login_btn": "Accedi",
     "register_btn": "Registrati",
     "no_account": "Non hai un account?",
@@ -256,7 +260,9 @@
     "logout_subtitle": "Esci dalla sessione",
     "rating": "Valutazione",
     "cancellation_reason": "Motivo cancellazione",
-    "offer_submitted_short": "Offerta di {amount} {currency} inviata!"
+    "offer_submitted_short": "Offerta di {amount} {currency} inviata!",
+    "services_menu": "Servizi",
+    "services_subtitle": "Catalogo dei servizi disponibili"
   },
   "client": {
     "dashboard_title": "La Mia Dashboard",
@@ -295,6 +301,7 @@
     "searching_driver": "Ricerca di un autista...",
     "driver_found": "Autista trovato!",
     "driver_en_route": "L'autista è in arrivo",
+    "driver_arrived": "L'autista è arrivato",
     "ride_in_progress": "Corsa in corso",
     "ride_completed": "Corsa completata",
     "cancel_ride": "Annullare la corsa?",
@@ -378,7 +385,9 @@
     "cancelling": "Annullamento...",
     "ride_completed_success": "Corsa completata! 🎉",
     "amount_paid": "Importo pagato: {amount} {currency}",
-    "cancel_confirm_body": "Sei sicuro di voler annullare? Potrebbero applicarsi costi."
+    "cancel_confirm_body": "Sei sicuro di voler annullare? Potrebbero applicarsi costi.",
+    "choose_service": "Scegli un servizio",
+    "change_service": "Cambia"
   },
   "payment": {
     "title": "Pagamento",
@@ -620,7 +629,8 @@
     "speaker": "Altoparlante",
     "earpiece": "Auricolare",
     "join_error": "Impossibile partecipare alla chiamata",
-    "incoming": "Chiamata in arrivo..."
+    "incoming": "Chiamata in arrivo...",
+    "ringing": "Sta squillando..."
   },
   "signup": {
     "step1_title": "Passo 1/3",
@@ -647,5 +657,22 @@
     "private": "Privato",
     "professional": "Professionale",
     "validate_register": "Valida / Registrati"
+  },
+  "ride_offer": {
+    "title": "Nuova corsa!",
+    "taken": "Corsa presa da un altro autista",
+    "cancelled": "Corsa annullata dal cliente",
+    "expired": "Offerta scaduta",
+    "accept_error": "Impossibile accettare questa corsa"
+  },
+  "location_always": {
+    "title": "Tracciamento della posizione in background",
+    "body": "Per ricevere corse e permettere al cliente di seguire il tuo tragitto anche con l'app in background o lo schermo bloccato, consenti la posizione « Sempre ».",
+    "allow": "Consenti",
+    "not_now": "Più tardi",
+    "later_notice": "Potrai attivarlo più tardi dalle impostazioni del telefono.",
+    "settings_title": "Autorizzazione necessaria",
+    "settings_body": "Apri le impostazioni dell'app e scegli « Sempre » per la posizione.",
+    "open_settings": "Apri impostazioni"
   }
 }

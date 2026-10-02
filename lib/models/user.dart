@@ -201,8 +201,14 @@ class User {
       cinImage: map['cinImage'],
       carteGriseImage: map['carteGriseImage'],
       permisImage: map['permisImage'],
-      isVerified: map['isVerified'] ?? false,
-      isAvailable: map['isAvailable'] ?? false,
+      // Le backend renvoie ces deux champs en snake_case (is_verified, is_available),
+      // comme le reste de cette fonction (first_name, created_at, referral_code…) —
+      // seuls ceux-ci ne lisaient que la variante camelCase, absente de la réponse
+      // réelle : ils retombaient donc toujours sur `false`, quelle que soit la
+      // valeur réelle côté serveur (cause du chauffeur affiché "hors ligne" après
+      // une course alors que `is_available` n'avait pas changé côté backend).
+      isVerified: map['is_verified'] ?? map['isVerified'] ?? false,
+      isAvailable: map['is_available'] ?? map['isAvailable'] ?? false,
       referralCode: map['referral_code'] ?? map['referralCode'],
     );
   }

@@ -1,4 +1,4 @@
-﻿{
+{
   "common": {
     "cancel": "Cancelar",
     "confirm": "Confirmar",
@@ -56,7 +56,9 @@
     "services": "Servicios",
     "dashboard": "Dashboard",
     "history": "Historial",
-    "revenue": "Ingresos"
+    "revenue": "Ingresos",
+    "subscription": "Suscripción",
+    "privilege": "Privilegio"
   },
   "lang": {
     "title": "Idioma",
@@ -76,6 +78,8 @@
     "password": "Contraseña",
     "password_hint": "••••••••",
     "forgot_password": "¿Olvidaste tu contraseña?",
+    "remember_me": "Recordarme",
+    "session_expired": "Tu sesión ha caducado. Vuelve a iniciar sesión.",
     "login_btn": "Iniciar sesión",
     "register_btn": "Registrarse",
     "no_account": "¿No tienes cuenta?",
@@ -256,7 +260,9 @@
     "logout_subtitle": "Cerrar sesión",
     "rating": "Calificación",
     "cancellation_reason": "Motivo de cancelación",
-    "offer_submitted_short": "¡Oferta de {amount} {currency} enviada!"
+    "offer_submitted_short": "¡Oferta de {amount} {currency} enviada!",
+    "services_menu": "Servicios",
+    "services_subtitle": "Catálogo de servicios disponibles"
   },
   "client": {
     "dashboard_title": "Mi Panel",
@@ -295,6 +301,7 @@
     "searching_driver": "Buscando conductor...",
     "driver_found": "¡Conductor encontrado!",
     "driver_en_route": "El conductor está en camino",
+    "driver_arrived": "Tu conductor ha llegado",
     "ride_in_progress": "Viaje en curso",
     "ride_completed": "Viaje completado",
     "cancel_ride": "¿Cancelar el viaje?",
@@ -378,7 +385,9 @@
     "cancelling": "Cancelando...",
     "ride_completed_success": "¡Viaje completado! 🎉",
     "amount_paid": "Importe pagado: {amount} {currency}",
-    "cancel_confirm_body": "¿Está seguro de que desea cancelar? Pueden aplicarse cargos."
+    "cancel_confirm_body": "¿Está seguro de que desea cancelar? Pueden aplicarse cargos.",
+    "choose_service": "Elige un servicio",
+    "change_service": "Cambiar"
   },
   "payment": {
     "title": "Pago",
@@ -620,7 +629,8 @@
     "speaker": "Altavoz",
     "earpiece": "Auricular",
     "join_error": "No se pudo unir a la llamada",
-    "incoming": "Llamada entrante..."
+    "incoming": "Llamada entrante...",
+    "ringing": "Sonando..."
   },
   "signup": {
     "step1_title": "Paso 1/3",
@@ -647,5 +657,22 @@
     "private": "Particular",
     "professional": "Profesional",
     "validate_register": "Validar / Registrarse"
+  },
+  "ride_offer": {
+    "title": "¡Nuevo viaje!",
+    "taken": "Viaje aceptado por otro conductor",
+    "cancelled": "Viaje cancelado por el cliente",
+    "expired": "Oferta caducada",
+    "accept_error": "No se pudo aceptar este viaje"
+  },
+  "location_always": {
+    "title": "Seguimiento de ubicación en segundo plano",
+    "body": "Para recibir viajes y permitir que el cliente siga tu trayecto incluso con la app en segundo plano o la pantalla bloqueada, permite la ubicación « Siempre ».",
+    "allow": "Permitir",
+    "not_now": "Más tarde",
+    "later_notice": "Podrás activarlo más tarde desde los ajustes de tu teléfono.",
+    "settings_title": "Permiso necesario",
+    "settings_body": "Abre los ajustes de la app y elige « Siempre » para la ubicación.",
+    "open_settings": "Abrir ajustes"
   }
 }
