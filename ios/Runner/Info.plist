@@ -4,6 +4,15 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>fr</string>
+		<string>en</string>
+		<string>ar</string>
+		<string>it</string>
+		<string>de</string>
+		<string>es</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>AtlasMove</string>
 	<key>CFBundleExecutable</key>
@@ -62,6 +71,31 @@
 		<string>remote-notification</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Atlas a besoin d&apos;accéder à la caméra pour prendre une photo de profil ou scanner un document.</string>
+	<string>Atlas a besoin d&apos;accéder à la caméra pour prendre votre selfie de vérification, les photos de votre véhicule, votre photo de profil et vos documents.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>fb28523193994013024</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.atlasmove.atlasmove</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>atlasmove</string>
+			</array>
+		</dict>
+	</array>
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
+	<key>FacebookAppID</key>
+	<string>28523193994013024</string>
+	<key>FacebookClientToken</key>
+	<string>48e80f2fe9aba80cb580b748c9b78cc2</string>
+	<key>FacebookDisplayName</key>
+	<string>AtlasMove</string>
 </dict>
 </plist>

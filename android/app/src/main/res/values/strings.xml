@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Meta (Facebook) App Events -->
+    <string name="facebook_app_id">28523193994013024</string>
+    <string name="facebook_client_token">48e80f2fe9aba80cb580b748c9b78cc2</string>
+</resources>

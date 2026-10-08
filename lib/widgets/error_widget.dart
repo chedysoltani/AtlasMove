@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../providers/map_provider.dart';
 
 class CustomErrorWidget extends StatelessWidget {
@@ -12,7 +13,7 @@ class CustomErrorWidget extends StatelessWidget {
     required this.message,
     this.onRetry,
     this.icon = Icons.error_outline,
-    this.retryText = 'Réessayer',
+    this.retryText,
   });
 
   @override
@@ -48,7 +49,7 @@ class CustomErrorWidget extends StatelessWidget {
                 ElevatedButton.icon(
                   onPressed: onRetry,
                   icon: const Icon(Icons.refresh),
-                  label: Text(retryText!),
+                  label: Text(retryText ?? 'common.retry'.tr()),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).primaryColor,
                     foregroundColor: Colors.white,
@@ -128,7 +129,7 @@ class LocationErrorWidget extends StatelessWidget {
                       ElevatedButton.icon(
                         onPressed: onRetry,
                         icon: const Icon(Icons.refresh),
-                        label: const Text('Réessayer'),
+                        label: Text('common.retry'.tr()),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Theme.of(context).primaryColor,
                           foregroundColor: Colors.white,
@@ -144,7 +145,7 @@ class LocationErrorWidget extends StatelessWidget {
                       OutlinedButton.icon(
                         onPressed: onOpenSettings,
                         icon: const Icon(Icons.settings),
-                        label: const Text('Paramètres'),
+                        label: Text('profile.settings'.tr()),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           shape: RoundedRectangleBorder(
@@ -187,11 +188,11 @@ class LocationErrorWidget extends StatelessWidget {
   String _getSubMessage() {
     switch (status) {
       case MapStatus.permissionDenied:
-        return 'Accordez la permission de localisation dans les paramètres de votre appareil';
+        return 'errors.location_permission_hint'.tr();
       case MapStatus.locationDisabled:
-        return 'Activez le service de localisation (GPS) dans les paramètres de votre appareil';
+        return 'errors.location_service_hint'.tr();
       default:
-        return 'Vérifiez votre connexion et réessayez';
+        return 'errors.check_connection'.tr();
     }
   }
 }

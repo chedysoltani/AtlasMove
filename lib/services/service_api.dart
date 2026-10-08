@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/service_models.dart';
 import '../core/config/api_config.dart';
 
@@ -371,7 +372,7 @@ class ServiceApi {
   }
 
   static Exception _handleApiError(http.Response response) {
-    String message = 'Erreur serveur';
+    String message = 'errors.server'.tr();
     
     try {
       final data = json.decode(response.body) as Map<String, dynamic>;
@@ -406,7 +407,7 @@ class ServiceApi {
     if (e is Exception) return e;
     
     if (e is SocketException) {
-      return Exception('Erreur de connexion: Vérifiez votre connexion internet');
+      return Exception('errors.no_internet'.tr());
     }
     
     if (e is HttpException) {

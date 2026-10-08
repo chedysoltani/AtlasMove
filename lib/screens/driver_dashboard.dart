@@ -279,7 +279,7 @@ class _DriverDashboardState extends State<DriverDashboard>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: impossible de changer le statut'),
+            content: Text('driver_dashboard.status_error'.tr()),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -850,7 +850,7 @@ class _DriverDashboardState extends State<DriverDashboard>
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Abonnement impayé — Régularisez pour accéder aux courses',
+                'driver_dashboard.sub_unpaid_banner'.tr(),
                 style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
@@ -873,10 +873,10 @@ class _DriverDashboardState extends State<DriverDashboard>
     final bg = isUrgent ? const Color(0xFFEA580C) : const Color(0xFF1E40AF);
     final icon = isUrgent ? Icons.timer_rounded : Icons.card_membership_rounded;
     final message = days == 0
-        ? 'Période d\'essai expirée — Abonnez-vous pour continuer'
+        ? 'driver_dashboard.trial_expired'.tr()
         : isUrgent
-            ? 'Période d\'essai : encore $days jour${days > 1 ? 's' : ''} — Abonnez-vous'
-            : 'Essai gratuit actif · encore $days jours restants';
+            ? 'driver_dashboard.trial_urgent'.tr(namedArgs: {'days': '$days'})
+            : 'driver_dashboard.trial_active'.tr(namedArgs: {'days': '$days'});
 
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, _bannerRoute),
@@ -936,9 +936,9 @@ class _DriverDashboardState extends State<DriverDashboard>
           children: [
             const Icon(Icons.lock_rounded, color: Colors.white, size: 18),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Compte inactif — Abonnez-vous pour recevoir des courses',
+                'driver_dashboard.account_inactive'.tr(),
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
@@ -1042,7 +1042,7 @@ class _DriverDashboardState extends State<DriverDashboard>
                 child: const Icon(Icons.menu_rounded, color: Colors.white, size: 18),
               ),
               const SizedBox(width: 10),
-              Text('Menu', style: const TextStyle(
+              Text('driver_dashboard.menu'.tr(), style: const TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w700,
                 color: Color(0xFF0F172A))),
             ]),
@@ -1059,8 +1059,8 @@ class _DriverDashboardState extends State<DriverDashboard>
             // chauffeurs non-taxi, qui n'ont pas d'abonnement à proprement
             // parler (paiement par commission, pas par plan).
             if (!_isTaxiDriver)
-              _buildMenuTile(Icons.percent_rounded, 'Commission 10%',
-                  'Payable chaque mois — compte désactivé sinon', () {
+              _buildMenuTile(Icons.percent_rounded, 'driver_dashboard.commission_menu'.tr(),
+                  'driver_dashboard.commission_menu_sub'.tr(), () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, '/driver_earnings');
               }),

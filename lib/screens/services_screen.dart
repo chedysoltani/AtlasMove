@@ -25,11 +25,11 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
   String? _activeFilter;
 
   final List<Map<String, dynamic>> _filters = [
-    {'label': 'Tous', 'value': null, 'icon': Icons.apps_rounded},
-    {'label': 'Taxi', 'value': 'taxi', 'icon': Icons.local_taxi_rounded},
-    {'label': 'VTC', 'value': 'vtc', 'icon': Icons.directions_car_rounded},
-    {'label': 'Moto', 'value': 'moto', 'icon': Icons.motorcycle_rounded},
-    {'label': 'Livraison', 'value': 'livraison', 'icon': Icons.delivery_dining_rounded},
+    {'label': 'services_extra.filter_all', 'value': null, 'icon': Icons.apps_rounded},
+    {'label': 'booking.taxi', 'value': 'taxi', 'icon': Icons.local_taxi_rounded},
+    {'label': 'services_extra.filter_vtc', 'value': 'vtc', 'icon': Icons.directions_car_rounded},
+    {'label': 'services_extra.filter_moto', 'value': 'moto', 'icon': Icons.motorcycle_rounded},
+    {'label': 'booking.delivery', 'value': 'livraison', 'icon': Icons.delivery_dining_rounded},
   ];
 
   @override
@@ -95,7 +95,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Trouvez votre mission idéale',
+                  'services_extra.find_mission'.tr(),
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.grey.shade500,
@@ -172,7 +172,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        f['label'] as String,
+                        (f['label'] as String).tr(),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -421,7 +421,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
               size: 10, color: Colors.orange.shade700),
           const SizedBox(width: 3),
           Text(
-            'Doc requis',
+            'services_extra.doc_required_short'.tr(),
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w700,
@@ -446,7 +446,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
           Icon(Icons.block_rounded, size: 10, color: Colors.red.shade600),
           const SizedBox(width: 3),
           Text(
-            'Indisponible',
+            'services_extra.unavailable'.tr(),
             style: TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w700,
@@ -469,7 +469,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
-          'Accepter',
+          'common.accept'.tr(),
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
@@ -496,14 +496,14 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
             child: const Icon(Icons.work_off_outlined, size: 40, color: _orange),
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Aucun service disponible',
+          Text(
+            'services.no_services'.tr(),
             style: TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black87),
           ),
           const SizedBox(height: 6),
           Text(
-            'Revenez plus tard ou modifiez les filtres',
+            'services_extra.come_back_later'.tr(),
             style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
           ),
         ],
@@ -550,8 +550,8 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                   color: _orange,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Text(
-                  'Réessayer',
+                child: Text(
+                  'common.retry'.tr(),
                   style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -638,8 +638,8 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Rejoindre la mission',
+                    Text(
+                      'services.join_mission'.tr(),
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.grey,
@@ -688,8 +688,8 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
           ],
           if (widget.service.requiresDocument) ...[
             const SizedBox(height: 20),
-            const Text(
-              'Document requis',
+            Text(
+              'services.doc_required'.tr(),
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -727,8 +727,8 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
                     const SizedBox(width: 8),
                     Text(
                       _documentUrl != null
-                          ? 'Document téléchargé'
-                          : 'Appuyez pour télécharger',
+                          ? 'services.doc_uploaded'.tr()
+                          : 'services.doc_tap_upload'.tr(),
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -776,7 +776,7 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
                       color: Colors.red.shade600, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    'Ce service est actuellement indisponible',
+                    'services.service_unavailable_now'.tr(),
                     style: TextStyle(
                         color: Colors.red.shade700,
                         fontSize: 13,
@@ -799,8 +799,8 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     alignment: Alignment.center,
-                    child: const Text(
-                      'Annuler',
+                    child: Text(
+                      'common.cancel'.tr(),
                       style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -844,8 +844,8 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text(
-                            'Confirmer la mission',
+                        : Text(
+                            'services.confirm_mission'.tr(),
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -878,7 +878,7 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erreur: $e'),
+          content: Text('common.error_detail'.tr(namedArgs: {'error': '$e'})),
           backgroundColor: Colors.red,
         ));
       }
@@ -917,7 +917,7 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erreur: $e'),
+          content: Text('common.error_detail'.tr(namedArgs: {'error': '$e'})),
           backgroundColor: Colors.red,
         ));
       }
@@ -950,7 +950,7 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
               ),
               const SizedBox(height: 20),
               Text(
-                'Demande envoyée !',
+                'services_extra.request_sent'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -959,10 +959,7 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
               ),
               const SizedBox(height: 14),
               Text(
-                'Votre demande d\'assignement a bien été enregistrée.\n\n'
-                'L\'administrateur doit approuver cette assignation '
-                'avant que vous puissiez commencer les missions.\n\n'
-                'Vous serez notifié dès que votre demande sera acceptée.',
+                'services_extra.request_sent_body'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 13,
                     color: const Color(0xFF6B7280),
@@ -983,7 +980,7 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
                     elevation: 0,
                   ),
                   child: Text(
-                    'Compris',
+                    'services_extra.got_it'.tr(),
                     style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700, fontSize: 15),
                   ),

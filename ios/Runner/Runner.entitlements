@@ -16,5 +16,16 @@
 	  -->
 	<key>aps-environment</key>
 	<string>development</string>
+	<!--
+	  Universal Links (liens d'inscription des campagnes). À activer dans Xcode :
+	  Signing & Capabilities → + Capability → "Associated Domains" ; vérifier que
+	  les deux domaines ci-dessous apparaissent. Le fichier
+	  apple-app-site-association doit être servi par les deux hôtes.
+	-->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:atlasbusiness.online</string>
+		<string>applinks:www.atlasbusiness.online</string>
+	</array>
 </dict>
 </plist>

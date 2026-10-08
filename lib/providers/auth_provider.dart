@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/user.dart';
 import '../models/auth_request.dart';
 import '../services/profile_service.dart';
@@ -64,7 +65,7 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       return true;
     } catch (e) {
-      _setError('Erreur d\'inscription: ${e.toString()}');
+      _setError('${'auth_extra.signup_error'.tr()}: ${e.toString()}');
       _setLoading(false);
       return false;
     }
@@ -106,7 +107,7 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       return true;
     } catch (e) {
-      _setError('Erreur de mise à jour: ${e.toString()}');
+      _setError('${'errors.update'.tr()}: ${e.toString()}');
       _setLoading(false);
       return false;
     }
@@ -133,7 +134,7 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       return true;
     } catch (e) {
-      _setError('Erreur de mise à jour: ${e.toString()}');
+      _setError('${'errors.update'.tr()}: ${e.toString()}');
       _setLoading(false);
       return false;
     }

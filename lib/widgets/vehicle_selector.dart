@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/user.dart';
 import '../utils/app_theme.dart';
 
@@ -18,7 +19,7 @@ class VehicleSelector extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Type de véhicule',
+          'signup.vehicle_type_title'.tr(),
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -131,21 +132,21 @@ class VehicleSelector extends StatelessWidget {
   String _getVehicleDescription(VehicleType vehicle) {
     switch (vehicle) {
       case VehicleType.car:
-        return 'Idéal pour les courses rapides';
+        return 'vehicles.desc_car'.tr();
       case VehicleType.motorcycle:
-        return 'Parfait pour les livraisons urgentes';
+        return 'vehicles.desc_moto'.tr();
       case VehicleType.truck:
-        return 'Pour les gros volumes et meubles';
+        return 'vehicles.desc_truck'.tr();
       case VehicleType.van:
-        return 'Pour les livraisons moyennes';
+        return 'vehicles.desc_van'.tr();
       case VehicleType.bus:
-        return 'Transport collectif de passagers';
+        return 'vehicles.desc_bus'.tr();
       case VehicleType.semiTrailer:
-        return 'Logistique lourde longue distance';
+        return 'vehicles.desc_semi'.tr();
       case VehicleType.heavyTruck:
-        return 'Transport de marchandises volumineuses';
+        return 'vehicles.desc_heavy'.tr();
       case VehicleType.tractor:
-        return 'Transport agricole et industriel';
+        return 'vehicles.desc_tractor'.tr();
     }
   }
 }

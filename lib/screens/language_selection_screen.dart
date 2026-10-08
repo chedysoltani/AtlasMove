@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../providers/locale_provider.dart';
+import '../services/onboarding_service.dart';
+import '../services/deep_link_service.dart';
 
 class LanguageSelectionScreen extends StatefulWidget {
-  const LanguageSelectionScreen({super.key});
+  /// Premier lancement : pas de bouton retour, la langue s'applique dès qu'on
+  /// la touche, puis « Continuer » enchaîne sur la présentation de l'app.
+  final bool firstLaunch;
+
+  const LanguageSelectionScreen({super.key, this.firstLaunch = false});
 
   @override
   State<LanguageSelectionScreen> createState() => _LanguageSelectionScreenState();
@@ -18,21 +24,56 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
 
   static const _languages = [
     _LangOption('fr', 'Français', '🇫🇷', 'French'),
+    _LangOption('en', 'English', '🇬🇧', 'English'),
     _LangOption('ar', 'العربية', '🇸🇦', 'Arabic'),
     _LangOption('it', 'Italiano', '🇮🇹', 'Italian'),
     _LangOption('de', 'Deutsch', '🇩🇪', 'German'),
     _LangOption('es', 'Español', '🇪🇸', 'Spanish'),
   ];
 
+  bool _initialized = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_initialized) return;
+    _initialized = true;
     _selected = context.locale.languageCode;
+    if (widget.firstLaunch) {
+      // Au premier lancement, on propose la langue du téléphone si elle est disponible
+      final device = WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+      if (_languages.any((l) => l.code == device) && device != _selected) {
+        _selected = device;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _select(device));
+      }
+    }
+  }
+
+  Future<void> _select(String code) async {
+    setState(() => _selected = code);
+    // Premier lancement : l'écran se traduit tout de suite dans la langue choisie
+    if (widget.firstLaunch && mounted) {
+      await LocaleProvider.changeLocale(context, Locale(code));
+    }
   }
 
   Future<void> _apply() async {
     await LocaleProvider.changeLocale(context, Locale(_selected));
-    if (mounted) Navigator.pop(context);
+    if (!mounted) return;
+    if (widget.firstLaunch) {
+      // Installation depuis un lien d'inscription (campagne) : directement
+      // l'écran d'inscription, avec l'accueil en dessous pour le bouton retour.
+      final linkRoute = DeepLinkService.instance.takePendingRoute();
+      final nav = Navigator.of(context);
+      if (linkRoute != null) {
+        nav.pushReplacementNamed('/landing');
+        nav.pushNamed(linkRoute);
+      } else {
+        nav.pushReplacementNamed(OnboardingGuide.intro.route);
+      }
+    } else {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -42,10 +83,13 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
+        leading: widget.firstLaunch
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                onPressed: () => Navigator.pop(context),
+              ),
         title: Text(
           'lang.title'.tr(),
           style: const TextStyle(
@@ -97,7 +141,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
                   elevation: 0,
                 ),
                 child: Text(
-                  'lang.apply'.tr(),
+                  widget.firstLaunch ? 'common.next'.tr() : 'lang.apply'.tr(),
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -114,7 +158,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
 
   Widget _buildLanguageTile(_LangOption lang, bool isSelected) {
     return GestureDetector(
-      onTap: () => setState(() => _selected = lang.code),
+      onTap: () => _select(lang.code),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),

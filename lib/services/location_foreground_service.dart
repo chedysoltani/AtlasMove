@@ -1,5 +1,6 @@
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'location_tracking_service.dart';
+import 'system_strings.dart';
 
 // Point d'entrée de l'isolate du foreground service — doit être top-level
 @pragma('vm:entry-point')
@@ -24,15 +25,16 @@ class _LocationTaskHandler extends TaskHandler {
 class LocationForegroundService {
   static bool _initialized = false;
 
-  static void init() {
-    if (_initialized) return;
+  /// [force] : reconfigure les options (ex. nom du canal dans la langue choisie).
+  static void init({bool force = false}) {
+    if (_initialized && !force) return;
     _initialized = true;
 
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'atlasmove_location_tracking',
-        channelName: 'Suivi de position',
-        channelDescription: 'Maintient le suivi GPS actif pendant une course',
+        channelName: SystemStrings.get('location_channel'),
+        channelDescription: SystemStrings.get('location_channel_desc'),
         channelImportance: NotificationChannelImportance.LOW,
         priority: NotificationPriority.LOW,
       ),
@@ -51,11 +53,11 @@ class LocationForegroundService {
 
   /// Démarre le foreground service + le tracking GPS.
   /// Appeler quand le livreur accepte une course ou se met en ligne.
-  static Future<void> start({
-    String title = '🚗 AtlasMove — Course active',
-    String body  = 'Suivi de position en cours…',
-  }) async {
-    init();
+  static Future<void> start({String? title, String? body}) async {
+    await SystemStrings.load();
+    title ??= SystemStrings.get('location_title');
+    body ??= SystemStrings.get('location_body');
+    init(force: true);
 
     await FlutterForegroundTask.requestNotificationPermission();
 

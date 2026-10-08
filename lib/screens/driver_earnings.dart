@@ -191,7 +191,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             TextButton.icon(
               onPressed: _load,
               icon: const Icon(Icons.refresh_rounded, color: _orange),
-              label: Text('Réessayer',
+              label: Text('common.retry'.tr(),
                   style: GoogleFonts.poppins(color: _orange, fontWeight: FontWeight.w600)),
             ),
           ],
@@ -262,7 +262,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               const Icon(Icons.bar_chart_rounded, color: Colors.white70, size: 20),
               const SizedBox(width: 8),
               Text(
-                'Chiffre d\'affaires',
+                'driver_earnings.revenue'.tr(),
                 style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
               ),
             ],
@@ -292,7 +292,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                         color: Colors.white, size: 14),
                     const SizedBox(width: 5),
                     Text(
-                      '$count rendez-vous terminés',
+                      'driver_earnings.rdv_completed'.tr(namedArgs: {'count': '$count'}),
                       style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 12,
@@ -349,12 +349,12 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Commission AtlasMove ($rate%)',
+                    'driver_earnings.commission_label'.tr(namedArgs: {'rate': '$rate'}),
                     style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700, fontSize: 15, color: _navy),
                   ),
                   Text(
-                    'Applicable aux services de livraison uniquement',
+                    'driver_earnings.delivery_only'.tr(),
                     style: GoogleFonts.poppins(
                         fontSize: 11, color: _textSecondary),
                   ),
@@ -369,7 +369,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Montant dû',
+                  Text('driver_earnings.amount_due'.tr(),
                       style: GoogleFonts.poppins(
                           fontSize: 12, color: _textSecondary)),
                   const SizedBox(height: 4),
@@ -403,7 +403,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      isPaid ? 'Payée' : 'En attente',
+                      isPaid ? 'driver_earnings.paid'.tr() : 'common.pending'.tr(),
                       style: GoogleFonts.poppins(
                         color: isPaid ? _green : _amber,
                         fontWeight: FontWeight.w700,
@@ -433,7 +433,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'À régler avant la fin du mois pour maintenir l\'accès à vos services.',
+                      'driver_earnings.pay_before'.tr(),
                       style: GoogleFonts.poppins(
                           fontSize: 11,
                           color: Color(0xFF92400E),
@@ -456,7 +456,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Détail par service',
+          'driver_earnings.by_service'.tr(),
           style: GoogleFonts.poppins(
               fontWeight: FontWeight.w700, fontSize: 16, color: _navy),
         ),
@@ -483,7 +483,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
             const Icon(Icons.inbox_rounded, color: _border, size: 44),
             const SizedBox(height: 10),
             Text(
-              'Aucun rendez-vous terminé ce mois-ci',
+              'driver_earnings.no_rdv_month'.tr(),
               style: GoogleFonts.poppins(
                   color: _textSecondary, fontSize: 13),
               textAlign: TextAlign.center,
@@ -544,7 +544,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                           color: _navy),
                     ),
                     Text(
-                      '${item.completedCount} mission${item.completedCount > 1 ? 's' : ''} terminée${item.completedCount > 1 ? 's' : ''}',
+                      'driver_earnings.missions_completed'.tr(namedArgs: {'count': '${item.completedCount}'}),
                       style: GoogleFonts.poppins(
                           fontSize: 11, color: _textSecondary),
                     ),
@@ -560,7 +560,7 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    'Exempté',
+                    'driver_earnings.exempt'.tr(),
                     style: GoogleFonts.poppins(
                         fontSize: 10,
                         color: _textSecondary,
@@ -580,12 +580,12 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _statPill(
-                    'CA',
+                    'driver_earnings.revenue_short'.tr(),
                     '${item.revenue.toStringAsFixed(2)} ${item.currency}',
                     _navy),
                 if (!isTaxi)
                   _statPill(
-                      'Commission (10%)',
+                      'driver_earnings.commission_10'.tr(),
                       '${item.commission.toStringAsFixed(2)} ${item.currency}',
                       _indigo),
               ],

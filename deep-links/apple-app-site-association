@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["7847C76BSR.com.atlasmove.atlasmove"],
+        "components": [
+          { "/": "/register/client" },
+          { "/": "/register/driver" }
+        ],
+        "appID": "7847C76BSR.com.atlasmove.atlasmove",
+        "paths": ["/register/client", "/register/driver"]
+      }
+    ]
+  }
+}

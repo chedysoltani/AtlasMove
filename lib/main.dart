@@ -55,8 +55,13 @@ import 'screens/reset_password_request_screen.dart';
 import 'screens/reset_password_verify_screen.dart';
 import 'screens/support_screen.dart';
 import 'screens/legal_consent_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'services/onboarding_service.dart';
 import 'services/location_foreground_service.dart';
 import 'services/push_notification_service.dart';
+import 'services/meta_events_service.dart';
+import 'services/firebase_analytics_service.dart';
+import 'services/deep_link_service.dart';
 import 'core/network/http_client.dart';
 import 'core/auth/auth_session.dart';
 import 'core/storage/token_storage.dart';
@@ -85,6 +90,12 @@ void main() async {
   await PushNotificationService.initialize();
   FirebaseMessaging.onMessage.listen(PushNotificationService.handleForegroundMessage);
 
+  // Meta App Events : installation / ouverture loguées automatiquement par le SDK natif
+  MetaEventsService.instance.init();
+
+  // Liens d'inscription des campagnes (atlasbusiness.online/register/…, atlasmove://)
+  DeepLinkService.instance.init(navigatorKey);
+
   // Pré-configurer le foreground service (sans le démarrer)
   LocationForegroundService.init();
 
@@ -101,8 +112,11 @@ void main() async {
     }
   });
 
-  // Initialiser les données de localisation française pour DateFormat
-  await initializeDateFormatting('fr', null);
+  // Données de localisation de toutes les langues pour DateFormat
+  // (jours et mois affichés dans la langue choisie)
+  await initializeDateFormatting();
+  // Arabe : chiffres 0-9 dans les dates, comme pour les prix et distances
+  DateFormat.useNativeDigitsByDefaultFor('ar', false);
 
   // Charger les variables d'environnement
   try {
@@ -248,8 +262,8 @@ void _showReferralBonusOverlay(BuildContext context, int points, String message)
               child: const Icon(Icons.emoji_events_rounded, color: Color(0xFFF97316), size: 40),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Parrainage Réussi !',
+            Text(
+              'referral.bonus_received'.tr(),
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,
@@ -266,7 +280,7 @@ void _showReferralBonusOverlay(BuildContext context, int points, String message)
                 border: Border.all(color: Colors.amber.withOpacity(0.3)),
               ),
               child: Text(
-                '+$points points IA',
+                'referral.points_gained'.tr(namedArgs: {'points': '$points'}),
                 style: const TextStyle(
                   color: Colors.amber,
                   fontSize: 18,
@@ -292,7 +306,7 @@ void _showReferralBonusOverlay(BuildContext context, int points, String message)
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
                 ),
-                child: const Text('Super !', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                child: Text('main_extra.great'.tr(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               ),
             ),
           ],
@@ -307,11 +321,15 @@ class AtlasMoveApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dates (DateFormat) dans la langue choisie ; reconstruit à chaque changement de langue
+    Intl.defaultLocale = context.locale.languageCode;
     return ProviderScope(
       child: provider.ChangeNotifierProvider(
         create: (context) => AuthProvider(),
         child: MaterialApp(
           navigatorKey: navigatorKey,
+          // Google Analytics : screen_view envoyé à chaque changement d'écran
+          navigatorObservers: FirebaseAnalyticsService.instance.navigatorObservers,
           title: 'AtlasMove',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
@@ -332,6 +350,14 @@ class AtlasMoveApp extends StatelessWidget {
           routes: {
             '/': (context) => const SplashScreen(),
             '/landing': (context) => const LandingScreen(),
+            '/language_first': (context) =>
+                const LanguageSelectionScreen(firstLaunch: true),
+            '/onboarding': (context) =>
+                const OnboardingScreen(guide: OnboardingGuide.intro),
+            '/onboarding_client': (context) =>
+                const OnboardingScreen(guide: OnboardingGuide.client),
+            '/onboarding_driver': (context) =>
+                const OnboardingScreen(guide: OnboardingGuide.driver),
             '/login': (context) => const LoginScreen(),
             '/support': (context) => const SupportScreen(),
             '/legal_consent': (context) => const LegalConsentScreen(),

@@ -113,7 +113,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
       );
       await ProfileService.updateProfile(req);
       if (mounted) {
-        _showSnack('Profil mis à jour', ok: true);
+        _showSnack('profile_extra.updated'.tr(), ok: true);
         await _loadProfile();
       }
     } catch (e) {
@@ -148,21 +148,21 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
           if (url is String) {
             setState(() => _localAvatarPath = null);
             await _loadProfile();
-            _showSnack('Photo mise à jour', ok: true);
+            _showSnack('profile_extra.photo_updated'.tr(), ok: true);
           } else {
-            _showSnack('Upload réussi mais URL manquante', ok: false);
+            _showSnack('profile_extra.upload_no_url'.tr(), ok: false);
           }
         }
       } catch (e) {
         if (mounted) {
           setState(() => _localAvatarPath = null);
-          _showSnack('Échec upload: ${_errMsg(e)}', ok: false);
+          _showSnack('profile_extra.upload_failed'.tr(namedArgs: {'error': _errMsg(e)}), ok: false);
         }
       } finally {
         if (mounted) setState(() => _isUploadingPhoto = false);
       }
     } catch (e) {
-      if (mounted) _showSnack('Erreur sélection photo: $e', ok: false);
+      if (mounted) _showSnack('profile_extra.photo_pick_error'.tr(namedArgs: {'error': '$e'}), ok: false);
     }
   }
 
@@ -228,21 +228,21 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
 
                               // ── Driver info (read-only) ───────────────
                               if (_user?.vehicleType != null || _user?.referralCode != null)
-                                _section('Informations livreur', Icons.local_taxi_rounded, [
+                                _section('profile_extra.driver_info'.tr(), Icons.local_taxi_rounded, [
                                   if (_user?.vehicleType != null)
-                                    _infoRow('Véhicule', _user!.vehicleType!.displayName,
+                                    _infoRow('profile.vehicle'.tr(), _user!.vehicleType!.displayName,
                                         Icons.directions_car_rounded),
                                   if (_user?.vehicleType != null && _user?.referralCode != null)
                                     _divider(),
                                   if (_user?.referralCode != null)
-                                    _infoRow('Code parrainage', _user!.referralCode!,
+                                    _infoRow('profile_extra.referral_code'.tr(), _user!.referralCode!,
                                         Icons.card_giftcard_rounded),
                                 ]),
                               if (_user?.vehicleType != null || _user?.referralCode != null)
                                 const SizedBox(height: 20),
 
                               // ── Actions ───────────────────────────────
-                              _section('Compte', Icons.settings_rounded, [
+                              _section('profile_extra.account'.tr(), Icons.settings_rounded, [
                                 _actionRow(Icons.card_giftcard_rounded,
                                     'driver.referral_menu'.tr(), _orange,
                                     () => Navigator.pushNamed(context, '/referral')),
@@ -252,17 +252,21 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
                                     () => Navigator.pushNamed(context, '/language')),
                                 _divider(),
                                 _actionRow(Icons.support_agent_rounded,
-                                    'Centre d\'aide', _orange,
+                                    'support.title'.tr(), _orange,
                                     () => Navigator.pushNamed(context, '/support')),
+                                _divider(),
+                                _actionRow(Icons.menu_book_rounded,
+                                    'onboarding.replay'.tr(), _orange,
+                                    () => Navigator.pushNamed(context, '/onboarding_driver')),
                                 _divider(),
                                 _actionRow(Icons.logout_rounded,
                                     'auth.logout'.tr(), const Color(0xFFEF4444),
                                     _showLogoutDialog),
                               ]),
                               const SizedBox(height: 20),
-                              _section('Zone dangereuse', Icons.warning_amber_rounded, [
+                              _section('profile_extra.danger_zone'.tr(), Icons.warning_amber_rounded, [
                                 _actionRow(Icons.delete_forever_rounded,
-                                    'Supprimer mon compte', const Color(0xFFEF4444),
+                                    'profile_extra.delete_account'.tr(), const Color(0xFFEF4444),
                                     () => Navigator.pushNamed(context, '/delete_account')),
                               ]),
                               const SizedBox(height: 28),
@@ -382,12 +386,12 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
                     decoration: BoxDecoration(
                         color: const Color(0xFF22C55E).withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20)),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.verified_rounded, color: Color(0xFF22C55E), size: 12),
                         SizedBox(width: 4),
-                        Text('Vérifié',
+                        Text('profile_extra.verified'.tr(),
                             style: TextStyle(
                                 color: Color(0xFF22C55E),
                                 fontSize: 11,
@@ -568,10 +572,10 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
             ),
             style: const TextStyle(fontSize: 14, color: _textPrim, fontWeight: FontWeight.w500),
-            items: const [
-              DropdownMenuItem(value: 'male',   child: Text('Homme')),
-              DropdownMenuItem(value: 'female', child: Text('Femme')),
-              DropdownMenuItem(value: 'other',  child: Text('Autre')),
+            items: [
+              DropdownMenuItem(value: 'male',   child: Text('profile.male'.tr())),
+              DropdownMenuItem(value: 'female', child: Text('profile.female'.tr())),
+              DropdownMenuItem(value: 'other',  child: Text('profile.other_gender'.tr())),
             ],
             onChanged: (v) => setState(() => _genderCtrl.text = v ?? ''),
           ),
@@ -661,7 +665,7 @@ class _DriverProfileScreenState extends State<DriverProfileScreen>
           child: _isLoading
               ? const SizedBox(width: 22, height: 22,
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-              : const Text('Enregistrer',
+              : Text('common.save'.tr(),
                     style: TextStyle(
                         color: Colors.white,
                         fontSize: 15,

@@ -1,3 +1,5 @@
+import 'package:easy_localization/easy_localization.dart';
+
 enum UserRole {
   client,
   delivery;
@@ -5,9 +7,9 @@ enum UserRole {
   String get displayName {
     switch (this) {
       case UserRole.client:
-        return 'Client';
+        return 'auth.client'.tr();
       case UserRole.delivery:
-        return 'Livreur';
+        return 'signup.driver_badge'.tr();
     }
   }
 }
@@ -25,21 +27,21 @@ enum VehicleType {
   String get displayName {
     switch (this) {
       case VehicleType.car:
-        return 'Voiture';
+        return 'vehicles.car'.tr();
       case VehicleType.motorcycle:
-        return 'Moto';
+        return 'vehicles.moto'.tr();
       case VehicleType.truck:
-        return 'Camion';
+        return 'vehicles.truck'.tr();
       case VehicleType.van:
-        return 'Fourgonnette';
+        return 'vehicles.van'.tr();
       case VehicleType.bus:
-        return 'Bus';
+        return 'vehicles.bus'.tr();
       case VehicleType.semiTrailer:
-        return 'Semi-remorque';
+        return 'vehicles.semi'.tr();
       case VehicleType.heavyTruck:
-        return 'Poids lourd';
+        return 'vehicles.heavy'.tr();
       case VehicleType.tractor:
-        return 'Tracteur';
+        return 'vehicles.tractor'.tr();
     }
   }
 

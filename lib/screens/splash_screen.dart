@@ -4,6 +4,8 @@ import '../utils/app_theme.dart';
 import '../core/auth/auth_session.dart';
 import '../main.dart' show navigatorKey;
 import '../services/push_notification_service.dart';
+import '../services/onboarding_service.dart';
+import '../services/deep_link_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -83,12 +85,29 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _navigateToLanding() async {
     final boot = await _bootFuture;
+    // Premier lancement sans session : présentation de l'app avant l'accueil.
+    final showIntro = boot.destination == BootDestination.landing &&
+        !await OnboardingService.instance.isSeen(OnboardingGuide.intro);
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacementNamed(
-      boot.route,
+    final nav = Navigator.of(context);
+    nav.pushReplacementNamed(
+      // Premier lancement : choix de la langue, puis présentation de l'app
+      showIntro ? '/language_first' : boot.route,
       arguments: boot.sessionExpired ? {'sessionExpired': true} : null,
     );
+
+    // Lien d'inscription (campagne) reçu au lancement : ignoré si une session
+    // est restaurée ; au premier lancement, c'est l'écran de langue qui l'ouvre.
+    final loggedIn = boot.destination == BootDestination.client ||
+        boot.destination == BootDestination.driver;
+    if (loggedIn) {
+      DeepLinkService.instance.takePendingRoute();
+    } else if (!showIntro) {
+      final linkRoute = DeepLinkService.instance.takePendingRoute();
+      if (linkRoute != null) nav.pushNamed(linkRoute);
+    }
+    DeepLinkService.instance.markReady();
 
     // Rejoue un tap sur une notification "nouvelle course" / "appel entrant"
     // reçu pendant que l'app était fermée (voir push_notification_service.dart).

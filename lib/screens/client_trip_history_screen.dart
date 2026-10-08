@@ -168,7 +168,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                           style: GoogleFonts.poppins(
                             fontSize: 18, fontWeight: FontWeight.w800,
                             color: Colors.white)),
-                        Text('${_trips.length} trajet${_trips.length > 1 ? 's' : ''}',
+                        Text('client_extra.trips_count'.tr(namedArgs: {'count': '${_trips.length}'}),
                           style: GoogleFonts.poppins(
                             fontSize: 12, color: Colors.white54)),
                       ],
@@ -260,7 +260,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
               fontSize: 15, fontWeight: FontWeight.w700,
               color: _dark)),
           const SizedBox(height: 4),
-          Text('Vos futurs trajets apparaîtront ici',
+          Text('client.trips_appear_here'.tr(),
             style: GoogleFonts.poppins(
               fontSize: 12, color: const Color(0xFF9BA3B4))),
           const SizedBox(height: 24),
@@ -336,11 +336,11 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
 
   Future<void> _cancelTripDialog(TripHistoryItem trip) async {
     final reasons = [
-      "Temps d'attente trop long",
-      "Changement de programme",
-      "Erreur lors de la commande",
-      "Chauffeur trop éloigné",
-      "Autre",
+      'client_extra.reason_wait'.tr(),
+      'client_extra.reason_plans'.tr(),
+      'client_extra.reason_mistake'.tr(),
+      'client_extra.reason_far'.tr(),
+      'booking.other'.tr(),
     ];
     String selectedReason = reasons[0];
     final customCtrl = TextEditingController();
@@ -391,7 +391,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                       color: _dark)),
                 ]),
                 const SizedBox(height: 6),
-                Text('Indiquez le motif de l\'annulation',
+                Text('client_extra.cancel_reason_prompt'.tr(),
                   style: GoogleFonts.poppins(
                     fontSize: 12, color: const Color(0xFF9BA3B4))),
                 const SizedBox(height: 16),
@@ -448,7 +448,7 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                   );
                 }),
 
-                if (selectedReason == 'Autre') ...[
+                if (selectedReason == reasons.last) ...[
                   const SizedBox(height: 4),
                   TextFormField(
                     controller: customCtrl,
@@ -501,10 +501,10 @@ class _ClientTripHistoryScreenState extends State<ClientTripHistoryScreen> {
                   Expanded(
                     child: GestureDetector(
                       onTap: isSubmitting ? null : () async {
-                        final reason = selectedReason == 'Autre'
+                        final reason = selectedReason == reasons.last
                             ? customCtrl.text.trim()
                             : selectedReason;
-                        if (selectedReason == 'Autre' && reason.isEmpty) {
+                        if (selectedReason == reasons.last && reason.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text('common.error'.tr())));
                           return;

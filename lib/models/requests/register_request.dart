@@ -1,3 +1,5 @@
+import 'package:easy_localization/easy_localization.dart';
+
 /// Modèle de requête pour l'inscription client
 class ClientRegisterRequest {
   final String firstName;
@@ -50,52 +52,52 @@ class ClientRegisterRequest {
   String? validate() {
     // Validation du prénom
     if (firstName.trim().isEmpty) {
-      return 'Le prénom est requis';
+      return 'signup.required_first_name'.tr();
     }
     if (firstName.trim().length < 2) {
-      return 'Le prénom doit contenir au moins 2 caractères';
+      return 'validation.first_name_min'.tr();
     }
 
     // Validation du nom
     if (lastName.trim().isEmpty) {
-      return 'Le nom est requis';
+      return 'signup.required_last_name'.tr();
     }
     if (lastName.trim().length < 2) {
-      return 'Le nom doit contenir au moins 2 caractères';
+      return 'validation.last_name_min'.tr();
     }
 
     // Validation de l'email
     final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
     if (!emailRegex.hasMatch(email.trim())) {
-      return 'Email invalide';
+      return 'auth.email_invalid'.tr();
     }
 
     // Validation du téléphone
     final phoneRegex = RegExp(r'^\+?[0-9]{8,15}$');
     if (!phoneRegex.hasMatch(phone.trim())) {
-      return 'Numéro de téléphone invalide';
+      return 'validation.phone_invalid'.tr();
     }
 
     // Validation du mot de passe
     if (password.length < 8) {
-      return 'Le mot de passe doit contenir au moins 8 caractères';
+      return 'auth.password_min8'.tr();
     }
     
     if (!password.contains(RegExp(r'[A-Z]'))) {
-      return 'Le mot de passe doit contenir au moins une majuscule';
+      return 'driver_reg.pw_upper'.tr();
     }
     
     if (!password.contains(RegExp(r'[a-z]'))) {
-      return 'Le mot de passe doit contenir au moins une minuscule';
+      return 'driver_reg.pw_lower'.tr();
     }
     
     if (!password.contains(RegExp(r'[0-9]'))) {
-      return 'Le mot de passe doit contenir au moins un chiffre';
+      return 'driver_reg.pw_digit'.tr();
     }
 
     // Validation de la confirmation du mot de passe
     if (password != confirmPassword) {
-      return 'Les mots de passe ne correspondent pas';
+      return 'auth.passwords_mismatch'.tr();
     }
 
     return null; // Pas d'erreur
@@ -181,19 +183,19 @@ class DeliveryRegisterRequest {
 
     // Validation spécifique au livreur
     if (vehicleType.trim().isEmpty) {
-      return 'Le type de véhicule est requis';
+      return 'driver_reg.select_vehicle'.tr();
     }
 
     if (cinImage.trim().isEmpty) {
-      return 'L\'image CIN est requise';
+      return 'driver_reg.select_id'.tr();
     }
 
     if (carteGriseImage.trim().isEmpty) {
-      return 'L\'image carte grise est requise';
+      return 'driver_reg.select_registration'.tr();
     }
 
     if (permisImage.trim().isEmpty) {
-      return 'L\'image permis est requise';
+      return 'driver_reg.select_license'.tr();
     }
 
     return null;

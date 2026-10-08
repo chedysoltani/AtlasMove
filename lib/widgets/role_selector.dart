@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/user.dart';
 import '../utils/app_theme.dart';
 
@@ -26,7 +27,7 @@ class RoleSelector extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Je suis un...',
+              'auth.i_am_a'.tr(),
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
@@ -35,16 +36,16 @@ class RoleSelector extends StatelessWidget {
           _buildRoleOption(
             context,
             UserRole.client,
-            'Client',
-            'Demander des courses et livraisons',
+            'auth.client'.tr(),
+            'auth.client_desc'.tr(),
             Icons.person,
           ),
           _buildDivider(),
           _buildRoleOption(
             context,
             UserRole.delivery,
-            'Livreur',
-            'Livrer des courses et gagner de l\'argent',
+            'signup.driver_badge'.tr(),
+            'auth.driver_desc'.tr(),
             Icons.local_shipping,
           ),
         ],

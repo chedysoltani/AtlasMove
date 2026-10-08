@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.atlasmove.app",
+      "sha256_cert_fingerprints": [
+        "EC:0A:DE:BD:8A:A7:55:3D:7F:17:A2:5E:11:1C:9A:56:7E:28:DA:8D:FD:BF:BE:80:CD:4D:9B:D8:F9:69:A6:A5"
+      ]
+    }
+  }
+]

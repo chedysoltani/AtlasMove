@@ -128,7 +128,7 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
               ? e.message
               : e is ServiceValidationException
                   ? e.toString()
-                  : 'Une erreur est survenue';
+                  : 'common.unknown_error'.tr();
           _isLoading = false;
         });
       }
@@ -507,7 +507,7 @@ class _ResetPasswordVerifyScreenState extends State<ResetPasswordVerifyScreen>
               size: 13, color: Color(0xFF9BA3B4)),
           const SizedBox(width: 5),
           Text(
-            'Minimum 8 caractères',
+            'auth.password_min8'.tr(),
             style: GoogleFonts.poppins(
                 fontSize: 11, color: const Color(0xFF9BA3B4)),
           ),

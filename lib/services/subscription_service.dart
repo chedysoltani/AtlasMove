@@ -36,7 +36,6 @@ class SubscriptionService extends ChangeNotifier {
 
   bool get hasActiveSubscription => _status?.hasActiveSubscription ?? false;
   DriverSubscription? get subscription => _status?.subscription;
-  LoyaltyProgram? get loyaltyProgram => _status?.loyaltyProgram;
 
   bool get isSubscriptionValid => hasActiveSubscription;
   bool get isSubscribed => subscription?.isActive ?? false;

@@ -642,11 +642,11 @@ class _ClientRendezvousBookingScreenState
       return;
     }
     if (_isDelivery && _destAddressCtrl.text.trim().isEmpty) {
-      _showSnack('Adresse de livraison requise');
+      _showSnack('rdv.delivery_address_required'.tr());
       return;
     }
     if (_isDelivery && _cargoDescCtrl.text.trim().isEmpty) {
-      _showSnack('Description du colis requise');
+      _showSnack('rdv.cargo_description_required'.tr());
       return;
     }
 
@@ -779,7 +779,7 @@ class _ClientRendezvousBookingScreenState
               _confirmRow(
                 Icons.calendar_today_rounded,
                 'rdv.date'.tr(),
-                DateFormat('dd MMM yyyy à HH:mm', 'fr').format(rdv.scheduledAt),
+                DateFormat('dd MMM yyyy • HH:mm', context.locale.languageCode).format(rdv.scheduledAt),
               ),
               const SizedBox(height: 10),
               _confirmRow(Icons.location_on_rounded, 'rdv.address'.tr(), rdv.address),
@@ -787,7 +787,7 @@ class _ClientRendezvousBookingScreenState
                 const SizedBox(height: 10),
                 _confirmRow(
                   Icons.flag_rounded,
-                  'Livraison',
+                  'booking.delivery'.tr(),
                   rdv.destinationAddress!,
                 ),
               ],
@@ -795,7 +795,7 @@ class _ClientRendezvousBookingScreenState
                 const SizedBox(height: 10),
                 _confirmRow(
                   Icons.payments_rounded,
-                  'Tarif estimé',
+                  'rdv.estimated_fare'.tr(),
                   FareCalculator.formatFare(
                     rdv.estimatedFare!,
                     _estimatedCurrency,
@@ -931,7 +931,7 @@ class _ClientRendezvousBookingScreenState
 
                               // ── Duration / Hours ──────────────────
                               if (_isHourly) ...[
-                                _sectionLabel('Durée de la prestation', Icons.timer_rounded),
+                                _sectionLabel('rdv.service_duration'.tr(), Icons.timer_rounded),
                                 const SizedBox(height: 10),
                                 _hourSelector(),
                               ] else if (!_isDelivery) ...[
@@ -953,7 +953,7 @@ class _ClientRendezvousBookingScreenState
                               // ── Delivery destination ──────────────
                               if (_isDelivery) ...[
                                 const SizedBox(height: 22),
-                                _sectionLabel('Adresse de livraison', Icons.flag_rounded),
+                                _sectionLabel('rdv.delivery_address'.tr(), Icons.flag_rounded),
                                 const SizedBox(height: 10),
                                 _buildDestField(),
 
@@ -980,11 +980,11 @@ class _ClientRendezvousBookingScreenState
                                 const SizedBox(height: 22),
 
                                 // ── Cargo details ─────────────────────
-                                _sectionLabel('Détails du colis / cargo', Icons.inventory_2_rounded),
+                                _sectionLabel('rdv.cargo_details'.tr(), Icons.inventory_2_rounded),
                                 const SizedBox(height: 10),
                                 _addressField(
                                   _cargoDescCtrl,
-                                  'Description de la marchandise',
+                                  'rdv.cargo_description'.tr(),
                                   Icons.description_rounded,
                                   required: true,
                                   maxLines: 2,
@@ -1012,7 +1012,7 @@ class _ClientRendezvousBookingScreenState
                                     minimumFare: _selectedService!.minimumFare ?? 0,
                                   ),
                                   currency: _estimatedCurrency,
-                                  label: 'Tarif estimé pour $_durationHours h',
+                                  label: 'rdv.estimated_for_hours'.tr(namedArgs: {'hours': '$_durationHours'}),
                                 ),
                               ],
 
@@ -1171,7 +1171,7 @@ class _ClientRendezvousBookingScreenState
                         children: [
                           Text(
                             _isDelivery
-                                ? 'Commander une livraison'
+                                ? 'rdv.order_delivery'.tr()
                                 : 'rdv.book'.tr(),
                             style: GoogleFonts.poppins(
                               fontSize: 20,
@@ -1181,7 +1181,7 @@ class _ClientRendezvousBookingScreenState
                           ),
                           Text(
                             _isDelivery
-                                ? 'Remplissez les détails de votre envoi'
+                                ? 'rdv.fill_shipment'.tr()
                                 : 'rdv.title'.tr(),
                             style: GoogleFonts.poppins(
                               fontSize: 12,
@@ -1368,7 +1368,7 @@ class _ClientRendezvousBookingScreenState
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text('Changer',
+                                Text('booking.change_service'.tr(),
                                     style: GoogleFonts.poppins(
                                         fontSize: 11,
                                         fontWeight: FontWeight.w600,
@@ -1418,7 +1418,7 @@ class _ClientRendezvousBookingScreenState
                     const SizedBox(width: 14),
                     Expanded(
                       child: svc == null
-                          ? Text('Sélectionner un service',
+                          ? Text('rdv.select_service'.tr(),
                               style: GoogleFonts.poppins(
                                   fontSize: 14, color: _textSecondary))
                           : Column(
@@ -1446,7 +1446,7 @@ class _ClientRendezvousBookingScreenState
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Changer',
+                          Text('booking.change_service'.tr(),
                               style: GoogleFonts.poppins(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
@@ -1487,8 +1487,8 @@ class _ClientRendezvousBookingScreenState
     switch (svc.pricingModel) {
       case 'fixed':
         return svc.basePrice != null
-            ? 'Prix fixe : ${FareCalculator.formatFare(svc.basePrice!, c)}'
-            : 'Prix fixe';
+            ? 'rdv.fixed_price_value'.tr(namedArgs: {'price': FareCalculator.formatFare(svc.basePrice!, c)})
+            : 'rdv.fixed_price'.tr();
       case 'distance':
         final base = (svc.basePrice != null && svc.basePrice! > 0)
             ? '${FareCalculator.formatFare(svc.basePrice!, c)} + '
@@ -1499,8 +1499,8 @@ class _ClientRendezvousBookingScreenState
         return '$base$km';
       case 'hourly':
         return svc.pricePerMinute != null
-            ? '${FareCalculator.formatFare(svc.pricePerMinute! * 60, c)} / heure'
-            : 'Prix horaire';
+            ? '${FareCalculator.formatFare(svc.pricePerMinute! * 60, c)} / ${'rdv.hour'.tr()}'
+            : 'rdv.hourly_price'.tr();
       default:
         final base = svc.basePrice != null
             ? FareCalculator.formatFare(svc.basePrice!, c)
@@ -1555,7 +1555,7 @@ class _ClientRendezvousBookingScreenState
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Choisir un service',
+                      'booking.choose_service'.tr(),
                       style: GoogleFonts.poppins(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -1809,7 +1809,7 @@ class _ClientRendezvousBookingScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Poids estimé',
+          Text('rdv.estimated_weight'.tr(),
               style: GoogleFonts.poppins(
                   fontSize: 12, color: _textSecondary, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
@@ -1853,16 +1853,16 @@ class _ClientRendezvousBookingScreenState
 
   Widget _cargoSizeSelector() {
     final labels = {
-      'small': 'Petit',
-      'medium': 'Moyen',
-      'large': 'Grand',
-      'extra_large': 'Très grand',
+      'small': 'rdv.size_small'.tr(),
+      'medium': 'rdv.size_medium'.tr(),
+      'large': 'rdv.size_large'.tr(),
+      'extra_large': 'rdv.size_xl'.tr(),
     };
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Taille du colis',
+          Text('rdv.package_size'.tr(),
               style: GoogleFonts.poppins(
                   fontSize: 12, color: _textSecondary, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
@@ -1936,12 +1936,12 @@ class _ClientRendezvousBookingScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Colis fragile',
+                Text('rdv.fragile_package_lc'.tr(),
                     style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: _textPrimary)),
-                Text('Manipulation avec précaution',
+                Text('rdv.handle_with_care'.tr(),
                     style: GoogleFonts.poppins(
                         fontSize: 11, color: _textSecondary)),
               ],
@@ -2131,7 +2131,7 @@ class _ClientRendezvousBookingScreenState
                 controller: _addressCtrl,
                 style: GoogleFonts.poppins(fontSize: 14, color: _textPrimary),
                 validator: (v) => (v == null || v.trim().isEmpty)
-                    ? (_isDelivery ? 'Adresse de collecte requise' : 'Adresse requise')
+                    ? (_isDelivery ? 'rdv.pickup_address_required'.tr() : 'rdv.address_required'.tr())
                     : null,
                 decoration: _inputDeco(
                   _isDelivery ? 'Adresse de collecte (départ)' : 'rdv.address'.tr(),
@@ -2187,10 +2187,10 @@ class _ClientRendezvousBookingScreenState
           controller: _destAddressCtrl,
           style: GoogleFonts.poppins(fontSize: 14, color: _textPrimary),
           validator: (v) => (v == null || v.trim().isEmpty)
-              ? 'Adresse de livraison requise'
+              ? 'rdv.delivery_address_required'.tr()
               : null,
           decoration: _inputDeco(
-            'Adresse de livraison (destination)',
+            'rdv.delivery_address_dest'.tr(),
             Icons.flag_rounded,
           ).copyWith(
             suffixIcon: _isSearchingDest
@@ -2350,13 +2350,13 @@ class _ServicePricingCard extends StatelessWidget {
           // Pricing rows — shown only when value is non-zero
           if (service.basePrice != null && service.basePrice! > 0)
             _priceRow(
-              'Prix de base',
+              'rdv.base_price'.tr(),
               FareCalculator.formatFare(service.basePrice!, currency),
             ),
           if (service.pricePerKm != null && service.pricePerKm! > 0) ...[
             const SizedBox(height: 6),
             _priceRow(
-              'Par kilomètre',
+              'rdv.per_km'.tr(),
               '${FareCalculator.formatFare(service.pricePerKm!, currency)}/km',
               highlight: true,
             ),
@@ -2366,7 +2366,7 @@ class _ServicePricingCard extends StatelessWidget {
               service.pricingModel != 'distance') ...[
             const SizedBox(height: 6),
             _priceRow(
-              service.pricingModel == 'hourly' ? 'Par heure' : 'Par minute',
+              service.pricingModel == 'hourly' ? 'rdv.per_hour'.tr() : 'rdv.per_minute'.tr(),
               service.pricingModel == 'hourly'
                   ? '${FareCalculator.formatFare(service.pricePerMinute! * 60, currency)}/h'
                   : '${FareCalculator.formatFare(service.pricePerMinute!, currency)}/min',
@@ -2375,7 +2375,7 @@ class _ServicePricingCard extends StatelessWidget {
           if (service.minimumFare != null && service.minimumFare! > 0) ...[
             const SizedBox(height: 6),
             _priceRow(
-              'Minimum garanti',
+              'rdv.guaranteed_min'.tr(),
               FareCalculator.formatFare(service.minimumFare!, currency),
               color: _orange,
             ),
@@ -2436,7 +2436,7 @@ class _ServicePricingCard extends StatelessWidget {
                       size: 13, color: Color(0xFF22C55E)),
                   const SizedBox(width: 6),
                   Text(
-                    'Prix forfaitaire — pas de surprises',
+                    'rdv.flat_price'.tr(),
                     style: GoogleFonts.poppins(
                       fontSize: 11,
                       color: const Color(0xFF22C55E),
@@ -2524,8 +2524,8 @@ class _FareEstimateBanner extends StatelessWidget {
                 Text(
                   label ??
                       (distanceKm != null
-                          ? 'Distance estimée : ${distanceKm!.toStringAsFixed(1)} km'
-                          : 'Tarif estimé'),
+                          ? 'rdv.estimated_distance'.tr(namedArgs: {'km': distanceKm!.toStringAsFixed(1)})
+                          : 'rdv.estimated_fare'.tr()),
                   style: GoogleFonts.poppins(
                     fontSize: 11,
                     color: Colors.white.withOpacity(0.6),
@@ -2543,7 +2543,7 @@ class _FareEstimateBanner extends StatelessWidget {
             ),
           ),
           Text(
-            'Estimatif',
+            'rdv.estimate_badge'.tr(),
             style: GoogleFonts.poppins(
               fontSize: 10,
               color: Colors.white.withOpacity(0.4),
@@ -2625,8 +2625,8 @@ class _ServicePickerTile extends StatelessWidget {
     switch (service.pricingModel) {
       case 'fixed':
         return service.basePrice != null
-            ? 'Prix fixe · ${FareCalculator.formatFare(service.basePrice!, c)}'
-            : 'Prix fixe';
+            ? 'rdv.fixed_price_dot'.tr(namedArgs: {'price': FareCalculator.formatFare(service.basePrice!, c)})
+            : 'rdv.fixed_price'.tr();
       case 'distance':
         final base = (service.basePrice != null && service.basePrice! > 0)
             ? '${FareCalculator.formatFare(service.basePrice!, c)} + '
@@ -2637,8 +2637,8 @@ class _ServicePickerTile extends StatelessWidget {
         return '$base$km';
       case 'hourly':
         return service.pricePerMinute != null
-            ? '${FareCalculator.formatFare(service.pricePerMinute! * 60, c)} / heure'
-            : 'Prix horaire';
+            ? '${FareCalculator.formatFare(service.pricePerMinute! * 60, c)} / ${'rdv.hour'.tr()}'
+            : 'rdv.hourly_price'.tr();
       default:
         final base = service.basePrice != null
             ? FareCalculator.formatFare(service.basePrice!, c)
@@ -2652,10 +2652,10 @@ class _ServicePickerTile extends StatelessWidget {
 
   String get _modelLabel {
     switch (service.pricingModel) {
-      case 'fixed':    return 'Fixe';
-      case 'distance': return 'Au km';
-      case 'hourly':   return 'À l\'h';
-      default:         return 'Combiné';
+      case 'fixed':    return 'rdv.model_fixed'.tr();
+      case 'distance': return 'rdv.model_km'.tr();
+      case 'hourly':   return 'rdv.model_hour'.tr();
+      default:         return 'rdv.model_combined'.tr();
     }
   }
 
@@ -2754,7 +2754,7 @@ class _ServicePickerTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            'LIVR.',
+                            'rdv.delivery_short'.tr(),
                             style: GoogleFonts.poppins(
                               fontSize: 9,
                               fontWeight: FontWeight.w700,

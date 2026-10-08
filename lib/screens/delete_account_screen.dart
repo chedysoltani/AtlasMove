@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../services/profile_service.dart';
 import '../services/notification_service.dart';
 import '../services/call_service.dart';
@@ -40,14 +41,14 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Votre compte a été supprimé.'),
+          SnackBar(
+            content: Text('delete_account.deleted'.tr()),
             backgroundColor: Color(0xFF22C55E),
           ),
         );
       }
     } on UnauthorizedException {
-      setState(() => _error = 'Mot de passe incorrect. Veuillez réessayer.');
+      setState(() => _error = 'delete_account.wrong_password'.tr());
     } on NotFoundException {
       // Compte déjà supprimé — nettoyer la session
       await ProfileService.logout();
@@ -55,9 +56,9 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
       }
     } on NetworkException {
-      setState(() => _error = 'Impossible de contacter le serveur. Vérifiez votre connexion.');
+      setState(() => _error = 'delete_account.server_unreachable'.tr());
     } catch (_) {
-      setState(() => _error = 'Une erreur est survenue. Veuillez réessayer.');
+      setState(() => _error = 'delete_account.generic_error'.tr());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -70,8 +71,8 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F172A),
         foregroundColor: Colors.white,
-        title: const Text(
-          'Supprimer le compte',
+        title: Text(
+          'delete_account.title'.tr(),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
         elevation: 0,
@@ -102,34 +103,34 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Supprimer définitivement votre compte',
+          Text(
+            'delete_account.headline'.tr(),
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _textPrimary),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Cette action est permanente et ne peut pas être annulée.',
+          Text(
+            'delete_account.permanent'.tr(),
             style: TextStyle(fontSize: 14, color: _red, fontWeight: FontWeight.w600, height: 1.4),
           ),
           const SizedBox(height: 24),
           _infoBox(
-            'Ce qui sera supprimé',
+            'delete_account.will_delete'.tr(),
             _red,
             Icons.delete_outline_rounded,
             [
-              'Votre nom, email, numéro de téléphone et photo de profil',
-              'Votre mot de passe et données d\'authentification',
-              'Vos documents livreur (pièce d\'identité, permis, véhicule)',
+              'delete_account.del_identity'.tr(),
+              'delete_account.del_auth'.tr(),
+              'delete_account.del_docs'.tr(),
             ],
           ),
           const SizedBox(height: 14),
           _infoBox(
-            'Ce qui est conservé (obligations légales)',
+            'delete_account.kept'.tr(),
             _textSecondary,
             Icons.info_outline_rounded,
             [
-              'Historique des courses et livraisons (anonymisé)',
-              'Données de facturation requises par la réglementation',
+              'delete_account.kept_history'.tr(),
+              'delete_account.kept_billing'.tr(),
             ],
           ),
           const SizedBox(height: 32),
@@ -143,8 +144,8 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 elevation: 0,
               ),
-              child: const Text(
-                'Continuer',
+              child: Text(
+                'legal.continue'.tr(),
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
               ),
             ),
@@ -154,7 +155,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
             width: double.infinity,
             child: TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler', style: TextStyle(color: _textSecondary, fontSize: 15)),
+              child: Text('common.cancel'.tr(), style: TextStyle(color: _textSecondary, fontSize: 15)),
             ),
           ),
         ],
@@ -221,13 +222,13 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Confirmez avec votre mot de passe',
+          Text(
+            'delete_account.confirm_title'.tr(),
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _textPrimary),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Entrez votre mot de passe pour confirmer la suppression définitive de votre compte.',
+          Text(
+            'delete_account.confirm_body'.tr(),
             style: TextStyle(fontSize: 14, color: _textSecondary, height: 1.5),
           ),
           const SizedBox(height: 28),
@@ -246,7 +247,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
               autofocus: true,
               onChanged: (_) { if (_error != null) setState(() => _error = null); },
               decoration: InputDecoration(
-                hintText: 'Mot de passe',
+                hintText: 'auth.password'.tr(),
                 hintStyle: const TextStyle(color: Color(0xFF9BA3B4)),
                 prefixIcon: const Icon(Icons.lock_rounded, color: Color(0xFF9BA3B4), size: 20),
                 suffixIcon: IconButton(
@@ -291,8 +292,8 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                       width: 22, height: 22,
                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                     )
-                  : const Text(
-                      'Supprimer définitivement mon compte',
+                  : Text(
+                      'delete_account.confirm_btn'.tr(),
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
                     ),
               ),
@@ -303,7 +304,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
             width: double.infinity,
             child: TextButton(
               onPressed: _loading ? null : () => setState(() { _step = 0; _error = null; }),
-              child: const Text('Retour', style: TextStyle(color: _textSecondary, fontSize: 15)),
+              child: Text('common.back'.tr(), style: TextStyle(color: _textSecondary, fontSize: 15)),
             ),
           ),
         ],

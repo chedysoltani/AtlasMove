@@ -118,8 +118,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
             _bidPollingTimers.remove(trip.id);
             HapticFeedback.heavyImpact();
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('🎉 Votre offre a été acceptée ! Course en cours.'),
+              SnackBar(
+                content: Text('driver_rides.offer_accepted'.tr()),
                 backgroundColor: Colors.green,
                 duration: Duration(seconds: 3),
               ),
@@ -150,17 +150,17 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
       // Check permissions and get location
       final serviceEnabled = await _locationService.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        throw Exception('Le service de localisation est désactivé. Veuillez l\'activer pour rechercher des courses.');
+        throw Exception('driver_rides.location_disabled'.tr());
       }
 
       final permission = await _locationService.requestLocationPermission();
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        throw Exception('La permission de localisation est requise pour trouver des courses à proximité.');
+        throw Exception('driver_rides.location_permission'.tr());
       }
 
       final position = await _locationService.getCurrentPosition();
       if (position == null) {
-        throw Exception('Impossible d\'obtenir votre position actuelle.');
+        throw Exception('driver_rides.location_unavailable'.tr());
       }
 
       debugPrint('Driver location found: ${position.latitude}, ${position.longitude}');
@@ -260,7 +260,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          '${_trips.length} disponibles',
+                          'driver_rides.available_count'.tr(namedArgs: {'count': '${_trips.length}'}),
                           style: const TextStyle(
                             color: AppTheme.primaryColor,
                             fontSize: 12,
@@ -297,14 +297,14 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                   color: Color(0xFF0F172A), size: 38),
             ),
             const SizedBox(height: 20),
-            const Text('Vous êtes hors ligne',
+            Text('driver_rides.offline_title'.tr(),
                 style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF0F172A))),
             const SizedBox(height: 10),
-            const Text(
-              'Passez en ligne depuis le tableau de bord pour voir et accepter des courses.',
+            Text(
+              'driver_rides.offline_body'.tr(),
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 13,
@@ -372,8 +372,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Nous vous notifierons dès qu\'une\ncourse sera disponible.',
+            Text(
+              'driver_rides.notify_when_available'.tr(),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.grey,
@@ -481,8 +481,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                                       color: Colors.red.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
-                                    child: const Text(
-                                      'PROCHE',
+                                    child: Text(
+                                      'driver_rides.near'.tr(),
                                       style: TextStyle(
                                         color: Colors.red,
                                         fontSize: 10,
@@ -495,7 +495,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Client: ${trip.clientName ?? "Inconnu"}',
+                              'driver_rides.client_label'.tr(namedArgs: {'name': trip.clientName ?? 'driver_rides.unknown'.tr()}),
                               style: const TextStyle(
                                 color: Colors.grey,
                                 fontSize: 12,
@@ -536,7 +536,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                           ),
                           Text(
                             trip.distanceToPickupKm != null 
-                                ? 'à ${trip.distanceToPickupKm!.toStringAsFixed(1)} km'
+                                ? 'driver_rides.distance_away'.tr(namedArgs: {'km': trip.distanceToPickupKm!.toStringAsFixed(1)})
                                 : '${trip.estimatedDistanceKm.toStringAsFixed(1)} km',
                             style: const TextStyle(
                               color: Colors.grey,
@@ -551,8 +551,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                                 color: Colors.orange.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: const Text(
-                                'Négociable 🤝',
+                              child: Text(
+                                'driver_rides.negotiable'.tr(),
                                 style: TextStyle(
                                   color: Colors.orange,
                                   fontSize: 9,
@@ -574,7 +574,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                       // Pickup
                       _buildLocationRow(
                         Icons.location_on,
-                        'Départ',
+                        'driver_rides.departure'.tr(),
                         trip.pickupAddress,
                         Colors.green,
                       ),
@@ -584,7 +584,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                       // Destination
                       _buildLocationRow(
                         Icons.flag,
-                        'Destination',
+                        'booking.destination'.tr(),
                         trip.destinationAddress,
                         Colors.red,
                       ),
@@ -677,8 +677,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                  child: const Text(
-                                    'Offre',
+                                  child: Text(
+                                    'driver_rides.offer'.tr(),
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
@@ -740,8 +740,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    'Proposer votre tarif',
+                  Text(
+                    'driver_rides.propose_fare'.tr(),
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 24),
@@ -827,8 +827,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                           ));
                         }
                       },
-                      child: const Text(
-                        'Envoyer l\'offre',
+                      child: Text(
+                        'driver_rides.send_offer'.tr(),
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -856,8 +856,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Proposer votre contre-tarif :',
+          Text(
+            'driver_rides.counter_fare'.tr(),
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -958,8 +958,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                   );
                 }
               },
-              child: const Text(
-                'Envoyer l\'offre',
+              child: Text(
+                'driver_rides.send_offer'.tr(),
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
@@ -1063,7 +1063,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
           setState(() => _acceptingTripId = null);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Abonnement requis pour accepter des courses'),
+              content: Text('driver_rides.subscription_required'.tr()),
               backgroundColor: const Color(0xFFEA580C),
               duration: const Duration(seconds: 4),
               action: SnackBarAction(

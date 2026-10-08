@@ -68,8 +68,8 @@ class _ServicesAssignmentsScreenState
         child: const Icon(Icons.arrow_back_ios_new_rounded,
             color: Colors.black, size: 20),
       ),
-      title: const Text(
-        'Mes Missions',
+      title: Text(
+        'services.assignments'.tr(),
         style: TextStyle(
           color: Colors.black,
           fontSize: 17,
@@ -101,7 +101,7 @@ class _ServicesAssignmentsScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionLabel('Mission active'),
+          _sectionLabel('services_extra.active_mission'.tr()),
           const SizedBox(height: 12),
           if (state.isLoadingCurrent)
             _shimmerCard(height: 140)
@@ -151,8 +151,8 @@ class _ServicesAssignmentsScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Mes Missions',
+                    Text(
+                      'services.assignments'.tr(),
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 11,
@@ -182,22 +182,22 @@ class _ServicesAssignmentsScreenState
           ),
           const SizedBox(height: 16),
           _detailRowWhite(
-              Icons.category_outlined, 'Catégorie', 'Service'),
+              Icons.category_outlined, 'support.category'.tr(), 'services_extra.service'.tr()),
           const SizedBox(height: 10),
           _detailRowWhite(
               Icons.calendar_today_outlined,
-              'Date d\'assignement',
+              'services_extra.assignment_date'.tr(),
               _formatDate(assignment.createdAt)),
           const SizedBox(height: 10),
           _detailRowWhite(
               Icons.info_outline_rounded,
-              'Statut',
+              'payment.status'.tr(),
               _getStatusLabel(assignment.status)),
           if (assignment.documentUrl != null &&
               assignment.documentUrl!.isNotEmpty) ...[
             const SizedBox(height: 10),
             _detailRowWhite(
-                Icons.description_outlined, 'Document', 'Fourni'),
+                Icons.description_outlined, 'services_extra.document'.tr(), 'services_extra.provided'.tr()),
           ],
         ],
       ),
@@ -232,8 +232,8 @@ class _ServicesAssignmentsScreenState
                 color: _orange, size: 32),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Aucune mission active',
+          Text(
+            'services_extra.no_active_mission'.tr(),
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
@@ -242,7 +242,7 @@ class _ServicesAssignmentsScreenState
           ),
           const SizedBox(height: 4),
           Text(
-            'Explorez le catalogue pour rejoindre une mission',
+            'services_extra.explore_catalogue'.tr(),
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
           ),
@@ -262,7 +262,7 @@ class _ServicesAssignmentsScreenState
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _sectionLabel('Historique des assignements'),
+              _sectionLabel('services.history'.tr()),
               if (state.history.isNotEmpty)
                 Container(
                   padding:
@@ -349,7 +349,7 @@ class _ServicesAssignmentsScreenState
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Assigné le ${_formatDate(assignment.createdAt)}',
+                  'services.assigned_on'.tr(namedArgs: {'date': _formatDate(assignment.createdAt)}),
                   style: TextStyle(
                     fontSize: 11,
                     color: Colors.grey.shade500,
@@ -380,7 +380,7 @@ class _ServicesAssignmentsScreenState
           Icon(Icons.history_rounded, size: 40, color: Colors.grey.shade300),
           const SizedBox(height: 10),
           Text(
-            'Aucun historique',
+            'services_extra.no_history'.tr(),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -426,7 +426,7 @@ class _ServicesAssignmentsScreenState
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                'Réessayer',
+                'common.retry'.tr(),
                 style: TextStyle(
                     color: Colors.red.shade700,
                     fontSize: 12,
@@ -563,21 +563,21 @@ class _ServicesAssignmentsScreenState
   String _getStatusLabel(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return 'En attente';
+        return 'common.pending'.tr();
       case 'approved':
-        return 'Approuvé';
+        return 'common.approved'.tr();
       case 'active':
-        return 'Active';
+        return 'common.active'.tr();
       case 'rejected':
-        return 'Rejeté';
+        return 'common.rejected'.tr();
       case 'cancelled':
-        return 'Annulé';
+        return 'common.cancelled'.tr();
       default:
         return status;
     }
   }
 
   String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} à ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} • ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 }

@@ -191,7 +191,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
         Marker(
           markerId: const MarkerId('pickup'),
           position: pickup,
-          infoWindow: const InfoWindow(title: 'Votre position'),
+          infoWindow: InfoWindow(title: 'booking_extra.your_position'.tr()),
           icon: _pickupIcon ??
               BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
           anchor: MapMarkerFactory.pinAnchor,
@@ -550,14 +550,14 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
           MapRoundButton(
             icon: Icons.route_rounded,
             onTap: _fitWholeTrip,
-            tooltip: 'Itinéraire complet',
+            tooltip: 'active_ride.full_route'.tr(),
           ),
           const SizedBox(height: 10),
           MapRoundButton(
             icon: following ? Icons.gps_fixed : Icons.gps_not_fixed,
             active: following,
             onTap: _recenter,
-            tooltip: 'Suivre le chauffeur',
+            tooltip: 'booking_extra.follow_driver'.tr(),
           ),
         ],
       ),
@@ -571,13 +571,13 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
         color: _C.amber.withOpacity(0.9),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Row(
+      child: Row(
         children: [
           Icon(Icons.signal_wifi_off_rounded, color: Colors.white, size: 16),
           SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Localisation en attente…',
+              'booking_extra.location_pending'.tr(),
               style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
@@ -652,15 +652,15 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   /// Timeline horizontale 4 étapes
   Widget _buildRideTimeline(ActiveRideState rideState) {
     final steps = [
-      (label: 'Confirmé',  done: true),
-      (label: 'En route',  done: rideState.status == RideStatus.arriving ||
+      (label: 'rdv.confirmed'.tr(),  done: true),
+      (label: 'booking_extra.step_en_route'.tr(),  done: rideState.status == RideStatus.arriving ||
           rideState.status == RideStatus.arrived ||
           rideState.status == RideStatus.inProgress ||
           rideState.status == RideStatus.completed),
-      (label: 'Arrivé',   done: rideState.status == RideStatus.arrived ||
+      (label: 'booking_extra.step_arrived'.tr(),   done: rideState.status == RideStatus.arrived ||
           rideState.status == RideStatus.inProgress ||
           rideState.status == RideStatus.completed),
-      (label: 'Terminé',  done: rideState.status == RideStatus.completed),
+      (label: 'rdv.completed'.tr(),  done: rideState.status == RideStatus.completed),
     ];
     final activeIndex = steps.lastIndexWhere((s) => s.done);
 
@@ -744,7 +744,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
             const Icon(Icons.timer_outlined, color: _C.primary, size: 20),
             const SizedBox(width: 10),
             Text(
-              'Arrivée dans ~$etaMin min',
+              'booking_extra.arriving_in'.tr(namedArgs: {'min': '$etaMin'}),
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _C.primary),
             ),
             const Spacer(),
@@ -875,7 +875,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
                   width: 6, height: 6,
                   decoration: const BoxDecoration(color: _C.green, shape: BoxShape.circle)),
               const SizedBox(width: 5),
-              const Text('LIVE',
+              Text('booking_extra.live'.tr(),
                   style: TextStyle(color: _C.green, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
             ],
           ),
@@ -962,11 +962,11 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     final session = await CallService().initiateCall(widget.tripId);
     if (session == null) {
       if (mounted) {
-        final err = CallService().lastError ?? 'Erreur inconnue';
+        final err = CallService().lastError ?? 'active_ride.unknown_error'.tr();
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Impossible de démarrer l\'appel'),
+            title: Text('active_ride.call_failed'.tr()),
             content: SelectableText(err),
             actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
           ),
@@ -988,7 +988,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('Numéro copié'),
+        content: Text('booking_extra.number_copied'.tr()),
         backgroundColor: _C.green,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 1),
@@ -1086,7 +1086,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Tarif négocié et verrouillé 🔒',
+              Text('booking_extra.fare_locked_negotiated'.tr(),
                   style: TextStyle(fontSize: 12, color: _C.gray600, fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
               Row(
@@ -1215,15 +1215,14 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
               child: const Icon(Icons.person_off_rounded, color: _C.amber, size: 22),
             ),
             const SizedBox(width: 12),
-            const Expanded(
-              child: Text('Course annulée',
+            Expanded(
+              child: Text('booking.ride_cancelled'.tr(),
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
-        content: const Text(
-          'Le livreur n\'a pas pu prendre en charge votre course.\n\n'
-          'Vous pouvez créer une nouvelle demande — d\'autres livreurs sont disponibles.',
+        content: Text(
+          'booking_extra.driver_unable'.tr(),
           style: TextStyle(fontSize: 14, height: 1.5),
         ),
         actions: [
@@ -1245,7 +1244,7 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Nouvelle course'),
+            child: Text('booking_extra.new_ride'.tr()),
           ),
         ],
       ),

@@ -48,6 +48,12 @@
         <!-- Configuration pour Google Maps -->
         <meta-data android:name="com.google.android.gms.version"
                    android:value="@integer/google_play_services_version"/>
+
+        <!-- Meta (Facebook) App Events -->
+        <meta-data android:name="com.facebook.sdk.ApplicationId"
+                   android:value="@string/facebook_app_id"/>
+        <meta-data android:name="com.facebook.sdk.ClientToken"
+                   android:value="@string/facebook_client_token"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -68,6 +74,31 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+
+            <!-- Liens d'inscription des campagnes, gérés par app_links
+                 (lib/services/deep_link_service.dart) : le deep linking
+                 intégré de Flutter est désactivé pour ne pas les traiter deux fois. -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>
+
+            <!-- App Links : https://(www.)atlasbusiness.online/register/client|driver
+                 Vérifiés via https://<hôte>/.well-known/assetlinks.json -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"/>
+                <data android:host="atlasbusiness.online"/>
+                <data android:host="www.atlasbusiness.online"/>
+                <data android:pathPrefix="/register/"/>
+            </intent-filter>
+
+            <!-- Schéma personnalisé : atlasmove://register/client|driver -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="atlasmove" android:host="register"/>
             </intent-filter>
         </activity>
         <!-- Foreground service pour le tracking GPS en arrière-plan -->

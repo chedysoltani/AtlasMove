@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../core/network/http_client.dart';
 import '../core/storage/token_storage.dart';
 import '../models/requests/register_request.dart';
@@ -129,7 +130,7 @@ class AuthService {
         throw ServiceValidationException(['L\'email est requis']);
       }
       if (password.trim().isEmpty) {
-        throw ServiceValidationException(['Le mot de passe est requis']);
+        throw ServiceValidationException(['auth.password_required'.tr()]);
       }
 
       final response = await HttpClient.post(
@@ -247,7 +248,7 @@ class AuthService {
       if (!response.isSuccess) {
         final msg = response.json['message']?.toString()
             ?? response.json['data']?['message']?.toString()
-            ?? 'Erreur lors de la demande';
+            ?? 'common.unknown_error'.tr();
         throw NetworkException(msg);
       }
       final data = response.json['data'] as Map<String, dynamic>? ?? response.json;
@@ -272,7 +273,7 @@ class AuthService {
   }) async {
     try {
       if (newPassword.length < 8) {
-        throw ServiceValidationException(['Le mot de passe doit contenir au moins 8 caractères']);
+        throw ServiceValidationException(['auth.password_min8'.tr()]);
       }
       final response = await HttpClient.post(
         '/m/auth/reset-password',
@@ -287,7 +288,7 @@ class AuthService {
       if (!response.isSuccess) {
         final msg = response.json['message']?.toString()
             ?? response.json['data']?['message']?.toString()
-            ?? 'Code invalide ou expiré';
+            ?? 'errors.invalid_code'.tr();
         throw NetworkException(msg);
       }
     } on ServiceValidationException {
@@ -305,7 +306,7 @@ class AuthService {
       // Validation de l'email
       final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
       if (!emailRegex.hasMatch(email.trim())) {
-        throw ServiceValidationException(['Email invalide']);
+        throw ServiceValidationException(['auth.email_invalid'.tr()]);
       }
 
       await HttpClient.post(
@@ -329,11 +330,11 @@ class AuthService {
     try {
       // Validation du mot de passe
       if (password.length < 8) {
-        throw ServiceValidationException(['Le mot de passe doit contenir au moins 8 caractères']);
+        throw ServiceValidationException(['auth.password_min8'.tr()]);
       }
       
       if (password != confirmPassword) {
-        throw ServiceValidationException(['Les mots de passe ne correspondent pas']);
+        throw ServiceValidationException(['auth.passwords_mismatch'.tr()]);
       }
 
       await HttpClient.post(
@@ -389,7 +390,7 @@ class AuthService {
       }
       
       if (otp.trim().isEmpty) {
-        throw ServiceValidationException(['Le code OTP est requis']);
+        throw ServiceValidationException(['auth.otp_enter_code'.tr()]);
       }
       
       if (sessionToken.trim().isEmpty) {
@@ -553,6 +554,8 @@ class AuthService {
       debugPrint('  - ID Card: ${request.idCard?.path}');
       debugPrint('  - Driving License: ${request.drivingLicense?.path}');
       debugPrint('  - Vehicle Registration: ${request.vehicleRegistration?.path}');
+      debugPrint('  - Vehicle photos: ${[request.vehiclePhotoFront, request.vehiclePhotoBack, request.vehiclePhotoLeft, request.vehiclePhotoRight].where((f) => f != null).length}/4');
+      debugPrint('  - Selfie: ${request.selfie?.path}');
 
       // Préparer les données multipart avec les fichiers
       final Map<String, dynamic> multipartData = Map<String, dynamic>.from(request.textFields);
@@ -665,7 +668,8 @@ class AuthService {
       debugPrint('📦 Fields: ${request.fields}');
       
       // Envoyer la requête
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      // 8 images pour l'inscription livreur : délai large pour les réseaux lents
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 90));
       final response = await http.Response.fromStream(streamedResponse)
           .timeout(const Duration(seconds: 10));
       

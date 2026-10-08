@@ -106,7 +106,7 @@ class _ResetPasswordRequestScreenState
               ? e.message
               : e is ServiceValidationException
                   ? e.toString()
-                  : 'Une erreur est survenue';
+                  : 'common.unknown_error'.tr();
           _isLoading = false;
         });
       }
@@ -318,7 +318,7 @@ class _ResetPasswordRequestScreenState
         style: GoogleFonts.poppins(
             fontSize: 14, fontWeight: FontWeight.w500, color: _dark),
         decoration: InputDecoration(
-          hintText: 'votre@email.com',
+          hintText: 'auth.email_hint'.tr(),
           hintStyle: GoogleFonts.poppins(
               fontSize: 14, color: const Color(0xFFCDD3E0)),
           prefixIcon: const Icon(Icons.mail_outline_rounded,
@@ -349,9 +349,9 @@ class _ResetPasswordRequestScreenState
               const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         validator: (v) {
-          if (v == null || v.isEmpty) return 'Email requis';
+          if (v == null || v.isEmpty) return 'auth.email_required'.tr();
           if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v)) {
-            return 'Email invalide';
+            return 'auth.email_invalid'.tr();
           }
           return null;
         },

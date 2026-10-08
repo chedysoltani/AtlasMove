@@ -42,7 +42,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
   bool _isMapReady = false;
   double _currentDistance = 0.0;
-  String _estimatedTime = 'Calcul...';
+  String _estimatedTime = '…';
   bool _isFetchingRoute = false;
   DateTime? _lastRouteFetchTime;
 
@@ -463,14 +463,14 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
             MapRoundButton(
               icon: Icons.route_rounded,
               onTap: _fitWholeTrip,
-              tooltip: 'Itinéraire complet',
+              tooltip: 'active_ride.full_route'.tr(),
             ),
             const SizedBox(height: 10),
             MapRoundButton(
               icon: following ? Icons.gps_fixed : Icons.gps_not_fixed,
               active: following,
               onTap: _recenter,
-              tooltip: 'Ma position',
+              tooltip: 'active_ride.my_position'.tr(),
             ),
           ],
         ),
@@ -554,11 +554,11 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
     final session = await CallService().initiateCall(widget.trip.id);
     if (session == null) {
       if (mounted) {
-        final err = CallService().lastError ?? 'Erreur inconnue';
+        final err = CallService().lastError ?? 'active_ride.unknown_error'.tr();
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Impossible de démarrer l\'appel'),
+            title: Text('active_ride.call_failed'.tr()),
             content: SelectableText(err),
             actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
           ),
@@ -692,7 +692,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.trip.clientName ?? 'Client',
+                          widget.trip.clientName ?? 'rdv.client'.tr(),
                           style: const TextStyle(
                               fontWeight: FontWeight.w700, fontSize: 14),
                         ),
@@ -785,7 +785,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              '${_currentDistance.toStringAsFixed(1)} km restants',
+              'active_ride.km_remaining'.tr(namedArgs: {'km': _currentDistance.toStringAsFixed(1)}),
               style: const TextStyle(
                 color: Colors.black87,
                 fontSize: 15,
@@ -823,12 +823,12 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
       ),
       child: Column(
         children: [
-          _buildInfoRow('Point de départ', widget.trip.pickupAddress),
+          _buildInfoRow('booking.departure'.tr(), widget.trip.pickupAddress),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Divider(),
           ),
-          _buildInfoRow('Destination', widget.trip.destinationAddress),
+          _buildInfoRow('booking.destination'.tr(), widget.trip.destinationAddress),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Divider(),
@@ -836,12 +836,12 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
           Row(
             children: [
               Expanded(
-                child: _buildInfoRow('Distance totale', '${widget.trip.estimatedDistanceKm.toStringAsFixed(1)} km'),
+                child: _buildInfoRow('active_ride.total_distance'.tr(), '${widget.trip.estimatedDistanceKm.toStringAsFixed(1)} km'),
               ),
               Container(width: 1, height: 30, color: Colors.grey.shade300),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildInfoRow('Prix convenu', '${(widget.trip.offeredFare ?? widget.trip.estimatedFare).toStringAsFixed(2)} ${widget.trip.currency}'),
+                child: _buildInfoRow('active_ride.agreed_price'.tr(), '${(widget.trip.offeredFare ?? widget.trip.estimatedFare).toStringAsFixed(2)} ${widget.trip.currency}'),
               ),
             ],
           ),
@@ -1005,8 +1005,8 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _summaryTile('Distance', '${widget.trip.estimatedDistanceKm.toStringAsFixed(1)} km'),
-                _summaryTile('Durée', _estimatedTime),
+                _summaryTile('booking.distance'.tr(), '${widget.trip.estimatedDistanceKm.toStringAsFixed(1)} km'),
+                _summaryTile('active_ride.duration'.tr(), _estimatedTime),
                 _summaryTile('nav.earnings'.tr(), '${(widget.trip.offeredFare ?? widget.trip.estimatedFare).toStringAsFixed(2)} ${widget.trip.currency}'),
               ],
             ),
@@ -1059,7 +1059,7 @@ class _DriverActiveRideScreenState extends ConsumerState<DriverActiveRideScreen>
 
   Widget _buildErrorWidget(MapState mapState) {
     return LocationErrorWidget(
-      message: mapState.errorMessage ?? 'Une erreur est survenue',
+      message: mapState.errorMessage ?? 'common.unknown_error'.tr(),
       status: mapState.status,
       onRetry: () => ref.read(mapProvider.notifier).retry(),
       onOpenSettings: () {

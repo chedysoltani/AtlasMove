@@ -124,15 +124,15 @@ class _ProfileScreenState extends State<ProfileScreen>
             _profilePictureUrl = ProfileService.resolveAvatarUrl(url, bust: true);
             _localAvatarPath = null;
           });
-          _showSnack('Photo mise à jour', success: true);
+          _showSnack('profile_extra.photo_updated'.tr(), success: true);
         } else if (mounted) {
           setState(() => _localAvatarPath = null);
-          _showSnack('Upload réussi mais URL manquante', success: false);
+          _showSnack('profile_extra.upload_no_url'.tr(), success: false);
         }
       } catch (e) {
         if (mounted) {
           setState(() => _localAvatarPath = null);
-          _showSnack('Échec upload photo: ${_getErrorMessage(e)}', success: false);
+          _showSnack('profile_extra.upload_failed'.tr(namedArgs: {'error': _getErrorMessage(e)}), success: false);
         }
       } finally {
         if (mounted) setState(() => _isLoading = false);
@@ -236,6 +236,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                               _languageButton(),
                               const SizedBox(height: 12),
                               _supportButton(),
+                              const SizedBox(height: 12),
+                              _guideButton(),
                               const SizedBox(height: 28),
                               _saveButton(),
                               const SizedBox(height: 16),
@@ -582,7 +584,21 @@ class _ProfileScreenState extends State<ProfileScreen>
     return OutlinedButton.icon(
       onPressed: () => Navigator.pushNamed(context, '/support'),
       icon: const Icon(Icons.support_agent_rounded),
-      label: const Text('Centre d\'aide'),
+      label: Text('support.title'.tr()),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 50),
+        side: const BorderSide(color: _border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        foregroundColor: _orange,
+      ),
+    );
+  }
+
+  Widget _guideButton() {
+    return OutlinedButton.icon(
+      onPressed: () => Navigator.pushNamed(context, '/onboarding_client'),
+      icon: const Icon(Icons.menu_book_rounded),
+      label: Text('onboarding.replay'.tr()),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(double.infinity, 50),
         side: const BorderSide(color: _border),
@@ -690,7 +706,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     return OutlinedButton.icon(
       onPressed: () => Navigator.pushNamed(context, '/delete_account'),
       icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444)),
-      label: const Text('Supprimer mon compte'),
+      label: Text('profile_extra.delete_account'.tr()),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(double.infinity, 50),
         side: const BorderSide(color: Color(0xFFEF4444), width: 1.5),

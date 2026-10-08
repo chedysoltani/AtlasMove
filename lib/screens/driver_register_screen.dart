@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:easy_localization/easy_localization.dart';
+import '../core/utils/permission_gate.dart';
 import '../models/requests/driver_register_request.dart';
 import '../models/service_models.dart';
 import '../services/auth_service.dart';
@@ -41,6 +44,10 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
   File? _idCard;
   File? _drivingLicense;
   File? _vehicleRegistration;
+
+  // Photos du véhicule (clé = angle, voir _vehicleSlots) et selfie de vérification
+  final Map<String, File> _vehiclePhotos = {};
+  File? _selfie;
 
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
@@ -107,12 +114,12 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
   List<Service> _fallbackServices() {
     final now = DateTime.now();
     final entries = [
-      ('taxi_fb',     'Taxi Standard',       'taxi',      3.0,  1.2),
-      ('vtc_fb',      'VTC / Chauffeur',     'vtc',       5.0,  1.8),
-      ('moto_fb',     'Moto-taxi',           'moto',      2.0,  0.8),
-      ('livr_fb',     'Livraison Moto',      'livraison', 2.0,  0.8),
-      ('van_fb',      'Van / Camionnette',   'van',       7.0,  2.2),
-      ('camion_fb',   'Camion / Poids lourd','camion',    10.0, 3.0),
+      ('taxi_fb',     'driver_reg.svc_taxi'.tr(),       'taxi',      3.0,  1.2),
+      ('vtc_fb',      'driver_reg.svc_vtc'.tr(),     'vtc',       5.0,  1.8),
+      ('moto_fb',     'booking.moto_taxi'.tr(),           'moto',      2.0,  0.8),
+      ('livr_fb',     'driver_reg.svc_moto_delivery'.tr(),      'livraison', 2.0,  0.8),
+      ('van_fb',      'driver_reg.svc_van'.tr(),   'van',       7.0,  2.2),
+      ('camion_fb',   'driver_reg.svc_truck'.tr(),'camion',    10.0, 3.0),
     ];
     return entries.map((e) => Service(
       id: e.$1, name: e.$2, categoryId: '',
@@ -153,29 +160,97 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
       final img = await _imagePicker.pickImage(source: ImageSource.gallery);
       if (img != null) { setState(() { onPicked(File(img.path)); }); }
     } catch (e) {
-      setState(() => _errorMessage = 'Erreur sélection image: $e');
+      setState(() => _errorMessage = 'driver_reg.image_error'.tr(namedArgs: {'error': '$e'}));
     }
   }
 
+
+  /// Photo du véhicule : appareil photo ou galerie, compressée (8 images à envoyer).
+  Future<void> _pickVehiclePhoto(String angle) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 8),
+          ListTile(
+            leading: const Icon(Icons.photo_camera_rounded, color: _orange),
+            title: Text('upload.camera'.tr()),
+            onTap: () => Navigator.pop(ctx, ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_rounded, color: _orange),
+            title: Text('upload.gallery'.tr()),
+            onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+    if (source == null) return;
+    await _pickCompressed(source, (f) => _vehiclePhotos[angle] = f);
+  }
+
+  /// Selfie : appareil photo frontal uniquement (pas de galerie), pour que la
+  /// photo soit prise au moment de l'inscription.
+  Future<void> _takeSelfie() =>
+      _pickCompressed(ImageSource.camera, (f) => _selfie = f, frontCamera: true);
+
+  Future<void> _pickCompressed(ImageSource source, void Function(File) onPicked,
+      {bool frontCamera = false}) async {
+    // Android : la permission CAMERA est déclarée (SDK d'appels), elle doit donc
+    // être accordée avant d'ouvrir l'appareil photo. Sur iOS, image_picker la
+    // demande lui-même.
+    if (source == ImageSource.camera && Platform.isAndroid) {
+      final status = await PermissionGate.run(Permission.camera.request,
+          onTimeout: PermissionStatus.denied);
+      if (!status.isGranted) {
+        if (status.isPermanentlyDenied) await openAppSettings();
+        if (mounted) setState(() => _errorMessage = 'driver_reg.camera_permission'.tr());
+        return;
+      }
+    }
+    try {
+      final img = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 75,
+        preferredCameraDevice: frontCamera ? CameraDevice.front : CameraDevice.rear,
+      );
+      if (img != null) setState(() => onPicked(File(img.path)));
+    } catch (e) {
+      setState(() => _errorMessage = 'driver_reg.image_error'.tr(namedArgs: {'error': '$e'}));
+    }
+  }
 
   // ── Register ──────────────────────────────────────────────────────────────
 
   Future<void> _registerDriver() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedService == null) {
-      setState(() => _errorMessage = 'Veuillez sélectionner un type de véhicule/service');
+      setState(() => _errorMessage = 'driver_reg.select_vehicle'.tr());
       return;
     }
     if (_idCard == null) {
-      setState(() => _errorMessage = 'Veuillez sélectionner votre carte d\'identité');
+      setState(() => _errorMessage = 'driver_reg.select_id'.tr());
       return;
     }
     if (_drivingLicense == null) {
-      setState(() => _errorMessage = 'Veuillez sélectionner votre permis de conduire');
+      setState(() => _errorMessage = 'driver_reg.select_license'.tr());
       return;
     }
     if (_vehicleRegistration == null) {
-      setState(() => _errorMessage = 'Veuillez sélectionner votre carte grise');
+      setState(() => _errorMessage = 'driver_reg.select_registration'.tr());
+      return;
+    }
+    if (_vehicleSlots.any((s) => _vehiclePhotos[s.key] == null)) {
+      setState(() => _errorMessage = 'driver_reg.vehicle_photos_required'.tr());
+      return;
+    }
+    if (_selfie == null) {
+      setState(() => _errorMessage = 'driver_reg.selfie_required'.tr());
       return;
     }
     setState(() { _isLoading = true; _errorMessage = null; });
@@ -196,6 +271,11 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
         idCard: _idCard,
         drivingLicense: _drivingLicense,
         vehicleRegistration: _vehicleRegistration,
+        vehiclePhotoFront: _vehiclePhotos['front'],
+        vehiclePhotoBack: _vehiclePhotos['back'],
+        vehiclePhotoLeft: _vehiclePhotos['left'],
+        vehiclePhotoRight: _vehiclePhotos['right'],
+        selfie: _selfie,
         referralCode: refCode.isNotEmpty ? refCode : null,
       );
       await AuthService.registerDriver(request);
@@ -236,7 +316,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
               ),
               const SizedBox(height: 20),
               Text(
-                'Inscription réussie !',
+                'driver_reg.success_title'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -245,11 +325,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
               ),
               const SizedBox(height: 14),
               Text(
-                'Votre compte a été créé avec succès.\n\n'
-                'L\'administrateur doit approuver votre compte '
-                'avant que vous puissiez vous connecter et utiliser '
-                'l\'application.\n\n'
-                'Vous serez notifié dès l\'activation de votre compte.',
+                'driver_reg.success_body'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 13,
                     color: const Color(0xFF6B7280),
@@ -270,7 +346,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                     elevation: 0,
                   ),
                   child: Text(
-                    'Compris, aller à la connexion',
+                    'driver_reg.go_login'.tr(),
                     style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700, fontSize: 14),
                   ),
@@ -313,28 +389,28 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                       ],
 
                       // ── Infos personnelles ─────────────────────────
-                      _a(0, _sectionLabel('Informations personnelles',
+                      _a(0, _sectionLabel('signup.personal_info_title'.tr(),
                           Icons.person_rounded)),
                       const SizedBox(height: 12),
                       _a(1, Row(children: [
                         Expanded(child: _field(ctrl: _firstNameCtrl,
-                            hint: 'Prénom', icon: Icons.person_rounded,
+                            hint: 'auth.first_name'.tr(), icon: Icons.person_rounded,
                             validator: (v) => (v == null || v.trim().length < 2)
-                                ? 'Min 2 caractères' : null)),
+                                ? 'driver_reg.min_2'.tr() : null)),
                         const SizedBox(width: 10),
                         Expanded(child: _field(ctrl: _lastNameCtrl,
-                            hint: 'Nom', icon: Icons.person_outline_rounded,
+                            hint: 'auth.last_name'.tr(), icon: Icons.person_outline_rounded,
                             validator: (v) => (v == null || v.trim().length < 2)
-                                ? 'Min 2 caractères' : null)),
+                                ? 'driver_reg.min_2'.tr() : null)),
                       ])),
                       const SizedBox(height: 11),
-                      _a(2, _field(ctrl: _emailCtrl, hint: 'Adresse email',
+                      _a(2, _field(ctrl: _emailCtrl, hint: 'driver_reg.email_address'.tr(),
                           icon: Icons.mail_outline_rounded,
                           keyboard: TextInputType.emailAddress,
                           validator: (v) {
-                            if (v == null || v.isEmpty) return 'Obligatoire';
+                            if (v == null || v.isEmpty) return 'auth.field_required'.tr();
                             if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-                                .hasMatch(v)) return 'Email invalide';
+                                .hasMatch(v)) return 'auth.email_invalid'.tr();
                             return null;
                           })),
                       const SizedBox(height: 11),
@@ -343,37 +419,37 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                       const SizedBox(height: 20),
 
                       // ── Mot de passe ───────────────────────────────
-                      _a(4, _sectionLabel('Mot de passe', Icons.lock_rounded)),
+                      _a(4, _sectionLabel('auth.password'.tr(), Icons.lock_rounded)),
                       const SizedBox(height: 12),
-                      _a(4, _field(ctrl: _passwordCtrl, hint: 'Mot de passe',
+                      _a(4, _field(ctrl: _passwordCtrl, hint: 'auth.password'.tr(),
                           icon: Icons.lock_outline_rounded,
                           obscure: _obscurePassword,
                           suffix: _eyeIcon(_obscurePassword,
                               () => setState(() => _obscurePassword = !_obscurePassword)),
                           validator: (v) {
-                            if (v == null || v.isEmpty) return 'Obligatoire';
-                            if (v.length < 8) return 'Min 8 caractères';
+                            if (v == null || v.isEmpty) return 'auth.field_required'.tr();
+                            if (v.length < 8) return 'auth.password_min8'.tr();
                             if (!RegExp(r'(?=.*[a-z])').hasMatch(v))
-                              return 'Doit contenir une minuscule';
+                              return 'driver_reg.pw_lower'.tr();
                             if (!RegExp(r'(?=.*[A-Z])').hasMatch(v))
-                              return 'Doit contenir une majuscule';
+                              return 'driver_reg.pw_upper'.tr();
                             if (!RegExp(r'(?=.*\d)').hasMatch(v))
-                              return 'Doit contenir un chiffre';
+                              return 'driver_reg.pw_digit'.tr();
                             if (!RegExp(r'(?=.*[@$!%*?&])').hasMatch(v))
-                              return 'Doit contenir un caractère spécial';
+                              return 'driver_reg.pw_special'.tr();
                             return null;
                           })),
                       const SizedBox(height: 11),
                       _a(5, _field(ctrl: _confirmPasswordCtrl,
-                          hint: 'Confirmer le mot de passe',
+                          hint: 'auth.confirm_password'.tr(),
                           icon: Icons.lock_outline_rounded,
                           obscure: _obscureConfirm,
                           suffix: _eyeIcon(_obscureConfirm,
                               () => setState(() => _obscureConfirm = !_obscureConfirm)),
                           validator: (v) {
-                            if (v == null || v.isEmpty) return 'Obligatoire';
+                            if (v == null || v.isEmpty) return 'auth.field_required'.tr();
                             if (v != _passwordCtrl.text)
-                              return 'Mots de passe différents';
+                              return 'auth.passwords_mismatch'.tr();
                             return null;
                           })),
                       const SizedBox(height: 11),
@@ -382,25 +458,25 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                       const SizedBox(height: 20),
 
                       // ── Informations véhicule ──────────────────────
-                      _a(5, _sectionLabel('Informations véhicule',
+                      _a(5, _sectionLabel('driver_reg.vehicle_info'.tr(),
                           Icons.directions_car_rounded)),
                       const SizedBox(height: 12),
                       _a(5, _field(
                         ctrl: _cinCtrl,
-                        hint: 'Numéro CIN (8 chiffres)',
+                        hint: 'driver_reg.cin_hint'.tr(),
                         icon: Icons.credit_card_rounded,
                         keyboard: TextInputType.number,
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Obligatoire';
+                          if (v == null || v.trim().isEmpty) return 'auth.field_required'.tr();
                           if (!RegExp(r'^\d{8}$').hasMatch(v.trim()))
-                            return 'Exactement 8 chiffres';
+                            return 'driver_reg.exactly_8'.tr();
                           return null;
                         },
                       )),
                       const SizedBox(height: 11),
                       _a(5, _field(
                         ctrl: _drivingLicenseNumberCtrl,
-                        hint: 'Numéro de permis de conduire',
+                        hint: 'driver_reg.license_number'.tr(),
                         icon: Icons.badge_rounded,
                         validator: (v) => (v == null || v.trim().isEmpty)
                             ? 'Obligatoire' : null,
@@ -408,7 +484,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                       const SizedBox(height: 11),
                       _a(5, _field(
                         ctrl: _vehiclePlateCtrl,
-                        hint: 'Immatriculation du véhicule',
+                        hint: 'driver_reg.plate'.tr(),
                         icon: Icons.local_shipping_rounded,
                         validator: (v) => (v == null || v.trim().isEmpty)
                             ? 'Obligatoire' : null,
@@ -417,45 +493,63 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                       const SizedBox(height: 20),
 
                       // ── Documents ──────────────────────────────────
-                      _a(6, _sectionLabel('Documents requis',
+                      _a(6, _sectionLabel('driver_reg.required_docs'.tr(),
                           Icons.folder_rounded)),
                       const SizedBox(height: 12),
                       _a(6, _docCard(
                         icon: Icons.credit_card_rounded,
-                        title: 'Carte d\'identité',
+                        title: 'signup.id_card'.tr(),
                         file: _idCard,
                         onTap: () => _pick((f) => _idCard = f),
                       )),
                       const SizedBox(height: 10),
                       _a(7, _docCard(
                         icon: Icons.badge_rounded,
-                        title: 'Permis de conduire',
+                        title: 'signup.driving_license'.tr(),
                         file: _drivingLicense,
                         onTap: () => _pick((f) => _drivingLicense = f),
                       )),
                       const SizedBox(height: 10),
                       _a(7, _docCard(
                         icon: Icons.description_rounded,
-                        title: 'Carte grise',
+                        title: 'signup.vehicle_registration'.tr(),
                         file: _vehicleRegistration,
                         onTap: () => _pick((f) => _vehicleRegistration = f),
                       )),
 
                       const SizedBox(height: 20),
 
+                      // ── Photos du véhicule ─────────────────────────
+                      _a(7, _sectionLabel('driver_reg.vehicle_photos_title'.tr(),
+                          Icons.directions_car_rounded)),
+                      const SizedBox(height: 6),
+                      _a(7, _hintText('driver_reg.vehicle_photos_hint'.tr())),
+                      const SizedBox(height: 12),
+                      _a(7, _vehiclePhotoGrid()),
+
+                      const SizedBox(height: 20),
+
+                      // ── Selfie ─────────────────────────────────────
+                      _a(8, _sectionLabel('driver_reg.selfie_title'.tr(),
+                          Icons.face_rounded)),
+                      const SizedBox(height: 12),
+                      _a(8, _selfieCard()),
+
+                      const SizedBox(height: 20),
+
                       // ── Parrainage ─────────────────────────────────
-                      _a(8, _sectionLabel('Parrainage (facultatif)',
+                      _a(8, _sectionLabel('driver_reg.referral_optional'.tr(),
                           Icons.card_giftcard_rounded)),
                       const SizedBox(height: 12),
                       _a(8, _field(ctrl: _referralCtrl,
-                          hint: 'Code de parrainage — ATLAS-XXXXXX',
+                          hint: 'driver_reg.referral_hint'.tr(),
                           icon: Icons.card_giftcard_rounded,
                           action: TextInputAction.done,
                           validator: (v) {
                             if (v != null && v.trim().isNotEmpty) {
                               if (!RegExp(r'^ATLAS-[A-Z0-9]{6}$')
                                   .hasMatch(v.trim().toUpperCase()))
-                                return 'Format invalide. Ex: ATLAS-J8K9F2';
+                                return 'auth.referral_format_error'.tr();
                             }
                             return null;
                           })),
@@ -619,7 +713,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                                 ),
                             ],
                           )
-                        : Text('Type de véhicule / Service',
+                        : Text('driver_reg.vehicle_service'.tr(),
                             style: TextStyle(
                                 fontSize: 14,
                                 color: const Color(0xFF9BA3B4))),
@@ -694,7 +788,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
         validator: (v) => (v == null || v.trim().isEmpty)
             ? 'Obligatoire' : null,
         decoration: InputDecoration(
-          hintText: 'Téléphone',
+          hintText: 'auth.phone'.tr(),
           hintStyle: GoogleFonts.poppins(fontSize: 13,
               color: const Color(0xFFCDD3E0)),
           prefixIcon: _dialCodeButton(),
@@ -847,11 +941,11 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                           fontSize: 13, fontWeight: FontWeight.w700,
                           color: Colors.white.withOpacity(0.9))),
                       const SizedBox(height: 6),
-                      Text('Inscription Livreur', style: GoogleFonts.poppins(
+                      Text('driver_reg.title'.tr(), style: GoogleFonts.poppins(
                           fontSize: 20, fontWeight: FontWeight.w800,
                           color: Colors.white, height: 1.1)),
                       const SizedBox(height: 3),
-                      Text('Rejoignez notre réseau de livreurs',
+                      Text('driver_reg.subtitle'.tr(),
                           style: GoogleFonts.poppins(
                               fontSize: 11, color: Colors.white.withOpacity(0.5))),
                     ],
@@ -884,6 +978,134 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
     ]);
   }
 
+
+  static const _vehicleSlots = [
+    (key: 'front', label: 'driver_reg.photo_front', icon: Icons.arrow_upward_rounded),
+    (key: 'back', label: 'driver_reg.photo_back', icon: Icons.arrow_downward_rounded),
+    (key: 'left', label: 'driver_reg.photo_left', icon: Icons.arrow_back_rounded),
+    (key: 'right', label: 'driver_reg.photo_right', icon: Icons.arrow_forward_rounded),
+  ];
+
+  Widget _hintText(String text) => Text(text,
+      style: GoogleFonts.poppins(fontSize: 11.5, color: const Color(0xFF6B7280), height: 1.4));
+
+  Widget _vehiclePhotoGrid() {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.3,
+      children: [
+        for (final slot in _vehicleSlots)
+          _vehiclePhotoTile(slot.key, slot.label.tr(), slot.icon),
+      ],
+    );
+  }
+
+  Widget _vehiclePhotoTile(String angle, String label, IconData icon) {
+    final file = _vehiclePhotos[angle];
+    final done = file != null;
+    return GestureDetector(
+      onTap: () => _pickVehiclePhoto(angle),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: done ? _green.withOpacity(0.5) : const Color(0xFFE2E6EF),
+            width: done ? 1.5 : 1,
+          ),
+        ),
+        child: done
+            ? Stack(fit: StackFit.expand, children: [
+                Image.file(file, fit: BoxFit.cover),
+                Positioned(
+                  left: 0, right: 0, bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    color: Colors.black.withOpacity(0.55),
+                    child: Row(children: [
+                      const Icon(Icons.check_circle_rounded, color: _green, size: 14),
+                      const SizedBox(width: 5),
+                      Expanded(child: Text(label,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(fontSize: 11,
+                              fontWeight: FontWeight.w600, color: Colors.white))),
+                      const Icon(Icons.edit_rounded, color: Colors.white, size: 13),
+                    ]),
+                  ),
+                ),
+              ])
+            : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Container(
+                  width: 38, height: 38,
+                  decoration: BoxDecoration(
+                    color: _orange.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(icon, color: _orange, size: 18),
+                ),
+                const SizedBox(height: 8),
+                Text(label, style: GoogleFonts.poppins(
+                    fontSize: 12.5, fontWeight: FontWeight.w600, color: _dark)),
+                Text('driver_reg.add_photo'.tr(), style: GoogleFonts.poppins(
+                    fontSize: 10.5, color: const Color(0xFF9BA3B4))),
+              ]),
+      ),
+    );
+  }
+
+  Widget _selfieCard() {
+    final done = _selfie != null;
+    return GestureDetector(
+      onTap: _takeSelfie,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: done ? _green.withOpacity(0.4) : const Color(0xFFE2E6EF),
+            width: done ? 1.5 : 1,
+          ),
+        ),
+        child: Row(children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: _orange.withOpacity(0.08),
+            backgroundImage: done ? FileImage(_selfie!) : null,
+            child: done ? null : const Icon(Icons.face_rounded, color: _orange, size: 28),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(done ? 'driver_reg.selfie_done'.tr() : 'driver_reg.selfie_take'.tr(),
+                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
+                      color: done ? _green : _dark)),
+              const SizedBox(height: 2),
+              Text('driver_reg.selfie_hint'.tr(),
+                  style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF9BA3B4))),
+            ],
+          )),
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: done ? _green.withOpacity(0.08) : _orange.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(done ? Icons.refresh_rounded : Icons.photo_camera_front_rounded,
+                color: done ? _green : _orange, size: 16),
+          ),
+        ]),
+      ),
+    );
+  }
 
   Widget _docCard({
     required IconData icon,
@@ -926,7 +1148,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
               Text(title, style: GoogleFonts.poppins(
                 fontSize: 13, fontWeight: FontWeight.w600,
                 color: uploaded ? _green : _dark)),
-              Text(uploaded ? 'Document ajouté ✓' : 'Appuyer pour sélectionner',
+              Text(uploaded ? 'driver_reg.doc_added'.tr() : 'booking.tap_to_select'.tr(),
                 style: GoogleFonts.poppins(fontSize: 11,
                     color: uploaded
                         ? _green.withOpacity(0.7)
@@ -1049,7 +1271,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
           ? const SizedBox(width: 20, height: 20,
               child: CircularProgressIndicator(strokeWidth: 2.5,
                   valueColor: AlwaysStoppedAnimation(Colors.white)))
-          : Text('S\'inscrire comme Livreur', style: GoogleFonts.poppins(
+          : Text('driver_reg.submit'.tr(), style: GoogleFonts.poppins(
               fontSize: 15, fontWeight: FontWeight.w600,
               color: Colors.white)),
     ),
@@ -1152,9 +1374,9 @@ class _ServicePickerSheetState extends State<_ServicePickerSheet> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Choisir un service',
+                  Text('booking.choose_service'.tr(),
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _dark)),
-                  Text('${widget.services.length} service${widget.services.length > 1 ? 's' : ''} disponibles',
+                  Text('driver_reg.services_available'.tr(namedArgs: {'count': '${widget.services.length}'}),
                       style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
                 ],
               ),
@@ -1167,7 +1389,7 @@ class _ServicePickerSheetState extends State<_ServicePickerSheet> {
               onChanged: _onSearch,
               style: const TextStyle(fontSize: 13, color: _dark),
               decoration: InputDecoration(
-                hintText: 'Rechercher un service...',
+                hintText: 'driver_reg.search_service'.tr(),
                 hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
                 prefixIcon: const Icon(Icons.search_rounded, color: Colors.grey, size: 20),
                 filled: true,
@@ -1184,7 +1406,7 @@ class _ServicePickerSheetState extends State<_ServicePickerSheet> {
           // List
           Expanded(
             child: _filtered.isEmpty
-                ? Center(child: Text('Aucun service trouvé',
+                ? Center(child: Text('driver_reg.no_service_found'.tr(),
                     style: TextStyle(color: Colors.grey.shade400)))
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -1317,39 +1539,39 @@ class _CountryCode {
   const _CountryCode({required this.flag, required this.name, required this.dial});
 
   static const _CountryCode defaultCode =
-      _CountryCode(flag: '🇹🇳', name: 'Tunisie', dial: '+216');
+      _CountryCode(flag: '🇹🇳', name: 'countries.tn', dial: '+216');
 
   static const List<_CountryCode> all = [
-    _CountryCode(flag: '🇹🇳', name: 'Tunisie',         dial: '+216'),
-    _CountryCode(flag: '🇩🇿', name: 'Algérie',         dial: '+213'),
-    _CountryCode(flag: '🇲🇦', name: 'Maroc',           dial: '+212'),
-    _CountryCode(flag: '🇱🇾', name: 'Libye',           dial: '+218'),
-    _CountryCode(flag: '🇪🇬', name: 'Égypte',          dial: '+20'),
-    _CountryCode(flag: '🇸🇦', name: 'Arabie Saoudite', dial: '+966'),
-    _CountryCode(flag: '🇦🇪', name: 'Émirats',         dial: '+971'),
-    _CountryCode(flag: '🇶🇦', name: 'Qatar',           dial: '+974'),
-    _CountryCode(flag: '🇰🇼', name: 'Koweït',          dial: '+965'),
-    _CountryCode(flag: '🇧🇭', name: 'Bahreïn',         dial: '+973'),
-    _CountryCode(flag: '🇴🇲', name: 'Oman',            dial: '+968'),
-    _CountryCode(flag: '🇯🇴', name: 'Jordanie',        dial: '+962'),
-    _CountryCode(flag: '🇱🇧', name: 'Liban',           dial: '+961'),
-    _CountryCode(flag: '🇸🇩', name: 'Soudan',          dial: '+249'),
-    _CountryCode(flag: '🇫🇷', name: 'France',          dial: '+33'),
-    _CountryCode(flag: '🇩🇪', name: 'Allemagne',       dial: '+49'),
-    _CountryCode(flag: '🇧🇪', name: 'Belgique',        dial: '+32'),
-    _CountryCode(flag: '🇨🇭', name: 'Suisse',          dial: '+41'),
-    _CountryCode(flag: '🇪🇸', name: 'Espagne',         dial: '+34'),
-    _CountryCode(flag: '🇮🇹', name: 'Italie',          dial: '+39'),
-    _CountryCode(flag: '🇬🇧', name: 'Royaume-Uni',     dial: '+44'),
-    _CountryCode(flag: '🇺🇸', name: 'États-Unis',      dial: '+1'),
-    _CountryCode(flag: '🇨🇦', name: 'Canada',          dial: '+1'),
-    _CountryCode(flag: '🇸🇳', name: 'Sénégal',         dial: '+221'),
-    _CountryCode(flag: '🇨🇮', name: "Côte d'Ivoire",   dial: '+225'),
-    _CountryCode(flag: '🇨🇲', name: 'Cameroun',        dial: '+237'),
-    _CountryCode(flag: '🇬🇳', name: 'Guinée',          dial: '+224'),
-    _CountryCode(flag: '🇲🇱', name: 'Mali',            dial: '+223'),
-    _CountryCode(flag: '🇹🇷', name: 'Turquie',         dial: '+90'),
-    _CountryCode(flag: '🇵🇰', name: 'Pakistan',        dial: '+92'),
+    _CountryCode(flag: '🇹🇳', name: 'countries.tn',         dial: '+216'),
+    _CountryCode(flag: '🇩🇿', name: 'countries.dz',         dial: '+213'),
+    _CountryCode(flag: '🇲🇦', name: 'countries.ma',           dial: '+212'),
+    _CountryCode(flag: '🇱🇾', name: 'countries.ly',           dial: '+218'),
+    _CountryCode(flag: '🇪🇬', name: 'countries.eg',          dial: '+20'),
+    _CountryCode(flag: '🇸🇦', name: 'countries.sa', dial: '+966'),
+    _CountryCode(flag: '🇦🇪', name: 'countries.ae',         dial: '+971'),
+    _CountryCode(flag: '🇶🇦', name: 'countries.qa',           dial: '+974'),
+    _CountryCode(flag: '🇰🇼', name: 'countries.kw',          dial: '+965'),
+    _CountryCode(flag: '🇧🇭', name: 'countries.bh',         dial: '+973'),
+    _CountryCode(flag: '🇴🇲', name: 'countries.om',            dial: '+968'),
+    _CountryCode(flag: '🇯🇴', name: 'countries.jo',        dial: '+962'),
+    _CountryCode(flag: '🇱🇧', name: 'countries.lb',           dial: '+961'),
+    _CountryCode(flag: '🇸🇩', name: 'countries.sd',          dial: '+249'),
+    _CountryCode(flag: '🇫🇷', name: 'countries.fr',          dial: '+33'),
+    _CountryCode(flag: '🇩🇪', name: 'countries.de',       dial: '+49'),
+    _CountryCode(flag: '🇧🇪', name: 'countries.be',        dial: '+32'),
+    _CountryCode(flag: '🇨🇭', name: 'countries.ch',          dial: '+41'),
+    _CountryCode(flag: '🇪🇸', name: 'countries.es',         dial: '+34'),
+    _CountryCode(flag: '🇮🇹', name: 'countries.it',          dial: '+39'),
+    _CountryCode(flag: '🇬🇧', name: 'countries.gb',     dial: '+44'),
+    _CountryCode(flag: '🇺🇸', name: 'countries.us',      dial: '+1'),
+    _CountryCode(flag: '🇨🇦', name: 'countries.ca',          dial: '+1'),
+    _CountryCode(flag: '🇸🇳', name: 'countries.sn',         dial: '+221'),
+    _CountryCode(flag: '🇨🇮', name: 'countries.ci',   dial: '+225'),
+    _CountryCode(flag: '🇨🇲', name: 'countries.cm',        dial: '+237'),
+    _CountryCode(flag: '🇬🇳', name: 'countries.gn',          dial: '+224'),
+    _CountryCode(flag: '🇲🇱', name: 'countries.ml',            dial: '+223'),
+    _CountryCode(flag: '🇹🇷', name: 'countries.tr',         dial: '+90'),
+    _CountryCode(flag: '🇵🇰', name: 'countries.pk',        dial: '+92'),
   ];
 }
 
@@ -1383,7 +1605,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
       _search = q.toLowerCase();
       _filtered = _CountryCode.all
           .where((c) =>
-              c.name.toLowerCase().contains(_search) ||
+              c.name.tr().toLowerCase().contains(_search) ||
               c.dial.contains(_search))
           .toList();
     });
@@ -1409,7 +1631,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-            child: Text('Sélectionner un pays',
+            child: Text('auth_extra.select_country'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 16, fontWeight: FontWeight.w700, color: _dark)),
           ),
@@ -1419,7 +1641,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
               onChanged: _onSearch,
               style: GoogleFonts.poppins(fontSize: 13, color: _dark),
               decoration: InputDecoration(
-                hintText: 'Rechercher...',
+                hintText: 'auth_extra.search_hint'.tr(),
                 hintStyle: GoogleFonts.poppins(
                     fontSize: 13, color: Colors.grey.shade400),
                 prefixIcon: const Icon(Icons.search_rounded,
@@ -1456,7 +1678,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
                         Text(c.flag, style: const TextStyle(fontSize: 22)),
                         const SizedBox(width: 14),
                         Expanded(
-                          child: Text(c.name,
+                          child: Text(c.name.tr(),
                               style: GoogleFonts.poppins(
                                   fontSize: 14,
                                   fontWeight: isSelected

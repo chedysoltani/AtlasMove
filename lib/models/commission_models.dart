@@ -1,4 +1,5 @@
 import '../models/service_models.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class CommissionBreakdownItem {
   final String serviceName;
@@ -55,12 +56,12 @@ class DriverCommissionStats {
   String get formattedPeriod {
     final parts = period.split('-');
     if (parts.length != 2) return period;
-    final months = [
-      '', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-    ];
-    final month = int.tryParse(parts[1]) ?? 0;
-    return '${months[month]} ${parts[0]}';
+    final year = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    if (year == null || month == null || month < 1 || month > 12) return period;
+    // Mois dans la langue de l'app (Intl.defaultLocale, voir main.dart)
+    final label = DateFormat('MMMM yyyy').format(DateTime(year, month));
+    return label.isEmpty ? label : label[0].toUpperCase() + label.substring(1);
   }
 
   factory DriverCommissionStats.fromJson(Map<String, dynamic> json) {

@@ -184,7 +184,7 @@ class _LoginScreenState extends State<LoginScreen>
         throw Exception('Réponse de connexion invalide');
       }
     } catch (e) {
-      String msg = 'Erreur de connexion';
+      String msg = 'auth.connection_error'.tr();
       if (e is ServiceValidationException) {
         msg = e.toString();
       } else if (e is ValidationException) {
@@ -194,7 +194,7 @@ class _LoginScreenState extends State<LoginScreen>
       } else if (e is NetworkException) {
         msg = e.message;
       } else {
-        msg = 'Erreur de connexion: $e';
+        msg = '${'auth.connection_error'.tr()}: $e';
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

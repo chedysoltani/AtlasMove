@@ -200,7 +200,7 @@ class _ServicesCatalogueScreenState
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${services.length} service${services.length > 1 ? 's' : ''}',
+                          'services_extra.count'.tr(namedArgs: {'count': '${services.length}'}),
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade500,
@@ -357,10 +357,10 @@ class _ServicesCatalogueScreenState
 
   String _pricingLabel(String model) {
     switch (model.toLowerCase()) {
-      case 'combined': return 'Combiné';
+      case 'combined': return 'rdv.model_combined'.tr();
       case 'per_km': return '/km';
-      case 'fixed': return 'Fixe';
-      case 'hourly': return '/heure';
+      case 'fixed': return 'rdv.model_fixed'.tr();
+      case 'hourly': return '/${'rdv.hour'.tr()}';
       default: return model;
     }
   }
@@ -873,7 +873,7 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red));
+            SnackBar(content: Text('common.error_detail'.tr(namedArgs: {'error': '$e'})), backgroundColor: Colors.red));
       }
     }
   }
@@ -897,7 +897,7 @@ class _AssignmentSheetState extends ConsumerState<_AssignmentSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erreur: $e'),
+          content: Text('common.error_detail'.tr(namedArgs: {'error': '$e'})),
           backgroundColor: Colors.red,
         ));
       }

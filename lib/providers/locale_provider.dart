@@ -9,6 +9,7 @@ class LocaleProvider extends ChangeNotifier {
 
   static const supportedLocales = [
     Locale('fr'),
+    Locale('en'),
     Locale('ar'),
     Locale('it'),
     Locale('de'),
@@ -17,6 +18,7 @@ class LocaleProvider extends ChangeNotifier {
 
   static const localeNames = {
     'fr': 'Français',
+    'en': 'English',
     'ar': 'العربية',
     'it': 'Italiano',
     'de': 'Deutsch',
@@ -25,6 +27,7 @@ class LocaleProvider extends ChangeNotifier {
 
   static const localeFlags = {
     'fr': '🇫🇷',
+    'en': '🇬🇧',
     'ar': '🇸🇦',
     'it': '🇮🇹',
     'de': '🇩🇪',

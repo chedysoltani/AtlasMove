@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../core/network/http_client.dart';
 import '../core/storage/token_storage.dart';
@@ -251,7 +252,7 @@ class CallService {
     final micStatus = await PermissionGate.run(Permission.microphone.request, onTimeout: PermissionStatus.denied);
     debugPrint('🎤 CallService: mic permission = $micStatus');
     if (!micStatus.isGranted) {
-      lastError = 'Permission microphone refusée ($micStatus)';
+      lastError = 'errors.mic_denied'.tr();
       debugPrint('❌ $lastError');
       return false;
     }
@@ -370,7 +371,7 @@ class CallService {
     final status = await PermissionGate.run(Permission.microphone.request, onTimeout: PermissionStatus.denied);
     debugPrint('🎤 CallService: mic permission = $status');
     if (!status.isGranted) {
-      lastError = 'Permission microphone refusée ($status). Sur iOS, vérifiez Réglages > AtlasMove > Microphone.';
+      lastError = 'errors.mic_denied_ios'.tr();
       debugPrint('❌ CallService: $lastError');
       return false;
     }
@@ -465,8 +466,7 @@ class CallService {
   /// est déjà lisible (ex. "trip not active", "forbidden").
   String _describeInitiateError(Object e) {
     if (e is ApiException && e.response?.statusCode == 409) {
-      return 'La ligne est occupée : l\'autre partie a déjà un appel en cours. '
-          'Réessayez dans un instant, ou vérifiez qu\'aucun appel précédent n\'est resté ouvert.';
+      return 'errors.line_busy'.tr();
     }
     if (e is ApiException) return e.message;
     return e.toString();

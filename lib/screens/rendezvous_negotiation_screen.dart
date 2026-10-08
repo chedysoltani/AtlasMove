@@ -72,7 +72,7 @@ class _RendezvousNegotiationScreenState
       _showSnack('rdv.offer_accepted_confirmed'.tr(), success: true);
       await _load();
     } catch (e) {
-      _showSnack('Erreur : $e', success: false);
+      _showSnack('common.error_detail'.tr(namedArgs: {'error': '$e'}), success: false);
     } finally {
       if (mounted) setState(() => _actingIds.remove(offer.id));
     }
@@ -85,7 +85,7 @@ class _RendezvousNegotiationScreenState
       _showSnack('rdv.offer_refused_msg'.tr());
       await _load();
     } catch (e) {
-      _showSnack('Erreur : $e', success: false);
+      _showSnack('common.error_detail'.tr(namedArgs: {'error': '$e'}), success: false);
     } finally {
       if (mounted) setState(() => _actingIds.remove(offer.id));
     }
@@ -155,7 +155,7 @@ class _RendezvousNegotiationScreenState
       _showSnack('rdv.counter_sent'.tr(namedArgs: {'amount': FareCalculator.formatFare(value, currency)}));
       await _load();
     } catch (e) {
-      _showSnack('Erreur : $e', success: false);
+      _showSnack('common.error_detail'.tr(namedArgs: {'error': '$e'}), success: false);
     } finally {
       if (mounted) setState(() => _actingIds.remove(offer.id));
     }
@@ -322,7 +322,7 @@ class _RendezvousNegotiationScreenState
                     style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700, fontSize: 14, color: _navy)),
                 Text(
-                  DateFormat('EEE dd MMM yyyy • HH:mm', 'fr').format(rdv.scheduledAt),
+                  DateFormat('EEE dd MMM yyyy • HH:mm', context.locale.languageCode).format(rdv.scheduledAt),
                   style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
                 ),
               ]),
@@ -431,7 +431,7 @@ class _RendezvousNegotiationScreenState
                           Text(
                             isFromMe
                                 ? (widget.isDriver ? 'rdv.you_driver'.tr() : 'rdv.you_client'.tr())
-                                : (widget.isDriver ? 'Client' : 'Livreur'),
+                                : (widget.isDriver ? 'rdv.client'.tr() : 'rdv.courier'.tr()),
                             style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13, color: _navy),
@@ -460,7 +460,7 @@ class _RendezvousNegotiationScreenState
                             color: isFromMe ? _orange : _indigo),
                       ),
                       Text(
-                        DateFormat('dd/MM • HH:mm', 'fr').format(offer.createdAt),
+                        DateFormat('dd/MM • HH:mm', context.locale.languageCode).format(offer.createdAt),
                         style: GoogleFonts.poppins(
                             fontSize: 11, color: _textSecondary),
                       ),

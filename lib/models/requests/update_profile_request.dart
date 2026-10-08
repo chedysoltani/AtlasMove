@@ -1,3 +1,5 @@
+import 'package:easy_localization/easy_localization.dart';
+
 /// Modèle de requête pour la mise à jour du profil utilisateur
 class UpdateProfileRequest {
   final String? email;
@@ -45,27 +47,27 @@ class UpdateProfileRequest {
     if (email != null && email!.isNotEmpty) {
       final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
       if (!emailRegex.hasMatch(email!)) {
-        return 'Email invalide';
+        return 'auth.email_invalid'.tr();
       }
     }
 
     // Validation du prénom
     if (firstName != null && firstName!.isNotEmpty) {
       if (firstName!.length < 2) {
-        return 'Le prénom doit contenir au moins 2 caractères';
+        return 'validation.first_name_min'.tr();
       }
       if (firstName!.length > 50) {
-        return 'Le prénom ne doit pas dépasser 50 caractères';
+        return 'validation.first_name_max'.tr();
       }
     }
 
     // Validation du nom
     if (lastName != null && lastName!.isNotEmpty) {
       if (lastName!.length < 2) {
-        return 'Le nom doit contenir au moins 2 caractères';
+        return 'validation.last_name_min'.tr();
       }
       if (lastName!.length > 50) {
-        return 'Le nom ne doit pas dépasser 50 caractères';
+        return 'validation.last_name_max'.tr();
       }
     }
 
@@ -73,7 +75,7 @@ class UpdateProfileRequest {
     if (phone != null && phone!.isNotEmpty) {
       final phoneRegex = RegExp(r'^\+?[0-9]{8,15}$');
       if (!phoneRegex.hasMatch(phone!)) {
-        return 'Numéro de téléphone invalide';
+        return 'validation.phone_invalid'.tr();
       }
     }
 

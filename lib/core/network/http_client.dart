@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../auth/jwt_utils.dart';
 import '../storage/token_storage.dart';
 import '../utils/safe_log.dart';
@@ -403,7 +404,7 @@ class HttpClient {
           if (outcome == RefreshOutcome.transient) {
             // Réseau/serveur indisponible : PAS de déconnexion.
             throw NetworkException(
-                'Connexion instable. Vérifiez votre réseau, nous réessaierons automatiquement.');
+                'errors.unstable_connection'.tr());
           }
         }
 
@@ -442,15 +443,15 @@ class HttpClient {
       return httpResponse;
     } on SocketException {
       debugPrint('❌ Network Error: No Internet Connection');
-      throw NetworkException('Aucune connexion Internet. Vérifiez votre réseau.');
+      throw NetworkException('errors.no_internet'.tr());
     } on TimeoutException {
       debugPrint('⏰ Timeout Error: Request timed out');
-      throw NetworkException('La requête a expiré. Veuillez réessayer.');
+      throw NetworkException('errors.timeout'.tr());
     } on ApiException {
       rethrow;
     } catch (e) {
       debugPrint('💥 Unexpected Error: $e');
-      throw NetworkException('Une erreur inattendue est survenue: $e');
+      throw NetworkException('${'common.unknown_error'.tr()} $e');
     }
   }
 
@@ -537,7 +538,7 @@ class HttpClient {
   static ApiException _handleHttpError(HttpResponse response) {
     try {
       final errorData = jsonDecode(response.body);
-      final message = errorData['message'] ?? errorData['error'] ?? 'Erreur serveur';
+      final message = errorData['message'] ?? errorData['error'] ?? 'errors.server'.tr();
       
       switch (response.statusCode) {
         case 400:
@@ -551,16 +552,16 @@ class HttpClient {
         case 422:
           final errors = errorData['errors'] is List ? 
             (errorData['errors'] as List).map((e) => e.toString()).toList() : 
-            [errorData['message']?.toString() ?? 'Erreur de validation'];
+            [errorData['message']?.toString() ?? 'errors.validation'.tr()];
           return ValidationException(errors.join(', '), response);
         case 429:
           return TooManyRequestsException(message, response);
         case 500:
-          return ServerException('Erreur serveur interne', response);
+          return ServerException('errors.server_internal'.tr(), response);
         case 502:
-          return ServerException('Service indisponible', response);
+          return ServerException('errors.service_unavailable'.tr(), response);
         case 503:
-          return ServerException('Service en maintenance', response);
+          return ServerException('errors.maintenance'.tr(), response);
         default:
           return ServerException(message, response);
       }
@@ -650,5 +651,5 @@ class ServerException extends ApiException {
 /// Lancée quand le refresh token est aussi invalide → forcer la reconnexion
 class SessionExpiredException extends ApiException {
   SessionExpiredException()
-      : super('Votre session a expiré. Veuillez vous reconnecter.');
+      : super('auth.session_expired'.tr());
 }

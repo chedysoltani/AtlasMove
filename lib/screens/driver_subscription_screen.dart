@@ -60,7 +60,6 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
           }
 
           final sub = _subService.subscription;
-          final loyalty = _subService.loyaltyProgram;
 
           return SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -78,12 +77,6 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
 
                   // Trial badge if trial
                   if (sub?.isTrial == true) _buildTrialBadge(sub!),
-
-                  // Loyalty program card
-                  if (loyalty != null) ...[
-                    _buildLoyaltyCard(loyalty),
-                    const SizedBox(height: 20),
-                  ],
 
                   // Pricing card
                   _buildPricingCard(sub),
@@ -244,112 +237,6 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
                 fontSize: 13,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoyaltyCard(LoyaltyProgram loyalty) {
-    final cashback = loyalty.cashbackAmount;
-    final progress = loyalty.progressPercent;
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF161722),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.amber.withOpacity(0.25), width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.star_rounded, color: Colors.amber, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'sub.loyalty_title'.tr(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 15,
-                ),
-              ),
-              const Spacer(),
-              if (loyalty.isCompleted)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppTheme.successColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'sub.loyalty_completed'.tr(),
-                    style: const TextStyle(
-                      color: AppTheme.successColor,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Cashback row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'sub.loyalty_cashback'.tr(),
-                style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-              ),
-              Text(
-                '\$${cashback.toStringAsFixed(2)} / \$${LoyaltyProgram.targetCashback.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  color: Colors.amber,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Progress bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 8,
-              backgroundColor: Colors.white.withOpacity(0.07),
-              valueColor: const AlwaysStoppedAnimation<Color>(Colors.amber),
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // Trips count
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'sub.loyalty_trips'.tr(namedArgs: {'count': loyalty.completedTripsCount.toString()}),
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
-              ),
-              Text(
-                '${(progress * 100).toStringAsFixed(0)}%',
-                style: TextStyle(color: Colors.grey.shade400, fontSize: 11, fontWeight: FontWeight.w700),
-              ),
-            ],
           ),
         ],
       ),
@@ -580,8 +467,8 @@ class _DriverSubscriptionScreenState extends State<DriverSubscriptionScreen> {
         ],
 
         const SizedBox(height: 16),
-        const Text(
-          'La facturation est gérée via notre portail web sécurisé.',
+        Text(
+          'sub.payment_secured'.tr(),
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 11,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../utils/app_theme.dart';
 import 'custom_button.dart';
 
@@ -31,7 +32,7 @@ class ImageUploadWidget extends StatelessWidget {
         if (isRequired) ...[
           const SizedBox(height: 4),
           Text(
-            '* Obligatoire',
+            '* ${'auth.field_required'.tr()}',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: AppTheme.errorColor,
             ),
@@ -59,7 +60,7 @@ class ImageUploadWidget extends StatelessWidget {
         if (imagePath != null) ...[
           const SizedBox(height: 8),
           CustomButton(
-            text: 'Supprimer',
+            text: 'common.delete'.tr(),
             type: ButtonType.outline,
             onPressed: () => onImageChanged(null),
             height: 40,
@@ -117,7 +118,7 @@ class ImageUploadWidget extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Télécharger une image',
+          'upload.title'.tr(),
           style: TextStyle(
             color: Colors.grey.shade600,
             fontSize: 14,
@@ -126,7 +127,7 @@ class ImageUploadWidget extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'PNG, JPG jusqu\'à 5MB',
+          'upload.formats'.tr(),
           style: TextStyle(
             color: Colors.grey.shade500,
             fontSize: 12,
@@ -147,7 +148,7 @@ class ImageUploadWidget extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Erreur de chargement',
+          'services.load_error'.tr(),
           style: TextStyle(
             color: Colors.grey.shade600,
             fontSize: 14,
@@ -182,7 +183,7 @@ class ImageUploadWidget extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Choisir une image',
+                    'upload.choose'.tr(),
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 20),
@@ -191,7 +192,7 @@ class ImageUploadWidget extends StatelessWidget {
                       Expanded(
                         child: _buildImageOption(
                           context,
-                          'Appareil photo',
+                          'upload.camera'.tr(),
                           Icons.camera_alt,
                           () => _pickImage(ImageSource.camera),
                         ),
@@ -200,7 +201,7 @@ class ImageUploadWidget extends StatelessWidget {
                       Expanded(
                         child: _buildImageOption(
                           context,
-                          'Galerie',
+                          'upload.gallery'.tr(),
                           Icons.photo_library,
                           () => _pickImage(ImageSource.gallery),
                         ),

@@ -720,7 +720,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${r.completedMonths} / ${r.targetMonths} mois',
+                  'privilege.months_progress'.tr(namedArgs: {'done': '${r.completedMonths}', 'total': '${r.targetMonths}'}),
                   style: const TextStyle(
                     color: Color(0xFF9BA3B4),
                     fontSize: 10,
@@ -813,7 +813,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Chaque mois, vous payez ${_commissionRateLabel(f.commissionRate)} de commission sur vos courses + un abonnement de 90 USD.',
+              'privilege.monthly_explainer'.tr(namedArgs: {'rate': _commissionRateLabel(f.commissionRate)}),
               style: const TextStyle(
                 color: Color(0xFF64748B),
                 fontSize: 11.5,
@@ -868,7 +868,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionLabel('2% Chiffre d\'Affaires Annuel'),
+        _sectionLabel('privilege.annual_share_title'.tr()),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(18),
@@ -902,12 +902,12 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                         color: Color(0xFF10B981), size: 22),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '2% de votre CA annuel',
+                          'privilege.annual_share_short'.tr(),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 15,
@@ -916,7 +916,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'Calculé sur vos courses complétées',
+                          'privilege.computed_on_rides'.tr(),
                           style: TextStyle(
                             color: Color(0xFFA7F3D0),
                             fontSize: 11,
@@ -932,8 +932,8 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: Colors.white.withOpacity(0.2)),
                     ),
-                    child: const Text(
-                      'Annuel',
+                    child: Text(
+                      'privilege.annual'.tr(),
                       style: TextStyle(
                         color: Color(0xFFA7F3D0),
                         fontSize: 10,
@@ -956,8 +956,8 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Chiffre d\'affaires',
+                          Text(
+                            'driver_earnings.revenue'.tr(),
                             style: TextStyle(
                               color: Color(0xFFA7F3D0),
                               fontSize: 10,
@@ -995,8 +995,8 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          const Text(
-                            'Part annuelle',
+                          Text(
+                            'privilege.annual_part'.tr(),
                             style: TextStyle(
                               color: Color(0xFFA7F3D0),
                               fontSize: 10,
@@ -1026,7 +1026,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Ce montant est calculé sur votre chiffre d\'affaires annuel total et versé une fois par an.',
+                      'privilege.annual_explainer'.tr(),
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.6),
                         fontSize: 11,

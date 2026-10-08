@@ -114,7 +114,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
       );
     } else {
       setState(() => _isAnswering = false);
-      final err = CallService().lastError ?? 'Erreur inconnue';
+      final err = CallService().lastError ?? 'active_ride.unknown_error'.tr();
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(

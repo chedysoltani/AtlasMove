@@ -3,6 +3,7 @@ import 'dart:ui' show Offset;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../services/location_service.dart';
 
 // État de la carte
@@ -121,7 +122,7 @@ class MapNotifier extends StateNotifier<MapState> {
       if (!serviceEnabled) {
         state = state.copyWith(
           status: MapStatus.locationDisabled,
-          errorMessage: 'Le service de localisation est désactivé. Veuillez l\'activer.',
+          errorMessage: 'errors.location_disabled'.tr(),
         );
         return;
       }
@@ -131,13 +132,13 @@ class MapNotifier extends StateNotifier<MapState> {
       if (permission == LocationPermission.denied) {
         state = state.copyWith(
           status: MapStatus.permissionDenied,
-          errorMessage: 'Permission de localisation refusée. Veuillez l\'accorder.',
+          errorMessage: 'errors.location_denied'.tr(),
         );
         return;
       } else if (permission == LocationPermission.deniedForever) {
         state = state.copyWith(
           status: MapStatus.permissionDenied,
-          errorMessage: 'Permission de localisation refusée définitivement. Veuillez l\'accorder dans les paramètres.',
+          errorMessage: 'errors.location_denied_forever'.tr(),
         );
         return;
       }
@@ -147,7 +148,7 @@ class MapNotifier extends StateNotifier<MapState> {
       if (position == null) {
         state = state.copyWith(
           status: MapStatus.error,
-          errorMessage: 'Impossible d\'obtenir votre position actuelle.',
+          errorMessage: 'driver_rides.location_unavailable'.tr(),
         );
         return;
       }
@@ -176,7 +177,7 @@ class MapNotifier extends StateNotifier<MapState> {
     } catch (e) {
       state = state.copyWith(
         status: MapStatus.error,
-        errorMessage: 'Erreur lors de l\'initialisation de la carte: ${e.toString()}',
+        errorMessage: 'errors.map_init'.tr(namedArgs: {'error': e.toString()}),
       );
     }
   }
@@ -220,7 +221,7 @@ class MapNotifier extends StateNotifier<MapState> {
   Marker _userMarker(LatLng position) => Marker(
         markerId: const MarkerId('current_position'),
         position: position,
-        infoWindow: const InfoWindow(title: 'Votre position'),
+        infoWindow: InfoWindow(title: 'booking_extra.your_position'.tr()),
         icon: _userIcon ??
             BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
         anchor: _userIcon != null ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../services/legal_service.dart';
 import '../core/storage/token_storage.dart';
 
@@ -77,7 +78,7 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Erreur : $e',
+        content: Text('common.error_detail'.tr(namedArgs: {'error': '$e'}),
             style: GoogleFonts.poppins(fontSize: 13)),
         backgroundColor: const Color(0xFFEF4444),
         behavior: SnackBarBehavior.floating,
@@ -127,7 +128,7 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
               },
               icon: const Icon(Icons.arrow_back_ios_new_rounded,
                   color: Colors.white70, size: 20),
-              tooltip: 'Se déconnecter',
+              tooltip: 'auth.logout'.tr(),
             ),
           ),
           const SizedBox(height: 4),
@@ -142,7 +143,7 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
           ),
           const SizedBox(height: 14),
           Text(
-            'Accords Légaux',
+            'legal.title'.tr(),
             style: GoogleFonts.poppins(
               color: Colors.white,
               fontSize: 22,
@@ -151,7 +152,7 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            'Veuillez lire et accepter nos documents\navant de continuer à utiliser l\'application.',
+            'legal.subtitle'.tr(),
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
               color: Colors.white54,
@@ -193,15 +194,15 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
         labelColor: _textPrimary,
         unselectedLabelColor: _textSecondary,
         dividerColor: Colors.transparent,
-        tabs: const [
+        tabs: [
           Tab(
             icon: Icon(Icons.privacy_tip_rounded, size: 16),
-            text: 'Confidentialité',
+            text: 'legal.privacy_tab'.tr(),
             iconMargin: EdgeInsets.only(bottom: 3),
           ),
           Tab(
             icon: Icon(Icons.article_rounded, size: 16),
-            text: 'Conditions',
+            text: 'legal.terms_tab'.tr(),
             iconMargin: EdgeInsets.only(bottom: 3),
           ),
         ],
@@ -258,7 +259,7 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Text('Chargement du document...',
+                  Text('legal.loading_doc'.tr(),
                       style: GoogleFonts.poppins(
                           fontSize: 13, color: _textSecondary)),
                 ],
@@ -282,16 +283,16 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
           _buildCheckbox(
             checked: _ppAccepted,
             onChanged: (v) => setState(() => _ppAccepted = v ?? false),
-            label: 'J\'accepte la ',
-            linkLabel: 'politique de confidentialité',
+            label: 'legal.accept_the_f'.tr(),
+            linkLabel: 'legal.privacy_policy'.tr(),
             onLinkTap: () => _tabCtrl.animateTo(0),
           ),
           const SizedBox(height: 10),
           _buildCheckbox(
             checked: _tocAccepted,
             onChanged: (v) => setState(() => _tocAccepted = v ?? false),
-            label: 'J\'accepte les ',
-            linkLabel: 'conditions d\'utilisation',
+            label: 'legal.accept_the_pl'.tr(),
+            linkLabel: 'legal.terms'.tr(),
             onLinkTap: () => _tabCtrl.animateTo(1),
           ),
           const SizedBox(height: 16),
@@ -336,7 +337,7 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
                               strokeWidth: 2.5, color: Colors.white),
                         )
                       : Text(
-                          'Continuer',
+                          'legal.continue'.tr(),
                           style: GoogleFonts.poppins(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class LoadingWidget extends StatelessWidget {
   final String? message;
@@ -51,7 +52,7 @@ class MapLoadingWidget extends StatelessWidget {
 
   const MapLoadingWidget({
     super.key,
-    this.message = 'Chargement de la carte...',
+    this.message,
   });
 
   @override
@@ -77,7 +78,7 @@ class MapLoadingWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  message!,
+                  message ?? 'loading_extra.map'.tr(),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

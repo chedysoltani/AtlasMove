@@ -1208,7 +1208,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
                       ? detail!.fare
                       : (tripData?.estimatedFare ?? _customOfferedFare ?? 0.0),
                   currency: detail?.currency ?? tripData?.currency ?? 'TND',
-                  driverName: detail?.driverName ?? 'Chauffeur',
+                  driverName: detail?.driverName ?? 'rdv.driver'.tr(),
                   driverPhone: detail?.driverPhone,
                   driverPhoto: detail?.driverPhoto,
                   driverRating: detail?.driverRating ?? 4.5,
@@ -1260,7 +1260,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
         status: 'pending',
         pickupAddress: 'booking.current_position'.tr(),
         destinationAddress: 'booking.destination'.tr(),
-        serviceName: 'Moto standard',
+        serviceName: 'booking_extra.moto_standard'.tr(),
         estimatedFare: offers.isNotEmpty ? offers.first.proposedFare : 4.50,
         currency: _fareEstimate?.currency ?? _tripResponse?.data?.currency ?? 'TND',
         createdAt: DateTime.now(),
@@ -3570,7 +3570,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
                 const SizedBox(width: 4),
                 Text(
                   _fareEstimate != null
-                      ? 'Estimé: ${_fareEstimate!.estimatedFare.toStringAsFixed(2)} ${_fareEstimate!.currency}  •  Min: ${_fareEstimate!.minBid.toStringAsFixed(2)}  •  Max: ${_fareEstimate!.maxBid.toStringAsFixed(2)}'
+                      ? 'booking_extra.fare_range'.tr(namedArgs: {'fare': _fareEstimate!.estimatedFare.toStringAsFixed(2), 'currency': _fareEstimate!.currency, 'min': _fareEstimate!.minBid.toStringAsFixed(2), 'max': _fareEstimate!.maxBid.toStringAsFixed(2)})
                       : 'booking.standard_estimated_fare'.tr(namedArgs: {'amount': defaultPrice.toStringAsFixed(2), 'currency': currency ?? ''}),
                   style: const TextStyle(fontSize: 11, color: _AppColors.gray400),
                 ),
@@ -3601,14 +3601,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
               ),
             // Indicateur de chargement de l'estimation tarifaire API
             if (_isFetchingEstimate)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 6),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1.5)),
                     SizedBox(width: 6),
-                    Text('Calcul du tarif...', style: TextStyle(fontSize: 10, color: _AppColors.gray400)),
+                    Text('booking_extra.calculating_fare'.tr(), style: TextStyle(fontSize: 10, color: _AppColors.gray400)),
                   ],
                 ),
               ),
@@ -3660,8 +3660,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
           children: [
             const Icon(Icons.credit_card_rounded, color: _AppColors.gray400, size: 13),
             const SizedBox(width: 6),
-            const Text(
-              'Paiement par carte bientôt disponible',
+            Text(
+              'booking_extra.card_soon'.tr(),
               style: TextStyle(fontSize: 11, color: _AppColors.gray400),
             ),
           ],
@@ -3814,15 +3814,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
                   color: Color(0xFFF59E0B), size: 22),
             ),
             const SizedBox(width: 12),
-            const Expanded(
-              child: Text('Aucun livreur disponible',
+            Expanded(
+              child: Text('booking_extra.no_driver_title'.tr(),
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
-        content: const Text(
-          'Aucun livreur n\'a pu prendre votre course dans le temps imparti.\n\n'
-          'Vous pouvez relancer une nouvelle demande — les livreurs disponibles la recevront immédiatement.',
+        content: Text(
+          'booking_extra.no_driver_body'.tr(),
           style: TextStyle(fontSize: 14, height: 1.5),
         ),
         actions: [
@@ -3838,7 +3837,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Réessayer'),
+            child: Text('common.retry'.tr()),
           ),
         ],
       ),

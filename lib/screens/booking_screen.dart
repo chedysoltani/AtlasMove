@@ -224,9 +224,9 @@ class _BookingScreenState extends State<BookingScreen> {
         _isLoadingTruckSizes = false;
         // Fallback to default sizes if API fails
         _truckDiameters = [
-          {'size': 'Petit (3-5m)', 'description': 'Colis et petites livraisons', 'icon': 'local_shipping'},
-          {'size': 'Moyen (6-8m)', 'description': 'Meubles et déménagement moyen', 'icon': 'moving'},
-          {'size': 'Grand (9-12m)', 'description': 'Grands volumes et marchandises', 'icon': 'local_shipping'},
+          {'size': 'booking_extra.truck_small'.tr(), 'description': 'booking_extra.truck_small_desc'.tr(), 'icon': 'local_shipping'},
+          {'size': 'booking_extra.truck_medium'.tr(), 'description': 'booking_extra.truck_medium_desc'.tr(), 'icon': 'moving'},
+          {'size': 'booking_extra.truck_large'.tr(), 'description': 'booking_extra.truck_large_desc'.tr(), 'icon': 'local_shipping'},
         ];
       });
     }
@@ -635,7 +635,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         Icons.local_shipping,
                         CamionService.livraison,
                         Colors.green,
-                        'Transport de colis et marchandises',
+                        'booking_extra.delivery_desc'.tr(),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -645,7 +645,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         Icons.moving,
                         CamionService.demenagement,
                         Colors.blue,
-                        'Services de déménagement complet',
+                        'booking_extra.moving_desc'.tr(),
                       ),
                     ),
                   ],
@@ -658,7 +658,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     Icons.local_shipping,
                     CamionService.poidsLourd,
                     Colors.red,
-                    'Transport de charges lourdes',
+                    'booking_extra.heavy_desc'.tr(),
                   ),
                 ),
               ],
@@ -750,14 +750,14 @@ class _BookingScreenState extends State<BookingScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildServiceCard(
-                'Yacht',
+                'booking_extra.yacht'.tr(),
                 Icons.sailing,
                 AutreService.yacht,
                 Colors.cyan,
               ),
               const SizedBox(width: 12),
               _buildServiceCard(
-                'Voiture',
+                'booking_extra.car'.tr(),
                 Icons.directions_car,
                 AutreService.voiture,
                 Colors.purple,
@@ -922,8 +922,8 @@ class _BookingScreenState extends State<BookingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Itinéraire',
+        Text(
+          'booking_extra.route'.tr(),
           style: TextStyle(
             color: Colors.black,
             fontSize: 16,
@@ -1047,8 +1047,8 @@ class _BookingScreenState extends State<BookingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Détails du transport',
+        Text(
+          'booking_extra.transport_details'.tr(),
           style: TextStyle(
             color: Colors.black,
             fontSize: 16,
@@ -1073,8 +1073,8 @@ class _BookingScreenState extends State<BookingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Détails de la livraison',
+        Text(
+          'booking_extra.delivery_details'.tr(),
           style: TextStyle(
             color: Colors.black,
             fontSize: 16,
@@ -1110,10 +1110,10 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
               )
             : _truckDiameters.isEmpty
-                ? const Padding(
+                ? Padding(
                     padding: EdgeInsets.all(16.0),
                     child: Text(
-                      'Aucune taille de camion disponible',
+                      'booking_extra.no_truck_size'.tr(),
                       style: TextStyle(color: Colors.red),
                     ),
                   )
@@ -1126,8 +1126,8 @@ class _BookingScreenState extends State<BookingScreen> {
                       child: DropdownButton<String>(
                         value: _selectedTruckDiameter,
                         isExpanded: true,
-                        hint: const Text(
-                          'Sélectionner le diamètre du camion',
+                        hint: Text(
+                          'booking_extra.select_truck_size'.tr(),
                           style: TextStyle(color: Colors.grey),
                         ),
                         icon: const Icon(Icons.arrow_drop_down),
@@ -1218,8 +1218,8 @@ class _BookingScreenState extends State<BookingScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Détails de la réservation',
+          Text(
+            'booking_extra.booking_details'.tr(),
             style: TextStyle(
               color: Colors.black,
               fontSize: 16,
@@ -1252,8 +1252,8 @@ class _BookingScreenState extends State<BookingScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Détails du véhicule',
+          Text(
+            'booking_extra.vehicle_details'.tr(),
             style: TextStyle(
               color: Colors.black,
               fontSize: 16,
@@ -1303,8 +1303,8 @@ class _BookingScreenState extends State<BookingScreen> {
               children: [
                 Column(
                   children: [
-                    const Text(
-                      'Distance',
+                    Text(
+                      'booking.distance'.tr(),
                       style: TextStyle(
                         color: Colors.grey,
                         fontSize: 12,
@@ -1323,8 +1323,8 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
                 Column(
                   children: [
-                    const Text(
-                      'Durée estimée',
+                    Text(
+                      'booking.estimated_duration'.tr(),
                       style: TextStyle(
                         color: Colors.grey,
                         fontSize: 12,
@@ -1343,8 +1343,8 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
                 Column(
                   children: [
-                    const Text(
-                      'Prix estimé',
+                    Text(
+                      'booking_extra.estimated_price'.tr(),
                       style: TextStyle(
                         color: Colors.grey,
                         fontSize: 12,

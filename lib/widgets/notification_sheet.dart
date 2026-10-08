@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../models/notification_model.dart';
 import '../models/trip_models.dart';
 import '../providers/auth_provider.dart';
@@ -162,13 +163,13 @@ class _NotificationSheetState extends State<NotificationSheet> {
     final difference = now.difference(dateTime);
 
     if (difference.inMinutes < 1) {
-      return "À l'instant";
+      return 'notif_extra.just_now'.tr();
     } else if (difference.inMinutes < 60) {
-      return "Il y a ${difference.inMinutes} min";
+      return 'notif_extra.minutes_ago'.tr(namedArgs: {'n': '${difference.inMinutes}'});
     } else if (difference.inHours < 24) {
-      return "Il y a ${difference.inHours} h";
+      return 'notif_extra.hours_ago'.tr(namedArgs: {'n': '${difference.inHours}'});
     } else if (difference.inDays < 7) {
-      return "Il y a ${difference.inDays} j";
+      return 'notif_extra.days_ago'.tr(namedArgs: {'n': '${difference.inDays}'});
     } else {
       return DateFormat('dd/MM/yyyy HH:mm').format(dateTime);
     }
@@ -216,13 +217,13 @@ class _NotificationSheetState extends State<NotificationSheet> {
   String _getPriorityLabel(NotificationPriority priority) {
     switch (priority) {
       case NotificationPriority.low:
-        return 'INFO';
+        return 'notif_extra.prio_info'.tr();
       case NotificationPriority.medium:
-        return 'MOYEN';
+        return 'notif_extra.prio_medium'.tr();
       case NotificationPriority.high:
-        return 'IMPORTANT';
+        return 'notif_extra.prio_important'.tr();
       case NotificationPriority.urgent:
-        return 'URGENT';
+        return 'notif_extra.prio_urgent'.tr();
     }
   }
 
@@ -411,8 +412,8 @@ class _NotificationSheetState extends State<NotificationSheet> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Notifications',
+                        Text(
+                          'notifications.title'.tr(),
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
@@ -423,8 +424,8 @@ class _NotificationSheetState extends State<NotificationSheet> {
                         const SizedBox(height: 2),
                         Text(
                           unreadCount > 0
-                              ? '$unreadCount nouvelle${unreadCount > 1 ? "s" : ""}'
-                              : 'À jour',
+                              ? 'notif_extra.new_count'.tr(namedArgs: {'count': '$unreadCount'})
+                              : 'notif_extra.up_to_date'.tr(),
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
@@ -439,8 +440,8 @@ class _NotificationSheetState extends State<NotificationSheet> {
                       TextButton.icon(
                         onPressed: () => _notificationService.markAllAsRead(),
                         icon: const Icon(Icons.done_all_rounded, size: 16),
-                        label: const Text(
-                          'Tout marquer lu',
+                        label: Text(
+                          'notifications.mark_all_read'.tr(),
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                         ),
                         style: TextButton.styleFrom(
@@ -666,8 +667,8 @@ class _NotificationSheetState extends State<NotificationSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Aucune notification',
+              Text(
+                'notifications.empty'.tr(),
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
@@ -676,7 +677,7 @@ class _NotificationSheetState extends State<NotificationSheet> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Vous recevrez des alertes instantanées sur vos courses, transactions et actualités ici.',
+                'notif_extra.empty_body'.tr(),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
@@ -702,7 +703,7 @@ class _DriverTripLoaderDialog extends StatefulWidget {
 class _DriverTripLoaderDialogState extends State<_DriverTripLoaderDialog> {
   int _attempt = 1;
   static const int _maxAttempts = 3;
-  String _statusMessage = "Récupération de votre course active...";
+  String _statusMessage = 'notif_extra.recovering_active'.tr();
   bool _hasError = false;
 
   @override
@@ -715,20 +716,20 @@ class _DriverTripLoaderDialogState extends State<_DriverTripLoaderDialog> {
     setState(() {
       _hasError = false;
       if (_attempt == 1) {
-        _statusMessage = "Connexion au service...";
+        _statusMessage = 'notif_extra.connecting'.tr();
       } else {
-        _statusMessage = "Tentative $_attempt de $_maxAttempts...";
+        _statusMessage = 'notif_extra.attempt'.tr(namedArgs: {'n': '$_attempt', 'max': '$_maxAttempts'});
       }
     });
 
     try {
       // 1. Tenter d'obtenir la course active directe
-      setState(() => _statusMessage = "Recherche de la course active...");
+      setState(() => _statusMessage = 'notif_extra.searching_active'.tr());
       AvailableTrip? activeTrip = await TripService.getActiveTrip();
 
       // 2. Si non trouvé, faire le fallback sur getDriverTrips(page: 1, limit: 1)
       if (activeTrip == null) {
-        setState(() => _statusMessage = "Vérification des dernières courses...");
+        setState(() => _statusMessage = 'notif_extra.checking_recent'.tr());
         final driverTrips = await TripService.getDriverTrips(page: 1, limit: 1);
         if (driverTrips.isNotEmpty) {
           final candidate = driverTrips.first;
@@ -748,14 +749,14 @@ class _DriverTripLoaderDialogState extends State<_DriverTripLoaderDialog> {
         if (_attempt < _maxAttempts) {
           _attempt++;
           setState(() {
-            _statusMessage = "Aucune course active. Nouvelle tentative...";
+            _statusMessage = 'notif_extra.no_active_retry'.tr();
           });
           await Future.delayed(const Duration(seconds: 2));
           _startFetchFlow();
         } else {
           setState(() {
             _hasError = true;
-            _statusMessage = "Aucune course active trouvée.";
+            _statusMessage = 'notif_extra.no_active_found'.tr();
           });
         }
       }
@@ -764,14 +765,14 @@ class _DriverTripLoaderDialogState extends State<_DriverTripLoaderDialog> {
       if (_attempt < _maxAttempts) {
         _attempt++;
         setState(() {
-          _statusMessage = "Erreur de connexion. Nouvelle tentative...";
+          _statusMessage = 'notif_extra.conn_error_retry'.tr();
         });
         await Future.delayed(const Duration(seconds: 2));
         _startFetchFlow();
       } else {
         setState(() {
           _hasError = true;
-          _statusMessage = "Erreur lors de la récupération de la course.";
+          _statusMessage = 'notif_extra.recover_error'.tr();
         });
       }
     }
@@ -819,7 +820,7 @@ class _DriverTripLoaderDialogState extends State<_DriverTripLoaderDialog> {
             
             // Titre
             Text(
-              _hasError ? "Échec de récupération" : "Récupération de course",
+              _hasError ? 'notif_extra.recover_failed'.tr() : 'notif_extra.recovering'.tr(),
               style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w900,
@@ -857,7 +858,7 @@ class _DriverTripLoaderDialogState extends State<_DriverTripLoaderDialog> {
                       ),
                     ),
                     child: Text(
-                      "Fermer",
+                      'common.close'.tr(),
                       style: TextStyle(
                         color: Colors.grey.shade700,
                         fontWeight: FontWeight.bold,
@@ -882,8 +883,8 @@ class _DriverTripLoaderDialogState extends State<_DriverTripLoaderDialog> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      "Réessayer",
+                    child: Text(
+                      'common.retry'.tr(),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                       ),
@@ -897,7 +898,7 @@ class _DriverTripLoaderDialogState extends State<_DriverTripLoaderDialog> {
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(
-                  "Annuler",
+                  'common.cancel'.tr(),
                   style: TextStyle(
                     color: Colors.grey.shade500,
                     fontWeight: FontWeight.w600,

@@ -285,44 +285,13 @@ class DriverSubscription {
   }
 }
 
-class LoyaltyProgram {
-  final String id;
-  final String accruedCashback;
-  final int completedTripsCount;
-  final bool isCompleted;
-
-  const LoyaltyProgram({
-    required this.id,
-    required this.accruedCashback,
-    required this.completedTripsCount,
-    required this.isCompleted,
-  });
-
-  factory LoyaltyProgram.fromJson(Map<String, dynamic> json) {
-    return LoyaltyProgram(
-      id: json['id'] ?? '',
-      accruedCashback: json['accrued_cashback'] ?? '0.00',
-      completedTripsCount: json['completed_trips_count'] ?? 0,
-      isCompleted: json['is_completed'] ?? false,
-    );
-  }
-
-  double get cashbackAmount => double.tryParse(accruedCashback) ?? 0.0;
-
-  // 100 USD cashback target over the loyalty period
-  static const double targetCashback = 100.0;
-  double get progressPercent => (cashbackAmount / targetCashback).clamp(0.0, 1.0);
-}
-
 class DriverSubscriptionStatus {
   final bool hasActiveSubscription;
   final DriverSubscription? subscription;
-  final LoyaltyProgram? loyaltyProgram;
 
   const DriverSubscriptionStatus({
     required this.hasActiveSubscription,
     this.subscription,
-    this.loyaltyProgram,
   });
 
   factory DriverSubscriptionStatus.fromJson(Map<String, dynamic> json) {
@@ -332,9 +301,6 @@ class DriverSubscriptionStatus {
       hasActiveSubscription: data['has_active_subscription'] ?? false,
       subscription: data['subscription'] != null
           ? DriverSubscription.fromJson(data['subscription'] as Map<String, dynamic>)
-          : null,
-      loyaltyProgram: data['loyalty_program'] != null
-          ? LoyaltyProgram.fromJson(data['loyalty_program'] as Map<String, dynamic>)
           : null,
     );
   }

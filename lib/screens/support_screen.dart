@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../core/config/app_config.dart';
 import '../core/network/http_client.dart';
+import '../core/storage/token_storage.dart';
 import 'support_ticket_chat_screen.dart';
 
 const _orange = Color(0xFFFF6B35);
@@ -143,11 +147,143 @@ class _SupportScreenState extends State<SupportScreen>
     }
   }
 
+  bool _openingWhatsApp = false;
+
+  /// Ouvre la conversation WhatsApp du support avec un message prérempli
+  /// (rôle, identifiant, version) pour que le support retrouve le compte.
+  /// Si WhatsApp (ou un navigateur) ne peut pas s'ouvrir : numéro et e-mail
+  /// à copier.
+  Future<void> _openWhatsApp() async {
+    if (_openingWhatsApp) return;
+    _openingWhatsApp = true;
+    try {
+      final message = await _whatsAppMessage();
+      final uri = Uri.parse('https://wa.me/${AppConfig.supportWhatsAppNumber}'
+          '?text=${Uri.encodeComponent(message)}');
+      var opened = false;
+      try {
+        opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        debugPrint('WhatsApp launch error: $e');
+      }
+      if (!opened && mounted) _showWhatsAppFallback();
+    } finally {
+      _openingWhatsApp = false;
+    }
+  }
+
+  Future<String> _whatsAppMessage() async {
+    final lines = <String>['support_extra.wa_greeting'.tr()];
+    try {
+      final loggedIn = await TokenStorage.hasSession() &&
+          !await TokenStorage.wasExplicitlyLoggedOut();
+      if (loggedIn) {
+        final role = await TokenStorage.getUserRole();
+        final userId = await TokenStorage.getUserId();
+        if (role != null && role.isNotEmpty) {
+          final roleLabel = (role == 'delivery' || role == 'driver')
+              ? 'rdv.driver'.tr()
+              : 'auth.client'.tr();
+          lines.add('support_extra.wa_role'.tr(namedArgs: {'role': roleLabel}));
+        }
+        if (userId != null && userId.isNotEmpty) {
+          lines.add('support_extra.wa_user_id'.tr(namedArgs: {'id': userId}));
+        }
+      } else {
+        lines.add('support_extra.wa_not_logged_in'.tr());
+      }
+    } catch (_) {}
+    try {
+      final info = await PackageInfo.fromPlatform();
+      lines.add('support_extra.wa_version'.tr(
+          namedArgs: {'version': '${info.version} (${info.buildNumber})'}));
+    } catch (_) {}
+    return lines.join('\n');
+  }
+
+  void _showWhatsAppFallback() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('support_extra.wa_unavailable_title'.tr(),
+                  style: GoogleFonts.poppins(
+                      fontSize: 16, fontWeight: FontWeight.w700, color: _textPrim)),
+              const SizedBox(height: 4),
+              Text('support_extra.wa_unavailable_body'.tr(),
+                  style: GoogleFonts.poppins(fontSize: 12.5, color: _textSecond)),
+              const SizedBox(height: 16),
+              _fallbackRow(ctx, Icons.chat_rounded, const Color(0xFF25D366),
+                  'support_extra.whatsapp'.tr(), '+${AppConfig.supportWhatsAppNumber}'),
+              const SizedBox(height: 10),
+              _fallbackRow(ctx, Icons.email_rounded, const Color(0xFF6366F1),
+                  'auth.email'.tr(), AppConfig.supportEmail),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _fallbackRow(BuildContext sheetContext, IconData icon, Color color,
+      String label, String value) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: GoogleFonts.poppins(fontSize: 11, color: _textSecond)),
+                SelectableText(value,
+                    style: GoogleFonts.poppins(
+                        fontSize: 14, fontWeight: FontWeight.w700, color: _textPrim)),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'common.copy'.tr(),
+            icon: Icon(Icons.copy_rounded, color: color, size: 20),
+            onPressed: () {
+              // Fermer la feuille d'abord pour que la confirmation soit visible
+              Navigator.pop(sheetContext);
+              _copyToClipboard(value, label);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   void _copyToClipboard(String value, String label) {
     Clipboard.setData(ClipboardData(text: value));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$label copié !',
+        content: Text('support_extra.copied'.tr(namedArgs: {'label': label}),
             style: GoogleFonts.poppins(fontSize: 13, color: Colors.white)),
         backgroundColor: _dark,
         behavior: SnackBarBehavior.floating,
@@ -326,26 +462,31 @@ class _SupportScreenState extends State<SupportScreen>
               child: _contactCard(
                 icon: Icons.email_rounded,
                 label: 'Email',
-                value: 'support@atla.business',
+                value: AppConfig.supportEmail,
                 color: const Color(0xFF6366F1),
-                onTap: () => _copyToClipboard('support@atla.business', 'Email'),
+                onTap: () => _copyToClipboard(AppConfig.supportEmail, 'Email'),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _contactCard(
-                icon: Icons.phone_rounded,
-                label: 'support.copy_number'.tr(),
-                value: '+216 XX XXX XXX',
-                color: _green,
-                onTap: () => _copyToClipboard('+216XXXXXXXX', 'support.copy_number'.tr()),
+            if (AppConfig.supportWhatsAppEnabled) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: _contactCard(
+                  icon: Icons.phone_rounded,
+                  label: 'support.copy_number'.tr(),
+                  value: '+${AppConfig.supportWhatsAppNumber}',
+                  color: _green,
+                  onTap: () => _copyToClipboard(
+                      '+${AppConfig.supportWhatsAppNumber}', 'support.copy_number'.tr()),
+                ),
               ),
-            ),
+            ],
           ],
         ),
         const SizedBox(height: 12),
-        _whatsAppCard(),
-        const SizedBox(height: 12),
+        if (AppConfig.supportWhatsAppEnabled) ...[
+          _whatsAppCard(),
+          const SizedBox(height: 12),
+        ],
         _availabilityBanner(),
       ],
     );
@@ -404,7 +545,7 @@ class _SupportScreenState extends State<SupportScreen>
               children: [
                 Icon(Icons.copy_rounded, size: 11, color: color),
                 const SizedBox(width: 4),
-                Text('Copier',
+                Text('common.copy'.tr(),
                     style: GoogleFonts.poppins(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
@@ -419,7 +560,7 @@ class _SupportScreenState extends State<SupportScreen>
 
   Widget _whatsAppCard() {
     return GestureDetector(
-      onTap: () => _copyToClipboard('+216XXXXXXXX', 'support.copy_number'.tr()),
+      onTap: _openWhatsApp,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
@@ -449,7 +590,7 @@ class _SupportScreenState extends State<SupportScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('WhatsApp Support',
+                  Text('support_extra.whatsapp_cta'.tr(),
                       style: GoogleFonts.poppins(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -466,7 +607,7 @@ class _SupportScreenState extends State<SupportScreen>
                 color: const Color(0xFF25D366).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text('support.copy_number'.tr(),
+              child: Text('support_extra.wa_open'.tr(),
                   style: GoogleFonts.poppins(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,

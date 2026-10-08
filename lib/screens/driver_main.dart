@@ -8,6 +8,7 @@ import 'driver_active_ride.dart';
 import 'driver_rendezvous_screen.dart';
 import '../services/trip_service.dart';
 import '../models/trip_models.dart';
+import '../services/onboarding_service.dart';
 
 class DriverMainScreen extends StatefulWidget {
   const DriverMainScreen({super.key});
@@ -45,6 +46,12 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
     // Check for active trip when screen is first loaded
     // TEMPORARILY DISABLED: uncomment to enable active trip checking on startup
     // _checkActiveTrip();
+    // Guide chauffeur affiché une seule fois, après la première connexion
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        OnboardingService.instance.showIfFirstTime(context, OnboardingGuide.driver);
+      }
+    });
   }
 
   @override

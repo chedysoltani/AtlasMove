@@ -194,7 +194,7 @@ class _ClientRendezvousHistoryScreenState
               ),
               const SizedBox(height: 8),
               Text(
-                DateFormat('dd MMM yyyy à HH:mm', 'fr').format(rdv.scheduledAt),
+                DateFormat('dd MMM yyyy • HH:mm', context.locale.languageCode).format(rdv.scheduledAt),
                 style: GoogleFonts.poppins(
                   fontSize: 13,
                   color: _textSecondary,
@@ -445,8 +445,8 @@ class _ClientRendezvousHistoryScreenState
         ),
         child: Row(
           children: [
-            _tabItem(0, Icons.upcoming_rounded, 'rdv.available'.tr(), _upcoming.length), // TODO: add translation key for "À venir"
-            _tabItem(1, Icons.history_rounded, 'rdv.history'.tr(), _past.length), // TODO: add translation key for "Passés"
+            _tabItem(0, Icons.upcoming_rounded, 'rdv.upcoming'.tr(), _upcoming.length),
+            _tabItem(1, Icons.history_rounded, 'rdv.past'.tr(), _past.length),
           ],
         ),
       ),
@@ -652,7 +652,7 @@ class _ClientRendezvousHistoryScreenState
             Text(
               isUpcoming
                   ? 'rdv.book'.tr()
-                  : 'rdv.history'.tr(), // TODO: add translation key for "Vos rendez-vous passés apparaîtront ici"
+                  : 'rdv.past_rdv_appear_here'.tr(),
               style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
               textAlign: TextAlign.center,
             ),
@@ -859,7 +859,7 @@ class _RdvCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        DateFormat('EEEE dd MMM yyyy', 'fr')
+                        DateFormat('EEEE dd MMM yyyy', context.locale.languageCode)
                             .format(rdv.scheduledAt),
                         style: GoogleFonts.poppins(
                             fontSize: 13,
@@ -867,7 +867,7 @@ class _RdvCard extends StatelessWidget {
                             color: statusColor),
                       ),
                       Text(
-                        DateFormat('HH:mm', 'fr').format(rdv.scheduledAt),
+                        DateFormat('HH:mm', context.locale.languageCode).format(rdv.scheduledAt),
                         style: GoogleFonts.poppins(
                             fontSize: 12,
                             color: statusColor.withOpacity(0.7),
@@ -893,7 +893,7 @@ class _RdvCard extends StatelessWidget {
                         const Icon(Icons.handshake_rounded,
                             color: _indigo, size: 11),
                         const SizedBox(width: 4),
-                        Text('Négociable',
+                        Text('rdv.negotiable'.tr(),
                             style: GoogleFonts.poppins(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
@@ -960,7 +960,7 @@ class _RdvCard extends StatelessWidget {
                 const SizedBox(height: 12),
 
                 // ── Route ──────────────────────────────────────
-                _sectionLabel('Trajet', Icons.route_rounded),
+                _sectionLabel('rdv.route'.tr(), Icons.route_rounded),
                 const SizedBox(height: 10),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1025,7 +1025,7 @@ class _RdvCard extends StatelessWidget {
                       _chip(Icons.category_rounded,
                           _cargoSizeLabel(rdv.cargoSize!), _textSecondary),
                     if (rdv.isFragile == true)
-                      _chip(Icons.warning_amber_rounded, 'FRAGILE', _red),
+                      _chip(Icons.warning_amber_rounded, 'rdv.fragile_caps'.tr(), _red),
                   ],
                 ),
 
@@ -1035,7 +1035,7 @@ class _RdvCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Divider(color: _border, height: 1, thickness: 1),
                   const SizedBox(height: 10),
-                  _sectionLabel('Marchandise', Icons.inventory_2_rounded),
+                  _sectionLabel('rdv.goods'.tr(), Icons.inventory_2_rounded),
                   const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
@@ -1059,7 +1059,7 @@ class _RdvCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Divider(color: _border, height: 1, thickness: 1),
                   const SizedBox(height: 10),
-                  _sectionLabel('Chauffeur', Icons.drive_eta_rounded),
+                  _sectionLabel('rdv.driver'.tr(), Icons.drive_eta_rounded),
                   const SizedBox(height: 8),
                   if (rdv.livreurName != null)
                     _infoRow(Icons.person_outline_rounded, rdv.livreurName!,
@@ -1076,7 +1076,7 @@ class _RdvCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Divider(color: _border, height: 1, thickness: 1),
                   const SizedBox(height: 10),
-                  _sectionLabel('Notes', Icons.notes_rounded),
+                  _sectionLabel('rdv.notes'.tr(), Icons.notes_rounded),
                   const SizedBox(height: 6),
                   Text(rdv.details!,
                       style: GoogleFonts.poppins(
@@ -1107,8 +1107,8 @@ class _RdvCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             rdv.finalFare != null
-                                ? 'Prix final'
-                                : 'Tarif estimé',
+                                ? 'rdv.final_price'.tr()
+                                : 'rdv.estimated_fare'.tr(),
                             style: GoogleFonts.poppins(
                                 fontSize: 12, color: Colors.white54),
                           ),
@@ -1157,7 +1157,7 @@ class _RdvCard extends StatelessWidget {
                   children: [
                     const Text('🤝', style: TextStyle(fontSize: 15)),
                     const SizedBox(width: 6),
-                    Text('Voir les négociations',
+                    Text('rdv.view_negotiations'.tr(),
                         style: GoogleFonts.poppins(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -1188,7 +1188,7 @@ class _RdvCard extends StatelessWidget {
                     const Icon(Icons.event_busy_rounded,
                         size: 15, color: Color(0xFFEF4444)),
                     const SizedBox(width: 6),
-                    Text('Annuler le rendez-vous',
+                    Text('rdv.cancel_rdv'.tr(),
                         style: GoogleFonts.poppins(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -1243,10 +1243,10 @@ class _RdvCard extends StatelessWidget {
 
   String _cargoSizeLabel(String size) {
     switch (size) {
-      case 'small':      return 'Petit';
-      case 'medium':     return 'Moyen';
-      case 'large':      return 'Grand';
-      case 'extra_large': return 'Très grand';
+      case 'small':      return 'rdv.size_small'.tr();
+      case 'medium':     return 'rdv.size_medium'.tr();
+      case 'large':      return 'rdv.size_large'.tr();
+      case 'extra_large': return 'rdv.size_xl'.tr();
       default:           return size;
     }
   }

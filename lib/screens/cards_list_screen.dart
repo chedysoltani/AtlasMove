@@ -43,8 +43,8 @@ class CardsListScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Paiement par carte',
+            Text(
+              'cards_extra.title'.tr(),
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,
@@ -52,8 +52,8 @@ class CardsListScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Bientôt disponible',
+            Text(
+              'cards_extra.coming_soon'.tr(),
               style: TextStyle(
                 color: Color(0xFFFF6B35),
                 fontSize: 16,
@@ -61,10 +61,10 @@ class CardsListScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 48),
               child: Text(
-                'Cette fonctionnalité sera disponible très prochainement.\nEn attendant, le paiement en espèces est accepté.',
+                'cards_extra.body'.tr(),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xFF9BA3B4),

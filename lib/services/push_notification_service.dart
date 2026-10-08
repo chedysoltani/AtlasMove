@@ -13,6 +13,7 @@ import '../screens/driver_active_ride.dart';
 import '../screens/incoming_call_screen.dart';
 import 'call_service.dart';
 import 'ride_offer_queue.dart';
+import 'system_strings.dart';
 import 'trip_service.dart';
 
 /// Notifications système pour les évènements qui doivent réveiller l'app :
@@ -30,10 +31,12 @@ class PushNotificationService {
 
   static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
 
-  static const _rideChannel = AndroidNotificationChannel(
+  // Getters (et non const) : nom et description dans la langue choisie,
+  // relue par SystemStrings.load() avant chaque création de canal.
+  static AndroidNotificationChannel get _rideChannel => AndroidNotificationChannel(
     'new_ride_channel',
-    'Nouvelles courses',
-    description: 'Alerte quand une nouvelle course est disponible',
+    SystemStrings.get('ride_channel'),
+    description: SystemStrings.get('ride_channel_desc'),
     importance: Importance.max,
     playSound: true,
     sound: RawResourceAndroidNotificationSound('new_ride'),
@@ -41,10 +44,10 @@ class PushNotificationService {
     vibrationPattern: null,
   );
 
-  static const _callChannel = AndroidNotificationChannel(
+  static AndroidNotificationChannel get _callChannel => AndroidNotificationChannel(
     'incoming_call_channel',
-    'Appels entrants',
-    description: 'Sonnerie d\'appel entrant client / chauffeur',
+    SystemStrings.get('call_channel'),
+    description: SystemStrings.get('call_channel_desc'),
     importance: Importance.max,
     playSound: true,
     sound: RawResourceAndroidNotificationSound('incoming_call'),
@@ -52,10 +55,10 @@ class PushNotificationService {
     vibrationPattern: null,
   );
 
-  static const _rdvChannel = AndroidNotificationChannel(
+  static AndroidNotificationChannel get _rdvChannel => AndroidNotificationChannel(
     'new_rdv_channel',
-    'Nouveaux rendez-vous',
-    description: 'Alerte quand un nouveau rendez-vous est disponible',
+    SystemStrings.get('rdv_channel'),
+    description: SystemStrings.get('rdv_channel_desc'),
     importance: Importance.high,
     playSound: true,
     sound: RawResourceAndroidNotificationSound('new_rdv'),
@@ -71,6 +74,7 @@ class PushNotificationService {
   static Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
+    await SystemStrings.load();
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     final darwinInit = DarwinInitializationSettings(
@@ -83,9 +87,9 @@ class PushNotificationService {
         DarwinNotificationCategory(
           'NEW_RIDE',
           actions: [
-            DarwinNotificationAction.plain('accept_ride', 'Accepter',
+            DarwinNotificationAction.plain('accept_ride', SystemStrings.get('accept'),
                 options: {DarwinNotificationActionOption.foreground}),
-            DarwinNotificationAction.plain('refuse_ride', 'Refuser',
+            DarwinNotificationAction.plain('refuse_ride', SystemStrings.get('refuse'),
                 options: {DarwinNotificationActionOption.destructive}),
           ],
           options: {DarwinNotificationCategoryOption.customDismissAction},
@@ -93,9 +97,9 @@ class PushNotificationService {
         DarwinNotificationCategory(
           'INCOMING_CALL',
           actions: [
-            DarwinNotificationAction.plain('accept_call', 'Répondre',
+            DarwinNotificationAction.plain('accept_call', SystemStrings.get('answer'),
                 options: {DarwinNotificationActionOption.foreground}),
-            DarwinNotificationAction.plain('decline_call', 'Refuser',
+            DarwinNotificationAction.plain('decline_call', SystemStrings.get('refuse'),
                 options: {DarwinNotificationActionOption.destructive}),
           ],
           options: {DarwinNotificationCategoryOption.customDismissAction},
@@ -186,6 +190,7 @@ class PushNotificationService {
 
   /// Isolate d'arrière-plan neuf : le plugin n'a jamais été initialisé dedans.
   static Future<void> _ensureLocalNotificationsForIsolate() async {
+    await SystemStrings.load();
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     await _plugin.initialize(
       settings: const InitializationSettings(android: androidInit),
@@ -216,11 +221,13 @@ class PushNotificationService {
     final pickup = data['pickup_address']?.toString() ?? '';
     final fare = data['offered_fare']?.toString();
     final currency = data['currency']?.toString() ?? '';
+    await SystemStrings.load();
+    final pickupLine = SystemStrings.get('ride_pickup', args: {'pickup': pickup});
 
     await _plugin.show(
       id: _rideNotifId(tripId),
-      title: 'Nouvelle course disponible !',
-      body: pickup.isEmpty ? 'Une course vous attend' : 'Départ : $pickup',
+      title: SystemStrings.get('ride_title'),
+      body: pickup.isEmpty ? SystemStrings.get('ride_waiting') : pickupLine,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _rideChannel.id,
@@ -230,15 +237,15 @@ class PushNotificationService {
           priority: Priority.max,
           fullScreenIntent: true,
           visibility: NotificationVisibility.public,
-          ticker: 'Nouvelle course',
+          ticker: SystemStrings.get('ride_ticker'),
           timeoutAfter: _msUntil(data['expires_at']),
           styleInformation: fare != null
-              ? BigTextStyleInformation('Départ : $pickup\n$fare $currency')
+              ? BigTextStyleInformation('$pickupLine\n$fare $currency')
               : null,
-          actions: const [
-            AndroidNotificationAction('accept_ride', 'Accepter',
+          actions: [
+            AndroidNotificationAction('accept_ride', SystemStrings.get('accept'),
                 showsUserInterface: true),
-            AndroidNotificationAction('refuse_ride', 'Refuser',
+            AndroidNotificationAction('refuse_ride', SystemStrings.get('refuse'),
                 showsUserInterface: false, cancelNotification: true),
           ],
         ),
@@ -264,12 +271,13 @@ class PushNotificationService {
   static Future<void> showIncomingCallNotification(Map<String, dynamic> data) async {
     final callId = (data['call_session_id'] ?? data['callSessionId'])?.toString();
     if (callId == null) return;
-    final caller = data['caller_name']?.toString() ?? 'Appel entrant';
+    await SystemStrings.load();
+    final caller = data['caller_name']?.toString() ?? SystemStrings.get('call_default');
 
     await _plugin.show(
       id: _callNotifId(callId),
       title: caller,
-      body: 'Appel AtlasMove entrant…',
+      body: SystemStrings.get('call_body'),
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _callChannel.id,
@@ -283,10 +291,10 @@ class PushNotificationService {
           ongoing: true,
           autoCancel: false,
           timeoutAfter: _msUntil(data['expires_at']) ?? 45000,
-          actions: const [
-            AndroidNotificationAction('accept_call', 'Répondre',
+          actions: [
+            AndroidNotificationAction('accept_call', SystemStrings.get('answer'),
                 showsUserInterface: true),
-            AndroidNotificationAction('decline_call', 'Refuser',
+            AndroidNotificationAction('decline_call', SystemStrings.get('refuse'),
                 showsUserInterface: false, cancelNotification: true),
           ],
         ),
@@ -320,11 +328,11 @@ class PushNotificationService {
       id: ('rdv_$id').hashCode & 0x7fffffff,
       title: title,
       body: body,
-      notificationDetails: const NotificationDetails(
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           'new_rdv_channel',
-          'Nouveaux rendez-vous',
-          channelDescription: 'Alerte quand un nouveau rendez-vous est disponible',
+          SystemStrings.get('rdv_channel'),
+          channelDescription: SystemStrings.get('rdv_channel_desc'),
           importance: Importance.high,
           priority: Priority.high,
         ),

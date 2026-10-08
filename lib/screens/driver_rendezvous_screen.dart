@@ -162,7 +162,7 @@ class _DriverRendezvousScreenState extends State<DriverRendezvousScreen>
                             ),
                           ),
                           Text(
-                            'rdv.my_rdv'.tr(), // TODO: add translation key for "Gérez vos courses planifiées"
+                            'rdv.manage_scheduled'.tr(),
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.white.withOpacity(0.55),
@@ -195,7 +195,7 @@ class _DriverRendezvousScreenState extends State<DriverRendezvousScreen>
         child: Row(
           children: [
             _tabItem(0, Icons.search_rounded, 'rdv.available'.tr()),
-            _tabItem(1, Icons.calendar_month_rounded, 'rdv.my_rdv'.tr()), // TODO: add translation key for "Planning"
+            _tabItem(1, Icons.calendar_month_rounded, 'rdv.planning'.tr()),
             _tabItem(2, Icons.history_rounded, 'rdv.history'.tr()),
           ],
         ),
@@ -418,7 +418,7 @@ class _AvailableTabState extends State<_AvailableTab>
       );
       if (mounted) {
         _showSnack(context,
-            '${'rdv.accept'.tr()} ${DateFormat('dd/MM/yyyy à HH:mm', 'fr').format(rdv.scheduledAt)}');
+            '${'rdv.accept'.tr()} ${DateFormat('dd/MM/yyyy • HH:mm', context.locale.languageCode).format(rdv.scheduledAt)}');
         _refresh();
         widget.onAccepted?.call();
       }
@@ -444,7 +444,7 @@ class _AvailableTabState extends State<_AvailableTab>
         title: Row(children: [
           const Text('💬', style: TextStyle(fontSize: 22)),
           const SizedBox(width: 8),
-          Text('Proposer un prix',
+          Text('rdv.propose_price'.tr(),
               style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 16)),
         ]),
         content: Column(
@@ -455,7 +455,7 @@ class _AvailableTabState extends State<_AvailableTab>
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
-                  'Prix client : ${FareCalculator.formatFare(rdv.estimatedFare!, currency)}',
+                  'rdv.client_price_value'.tr(namedArgs: {'price': FareCalculator.formatFare(rdv.estimatedFare!, currency)}),
                   style: GoogleFonts.poppins(
                       fontSize: 13, color: const Color(0xFF64748B)),
                 ),
@@ -464,7 +464,7 @@ class _AvailableTabState extends State<_AvailableTab>
               controller: ctrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
-                labelText: 'Votre prix ($currency)',
+                labelText: 'rdv.your_price'.tr(namedArgs: {'currency': currency}),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12)),
                 prefixIcon: const Icon(Icons.payments_rounded),
@@ -476,7 +476,7 @@ class _AvailableTabState extends State<_AvailableTab>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Annuler',
+            child: Text('common.cancel'.tr(),
                 style: GoogleFonts.poppins(color: const Color(0xFF64748B))),
           ),
           ElevatedButton(
@@ -489,7 +489,7 @@ class _AvailableTabState extends State<_AvailableTab>
               final v = double.tryParse(ctrl.text.replaceAll(',', '.'));
               if (v != null && v > 0) Navigator.pop(ctx, v);
             },
-            child: Text('Envoyer',
+            child: Text('common.send'.tr(),
                 style: GoogleFonts.poppins(
                     color: Colors.white, fontWeight: FontWeight.w700)),
           ),
@@ -501,7 +501,7 @@ class _AvailableTabState extends State<_AvailableTab>
       await RendezvousService.proposeOffer(rdv.id, confirmed, currency: currency);
       if (mounted) {
         _showSnack(context,
-            'Offre de ${FareCalculator.formatFare(confirmed, currency)} envoyée');
+            'rdv.offer_sent'.tr(namedArgs: {'price': FareCalculator.formatFare(confirmed, currency)}));
       }
     } catch (e) {
       if (mounted) _showSnack(context, '${'common.error'.tr()} : $e', success: false);
@@ -575,7 +575,7 @@ class _AvailableTabState extends State<_AvailableTab>
                   style: GoogleFonts.poppins(
                       fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary)),
               const SizedBox(height: 6),
-              Text('common.no_data'.tr(), // TODO: add translation key for "Tirez vers le bas pour actualiser"
+              Text('rdv.pull_to_refresh'.tr(),
                   style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary)),
             ]),
           )
@@ -673,12 +673,12 @@ class _AvailableCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        DateFormat('EEEE dd MMM yyyy', 'fr').format(rdv.scheduledAt),
+                        DateFormat('EEEE dd MMM yyyy', context.locale.languageCode).format(rdv.scheduledAt),
                         style: GoogleFonts.poppins(
                             color: _orange, fontWeight: FontWeight.w700, fontSize: 13),
                       ),
                       Text(
-                        DateFormat('HH:mm', 'fr').format(rdv.scheduledAt),
+                        DateFormat('HH:mm', context.locale.languageCode).format(rdv.scheduledAt),
                         style: GoogleFonts.poppins(
                             color: _orange.withOpacity(0.7),
                             fontWeight: FontWeight.w600,
@@ -701,7 +701,7 @@ class _AvailableCard extends StatelessWidget {
                       children: [
                         const Icon(Icons.handshake_rounded, color: _indigo, size: 12),
                         const SizedBox(width: 4),
-                        Text('Négociable',
+                        Text('rdv.negotiable'.tr(),
                             style: GoogleFonts.poppins(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
@@ -766,7 +766,7 @@ class _AvailableCard extends StatelessWidget {
                 const SizedBox(height: 12),
 
                 // ── Route ────────────────────────────────────────────
-                _sectionLabel('Trajet', Icons.route_rounded),
+                _sectionLabel('rdv.route'.tr(), Icons.route_rounded),
                 const SizedBox(height: 10),
 
                 // Pickup
@@ -841,7 +841,7 @@ class _AvailableCard extends StatelessWidget {
                       _chip(Icons.category_rounded,
                           _cargoSizeLabel(rdv.cargoSize!), _textSecondary),
                     if (rdv.isFragile == true)
-                      _chip(Icons.warning_amber_rounded, 'FRAGILE', _red),
+                      _chip(Icons.warning_amber_rounded, 'rdv.fragile_caps'.tr(), _red),
                   ],
                 ),
 
@@ -851,7 +851,7 @@ class _AvailableCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Divider(color: _border, height: 1, thickness: 1),
                   const SizedBox(height: 10),
-                  _sectionLabel('Marchandise', Icons.inventory_2_rounded),
+                  _sectionLabel('rdv.goods'.tr(), Icons.inventory_2_rounded),
                   const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
@@ -877,7 +877,7 @@ class _AvailableCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Divider(color: _border, height: 1, thickness: 1),
                   const SizedBox(height: 10),
-                  _sectionLabel('Client', Icons.person_rounded),
+                  _sectionLabel('rdv.client'.tr(), Icons.person_rounded),
                   const SizedBox(height: 8),
                   if (rdv.clientName != null)
                     _infoRow(Icons.person_outline_rounded,
@@ -894,7 +894,7 @@ class _AvailableCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Divider(color: _border, height: 1, thickness: 1),
                   const SizedBox(height: 10),
-                  _sectionLabel('Notes', Icons.notes_rounded),
+                  _sectionLabel('rdv.notes'.tr(), Icons.notes_rounded),
                   const SizedBox(height: 8),
                   Text(
                     rdv.details!,
@@ -926,7 +926,7 @@ class _AvailableCard extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Tarif estimé',
+                            'rdv.estimated_fare'.tr(),
                             style: GoogleFonts.poppins(
                                 fontSize: 12,
                                 color: Colors.white54),
@@ -955,7 +955,7 @@ class _AvailableCard extends StatelessWidget {
                         onPressed: isAccepting ? null : onPropose,
                         icon: const Icon(Icons.edit_rounded,
                             size: 16, color: _indigo),
-                        label: Text('Proposer',
+                        label: Text('rdv.propose'.tr(),
                             style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13,
@@ -1072,10 +1072,10 @@ class _AvailableCard extends StatelessWidget {
 
   String _cargoSizeLabel(String size) {
     switch (size) {
-      case 'small': return 'Petit';
-      case 'medium': return 'Moyen';
-      case 'large': return 'Grand';
-      case 'extra_large': return 'Très grand';
+      case 'small': return 'rdv.size_small'.tr();
+      case 'medium': return 'rdv.size_medium'.tr();
+      case 'large': return 'rdv.size_large'.tr();
+      case 'extra_large': return 'rdv.size_xl'.tr();
       default: return size;
     }
   }
@@ -1125,9 +1125,9 @@ class _PlanningTabState extends State<_PlanningTab>
       context,
       icon: Icons.undo_rounded,
       iconColor: const Color(0xFFF59E0B),
-      title: 'rdv.refuse'.tr(), // TODO: add translation key for "Libérer ce rendez-vous ?"
+      title: 'rdv.release_title'.tr(),
       subtitle:
-          '${DateFormat('dd/MM/yyyy à HH:mm', 'fr').format(rdv.scheduledAt)}',
+          '${DateFormat('dd/MM/yyyy • HH:mm', context.locale.languageCode).format(rdv.scheduledAt)}',
       confirmLabel: 'rdv.refuse'.tr(),
       confirmColor: const Color(0xFFF59E0B),
     );
@@ -1153,9 +1153,9 @@ class _PlanningTabState extends State<_PlanningTab>
       context,
       icon: Icons.task_alt_rounded,
       iconColor: const Color(0xFF22C55E),
-      title: 'Terminer le rendez-vous',
-      subtitle: DateFormat('dd/MM/yyyy à HH:mm', 'fr').format(rdv.scheduledAt),
-      confirmLabel: 'Terminer',
+      title: 'rdv.complete_title'.tr(),
+      subtitle: DateFormat('dd/MM/yyyy • HH:mm', context.locale.languageCode).format(rdv.scheduledAt),
+      confirmLabel: 'rdv.complete'.tr(),
       confirmColor: const Color(0xFF22C55E),
     );
     if (confirmed != true) return;
@@ -1165,7 +1165,7 @@ class _PlanningTabState extends State<_PlanningTab>
     try {
       await RendezvousService.completeRendezvous(rdv.id);
       if (mounted) {
-        _showSnack(context, 'Rendez-vous terminé');
+        _showSnack(context, 'rdv.completed_msg'.tr());
         _load();
       }
     } catch (e) {
@@ -1177,7 +1177,7 @@ class _PlanningTabState extends State<_PlanningTab>
 
   void _copyCoords(Rendezvous rdv) {
     Clipboard.setData(ClipboardData(text: '${rdv.latitude}, ${rdv.longitude}'));
-    _showSnack(context, 'rdv.address'.tr()); // TODO: add translation key for "Coordonnées copiées"
+    _showSnack(context, 'rdv.coords_copied'.tr());
   }
 
   @override
@@ -1231,7 +1231,7 @@ class _PlanningTabState extends State<_PlanningTab>
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
-            isToday ? 'rdv.today'.tr() : DateFormat('EEEE dd MMMM', 'fr').format(date),
+            isToday ? 'rdv.today'.tr() : DateFormat('EEEE dd MMMM', context.locale.languageCode).format(date),
             style: GoogleFonts.poppins(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -1277,7 +1277,7 @@ class _PlanningTabState extends State<_PlanningTab>
                   style: GoogleFonts.poppins(
                       fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary)),
               const SizedBox(height: 6),
-              Text('rdv.available'.tr(), // TODO: add translation key for "Acceptez des RDV dans l'onglet Disponibles"
+              Text('rdv.accept_in_available'.tr(),
                   style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary)),
             ]),
           )
@@ -1366,7 +1366,7 @@ class _PlanningCard extends StatelessWidget {
               const SizedBox(width: 10),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(
-                  DateFormat('HH:mm', 'fr').format(rdv.scheduledAt),
+                  DateFormat('HH:mm', context.locale.languageCode).format(rdv.scheduledAt),
                   style: GoogleFonts.poppins(
                       fontSize: 16, fontWeight: FontWeight.w800, color: _green),
                 ),
@@ -1411,7 +1411,7 @@ class _PlanningCard extends StatelessWidget {
               if (rdv.estimatedDistanceKm != null) ...[
                 const SizedBox(height: 8),
                 _infoRow(Icons.route_rounded,
-                    '${rdv.estimatedDistanceKm!.toStringAsFixed(1)} km estimés'),
+                    'rdv.km_estimated'.tr(namedArgs: {'km': rdv.estimatedDistanceKm!.toStringAsFixed(1)})),
               ],
               if (rdv.cargoDescription != null &&
                   rdv.cargoDescription!.isNotEmpty) ...[
@@ -1420,7 +1420,7 @@ class _PlanningCard extends StatelessWidget {
               ],
               if (rdv.isFragile == true) ...[
                 const SizedBox(height: 8),
-                _infoRow(Icons.warning_amber_rounded, 'Colis FRAGILE',
+                _infoRow(Icons.warning_amber_rounded, 'rdv.fragile_package'.tr(),
                     iconColor: const Color(0xFFEF4444)),
               ],
               if (!rdv.isDelivery) ...[
@@ -1445,7 +1445,7 @@ class _PlanningCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     onPressed: onNavigate,
                     icon: const Icon(Icons.navigation_rounded, size: 16, color: _navy),
-                    label: Text('Naviguer',
+                    label: Text('rdv.navigate'.tr(),
                         style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w600, color: _navy, fontSize: 13)),
                     style: OutlinedButton.styleFrom(
@@ -1496,7 +1496,7 @@ class _PlanningCard extends StatelessWidget {
                       : const Icon(Icons.task_alt_rounded,
                           size: 16, color: Colors.white),
                   label: Text(
-                    isCompleting ? 'common.loading'.tr() : 'Terminer',
+                    isCompleting ? 'common.loading'.tr() : 'rdv.complete'.tr(),
                     style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
@@ -1525,7 +1525,7 @@ class _PlanningCard extends StatelessWidget {
                     ),
                   ),
                   icon: const Text('🤝', style: TextStyle(fontSize: 15)),
-                  label: Text('Voir les négociations',
+                  label: Text('rdv.view_negotiations'.tr(),
                       style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           color: _indigo,
@@ -1681,7 +1681,7 @@ class _HistoryTabState extends State<_HistoryTab>
               style: GoogleFonts.poppins(
                   fontSize: 15, fontWeight: FontWeight.w600, color: _textPrimary)),
           const SizedBox(height: 6),
-          Text('rdv.history'.tr(), // TODO: add translation key for "Vos courses passées apparaîtront ici"
+          Text('rdv.past_appear_here'.tr(),
               style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary)),
         ]),
       );
@@ -1776,12 +1776,12 @@ class _HistoryCard extends StatelessWidget {
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(
-                    DateFormat('EEEE dd MMMM', 'fr').format(rdv.scheduledAt),
+                    DateFormat('EEEE dd MMMM', context.locale.languageCode).format(rdv.scheduledAt),
                     style: GoogleFonts.poppins(
                         fontSize: 13, fontWeight: FontWeight.w700, color: _textPrimary),
                   ),
                   Text(
-                    DateFormat('HH:mm', 'fr').format(rdv.scheduledAt),
+                    DateFormat('HH:mm', context.locale.languageCode).format(rdv.scheduledAt),
                     style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
                   ),
                 ]),
@@ -1816,14 +1816,14 @@ class _HistoryCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 _infoRow(
                   Icons.payments_rounded,
-                  'Montant final : ${FareCalculator.formatFare(rdv.finalFare!, rdv.currency ?? 'TND')}',
+                  'rdv.final_amount'.tr(namedArgs: {'price': FareCalculator.formatFare(rdv.finalFare!, rdv.currency ?? 'TND')}),
                   bold: true,
                 ),
               ] else if (rdv.estimatedFare != null) ...[
                 const SizedBox(height: 8),
                 _infoRow(
                   Icons.payments_rounded,
-                  'Tarif estimé : ${FareCalculator.formatFare(rdv.estimatedFare!, rdv.currency ?? 'TND')}',
+                  'rdv.estimated_fare_value'.tr(namedArgs: {'price': FareCalculator.formatFare(rdv.estimatedFare!, rdv.currency ?? 'TND')}),
                 ),
               ],
             ]),

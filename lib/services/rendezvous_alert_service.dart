@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../services/push_notification_service.dart';
 import '../services/rendezvous_service.dart';
+import '../services/system_strings.dart';
 
 /// Alerte le chauffeur des NOUVEAUX rendez-vous disponibles.
 ///
@@ -63,11 +64,12 @@ class RendezvousAlertService {
       }
 
       final newOnes = resp.items.where((r) => !_seenIds.contains(r.id));
+      if (newOnes.isNotEmpty) await SystemStrings.load();
       for (final rdv in newOnes) {
         final time = DateFormat('dd/MM HH:mm').format(rdv.scheduledAt);
         await PushNotificationService.showNewRendezvousNotification(
           id: rdv.id,
-          title: 'Nouveau rendez-vous disponible',
+          title: SystemStrings.get('rdv_title'),
           body: '${rdv.serviceName} — ${rdv.address} · $time',
         );
       }

@@ -1,4 +1,5 @@
 import '../user.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 /// Modèle de réponse pour l'inscription/authentification
 class AuthResponse {
@@ -27,14 +28,23 @@ class AuthResponse {
     if (json.containsKey('data')) {
       final data = json['data'] as Map<String, dynamic>;
 
-      final email = data['email'] ?? '';
-      final nameParts = email.split('@');
-      final firstName = data['first_name'] ?? nameParts[0];
-      final lastName = data['last_name'] ?? '';
-
-      // Cherche l'id UUID dans plusieurs emplacements possibles de la réponse
       final nestedData = data['data'] is Map ? data['data'] as Map<String, dynamic> : null;
       final nestedUser = data['user'] is Map ? data['user'] as Map<String, dynamic> : null;
+
+      // verify-otp renvoie l'utilisateur dans `data.user` : sans ce repli, le
+      // rôle retombait sur 'client' et un livreur atterrissait sur le dashboard client.
+      final String email = (data['email'] ?? nestedUser?['email'] ?? '').toString();
+      final nameParts = email.split('@');
+      final firstName = data['first_name'] ??
+          nestedUser?['first_name'] ??
+          nestedUser?['firstName'] ??
+          nameParts[0];
+      final lastName = data['last_name'] ??
+          nestedUser?['last_name'] ??
+          nestedUser?['lastName'] ??
+          '';
+
+      // Cherche l'id UUID dans plusieurs emplacements possibles de la réponse
       final userId = data['id'] ??
           data['userId'] ??
           data['user_id'] ??
@@ -48,8 +58,8 @@ class AuthResponse {
         'first_name': firstName,
         'last_name': lastName,
         'email': email,
-        'phone': data['phone'] ?? '',
-        'role': data['role'] ?? 'client',
+        'phone': data['phone'] ?? nestedUser?['phone'] ?? '',
+        'role': data['role'] ?? nestedUser?['role'] ?? 'client',
         'created_at': data['created_at'] ?? DateTime.now().toIso8601String(),
         'updated_at': data['updated_at'] ?? DateTime.now().toIso8601String(),
       };
@@ -119,12 +129,12 @@ class AuthErrorResponse implements Exception {
 
   factory AuthErrorResponse.fromJson(Map<String, dynamic> json, int statusCode) {
     // Gérer la structure de réponse réelle de l'API
-    String message = 'Erreur inconnue';
+    String message = 'active_ride.unknown_error'.tr();
     List<String>? errors;
     
     if (json.containsKey('data') && json['data'] != null) {
       final data = json['data'] as Map<String, dynamic>;
-      message = data['message']?.toString() ?? 'Erreur inconnue';
+      message = data['message']?.toString() ?? 'active_ride.unknown_error'.tr();
       errors = data['errors']?.cast<String>();
     } else if (json.containsKey('message')) {
       final messageData = json['message'];

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../core/network/http_client.dart';
 import '../main.dart' show navigatorKey;
@@ -79,8 +80,8 @@ class _Panel extends StatelessWidget {
                   Expanded(
                     child: Text(
                       offers.length > 1
-                          ? '${offers.length} nouvelles courses disponibles'
-                          : 'Nouvelle course disponible',
+                          ? 'ride_offer.new_count'.tr(namedArgs: {'count': '${offers.length}'})
+                          : 'ride_offer.new_one'.tr(),
                       style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF0F172A)),
                     ),
                   ),
@@ -127,10 +128,10 @@ class _OfferCardState extends State<_OfferCard> {
       }
     } on ApiException catch (e) {
       _showError(e.response?.statusCode == 409
-          ? 'Cette course a déjà été prise ou annulée.'
-          : 'Impossible d\'accepter cette course.');
+          ? 'ride_offer.already_taken'.tr()
+          : 'ride_offer.accept_error'.tr());
     } catch (_) {
-      _showError('Erreur réseau — réessayez.');
+      _showError('ride_offer.network_error'.tr());
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -220,7 +221,7 @@ class _OfferCardState extends State<_OfferCard> {
                       padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Refuser', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+                    child: Text('common.reject'.tr(), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
                   ),
                 ),
               ),
@@ -241,7 +242,7 @@ class _OfferCardState extends State<_OfferCard> {
                         ? const SizedBox(
                             width: 18, height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
-                        : const Text('Accepter', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                        : Text('common.accept'.tr(), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                   ),
                 ),
               ),

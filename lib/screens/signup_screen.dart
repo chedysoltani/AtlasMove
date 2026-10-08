@@ -108,12 +108,12 @@ class _SignupScreenState extends State<SignupScreen>
         Navigator.pop(context);
       }
     } catch (e) {
-      String msg = 'Erreur d\'inscription';
+      String msg = 'auth_extra.signup_error'.tr();
       if (e is ServiceValidationException) msg = e.toString();
       else if (e is ValidationException) msg = e.toString();
       else if (e is AuthErrorResponse) msg = e.message;
       else if (e is NetworkException) msg = e.message;
-      else msg = 'Erreur: $e';
+      else msg = 'common.error_detail'.tr(namedArgs: {'error': '$e'});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(msg),
@@ -557,39 +557,39 @@ class _CountryCode {
   const _CountryCode({required this.flag, required this.name, required this.dial});
 
   static const _CountryCode defaultCode =
-      _CountryCode(flag: '🇹🇳', name: 'Tunisie', dial: '+216');
+      _CountryCode(flag: '🇹🇳', name: 'countries.tn', dial: '+216');
 
   static const List<_CountryCode> all = [
-    _CountryCode(flag: '🇹🇳', name: 'Tunisie',        dial: '+216'),
-    _CountryCode(flag: '🇩🇿', name: 'Algérie',        dial: '+213'),
-    _CountryCode(flag: '🇲🇦', name: 'Maroc',          dial: '+212'),
-    _CountryCode(flag: '🇱🇾', name: 'Libye',          dial: '+218'),
-    _CountryCode(flag: '🇪🇬', name: 'Égypte',         dial: '+20'),
-    _CountryCode(flag: '🇸🇦', name: 'Arabie Saoudite',dial: '+966'),
-    _CountryCode(flag: '🇦🇪', name: 'Émirats',        dial: '+971'),
-    _CountryCode(flag: '🇶🇦', name: 'Qatar',          dial: '+974'),
-    _CountryCode(flag: '🇰🇼', name: 'Koweït',         dial: '+965'),
-    _CountryCode(flag: '🇧🇭', name: 'Bahreïn',        dial: '+973'),
-    _CountryCode(flag: '🇴🇲', name: 'Oman',           dial: '+968'),
-    _CountryCode(flag: '🇯🇴', name: 'Jordanie',       dial: '+962'),
-    _CountryCode(flag: '🇱🇧', name: 'Liban',          dial: '+961'),
-    _CountryCode(flag: '🇸🇩', name: 'Soudan',         dial: '+249'),
-    _CountryCode(flag: '🇫🇷', name: 'France',         dial: '+33'),
-    _CountryCode(flag: '🇩🇪', name: 'Allemagne',      dial: '+49'),
-    _CountryCode(flag: '🇧🇪', name: 'Belgique',       dial: '+32'),
-    _CountryCode(flag: '🇨🇭', name: 'Suisse',         dial: '+41'),
-    _CountryCode(flag: '🇪🇸', name: 'Espagne',        dial: '+34'),
-    _CountryCode(flag: '🇮🇹', name: 'Italie',         dial: '+39'),
-    _CountryCode(flag: '🇬🇧', name: 'Royaume-Uni',    dial: '+44'),
-    _CountryCode(flag: '🇺🇸', name: 'États-Unis',     dial: '+1'),
-    _CountryCode(flag: '🇨🇦', name: 'Canada',         dial: '+1'),
-    _CountryCode(flag: '🇸🇳', name: 'Sénégal',        dial: '+221'),
-    _CountryCode(flag: '🇨🇮', name: "Côte d'Ivoire",  dial: '+225'),
-    _CountryCode(flag: '🇨🇲', name: 'Cameroun',       dial: '+237'),
-    _CountryCode(flag: '🇬🇳', name: 'Guinée',         dial: '+224'),
-    _CountryCode(flag: '🇲🇱', name: 'Mali',           dial: '+223'),
-    _CountryCode(flag: '🇹🇷', name: 'Turquie',        dial: '+90'),
-    _CountryCode(flag: '🇵🇰', name: 'Pakistan',       dial: '+92'),
+    _CountryCode(flag: '🇹🇳', name: 'countries.tn',        dial: '+216'),
+    _CountryCode(flag: '🇩🇿', name: 'countries.dz',        dial: '+213'),
+    _CountryCode(flag: '🇲🇦', name: 'countries.ma',          dial: '+212'),
+    _CountryCode(flag: '🇱🇾', name: 'countries.ly',          dial: '+218'),
+    _CountryCode(flag: '🇪🇬', name: 'countries.eg',         dial: '+20'),
+    _CountryCode(flag: '🇸🇦', name: 'countries.sa',dial: '+966'),
+    _CountryCode(flag: '🇦🇪', name: 'countries.ae',        dial: '+971'),
+    _CountryCode(flag: '🇶🇦', name: 'countries.qa',          dial: '+974'),
+    _CountryCode(flag: '🇰🇼', name: 'countries.kw',         dial: '+965'),
+    _CountryCode(flag: '🇧🇭', name: 'countries.bh',        dial: '+973'),
+    _CountryCode(flag: '🇴🇲', name: 'countries.om',           dial: '+968'),
+    _CountryCode(flag: '🇯🇴', name: 'countries.jo',       dial: '+962'),
+    _CountryCode(flag: '🇱🇧', name: 'countries.lb',          dial: '+961'),
+    _CountryCode(flag: '🇸🇩', name: 'countries.sd',         dial: '+249'),
+    _CountryCode(flag: '🇫🇷', name: 'countries.fr',         dial: '+33'),
+    _CountryCode(flag: '🇩🇪', name: 'countries.de',      dial: '+49'),
+    _CountryCode(flag: '🇧🇪', name: 'countries.be',       dial: '+32'),
+    _CountryCode(flag: '🇨🇭', name: 'countries.ch',         dial: '+41'),
+    _CountryCode(flag: '🇪🇸', name: 'countries.es',        dial: '+34'),
+    _CountryCode(flag: '🇮🇹', name: 'countries.it',         dial: '+39'),
+    _CountryCode(flag: '🇬🇧', name: 'countries.gb',    dial: '+44'),
+    _CountryCode(flag: '🇺🇸', name: 'countries.us',     dial: '+1'),
+    _CountryCode(flag: '🇨🇦', name: 'countries.ca',         dial: '+1'),
+    _CountryCode(flag: '🇸🇳', name: 'countries.sn',        dial: '+221'),
+    _CountryCode(flag: '🇨🇮', name: 'countries.ci',  dial: '+225'),
+    _CountryCode(flag: '🇨🇲', name: 'countries.cm',       dial: '+237'),
+    _CountryCode(flag: '🇬🇳', name: 'countries.gn',         dial: '+224'),
+    _CountryCode(flag: '🇲🇱', name: 'countries.ml',           dial: '+223'),
+    _CountryCode(flag: '🇹🇷', name: 'countries.tr',        dial: '+90'),
+    _CountryCode(flag: '🇵🇰', name: 'countries.pk',       dial: '+92'),
   ];
 }
 
@@ -623,7 +623,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
       _search = q.toLowerCase();
       _filtered = _CountryCode.all
           .where((c) =>
-              c.name.toLowerCase().contains(_search) ||
+              c.name.tr().toLowerCase().contains(_search) ||
               c.dial.contains(_search))
           .toList();
     });
@@ -651,7 +651,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
           // Title
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-            child: Text('Sélectionner un pays',
+            child: Text('auth_extra.select_country'.tr(),
                 style: GoogleFonts.poppins(
                     fontSize: 16, fontWeight: FontWeight.w700, color: _dark)),
           ),
@@ -662,7 +662,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
               onChanged: _onSearch,
               style: GoogleFonts.poppins(fontSize: 13, color: _dark),
               decoration: InputDecoration(
-                hintText: 'Rechercher...',
+                hintText: 'auth_extra.search_hint'.tr(),
                 hintStyle: GoogleFonts.poppins(
                     fontSize: 13, color: Colors.grey.shade400),
                 prefixIcon: const Icon(Icons.search_rounded,
@@ -701,7 +701,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
                             style: const TextStyle(fontSize: 22)),
                         const SizedBox(width: 14),
                         Expanded(
-                          child: Text(c.name,
+                          child: Text(c.name.tr(),
                               style: GoogleFonts.poppins(
                                   fontSize: 14,
                                   fontWeight: isSelected

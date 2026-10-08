@@ -8,6 +8,7 @@ import '../models/trip_models.dart';
 import '../services/notification_service.dart';
 import '../services/call_service.dart';
 import '../services/profile_service.dart';
+import '../services/onboarding_service.dart';
 import '../widgets/notification_sheet.dart';
 
 class ClientDashboard extends StatefulWidget {
@@ -55,6 +56,12 @@ class _ClientDashboardState extends State<ClientDashboard>
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
     ));
+    // Guide client affiché une seule fois, après la première connexion
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        OnboardingService.instance.showIfFirstTime(context, OnboardingGuide.client);
+      }
+    });
   }
 
   @override
@@ -416,7 +423,7 @@ class _ClientDashboardState extends State<ClientDashboard>
         const SizedBox(width: 10),
         _statChip(
           icon: Icons.event_available_rounded,
-          value: loading ? '...' : (_statsUpcomingRdv > 0 ? '$_statsUpcomingRdv RDV' : '0 RDV'),
+          value: loading ? '...' : '$_statsUpcomingRdv ${'nav.rdv'.tr()}',
           label: 'rdv.upcoming'.tr(),
           color: _orange,
           onTap: () => Navigator.pushNamed(context, '/client_rendezvous_history'),
@@ -625,7 +632,7 @@ class _ClientDashboardState extends State<ClientDashboard>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Vers ${trip.destinationAddress.split(',').first}',
+                  'client_extra.to_place'.tr(namedArgs: {'place': trip.destinationAddress.split(',').first}),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(

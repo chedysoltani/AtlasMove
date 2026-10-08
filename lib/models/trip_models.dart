@@ -1,4 +1,5 @@
 import '../services/profile_service.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 class TripResponse {
   final bool success;
@@ -172,7 +173,7 @@ class AvailableTrip {
 
   factory AvailableTrip.fromJson(Map<String, dynamic> json) {
     // Parser le service
-    String serviceName = 'Inconnu';
+    String serviceName = 'driver_rides.unknown'.tr();
     if (json['service'] != null && json['service']['name'] != null) {
       serviceName = json['service']['name'].toString();
     }
@@ -191,10 +192,10 @@ class AvailableTrip {
 
     return AvailableTrip(
       id: json['id']?.toString() ?? '',
-      pickupAddress: json['pickup_address']?.toString() ?? 'Adresse inconnue',
+      pickupAddress: json['pickup_address']?.toString() ?? 'models.unknown_address'.tr(),
       pickupLatitude: double.tryParse(json['pickup_latitude']?.toString() ?? '0') ?? 0.0,
       pickupLongitude: double.tryParse(json['pickup_longitude']?.toString() ?? '0') ?? 0.0,
-      destinationAddress: json['destination_address']?.toString() ?? 'Adresse inconnue',
+      destinationAddress: json['destination_address']?.toString() ?? 'models.unknown_address'.tr(),
       destinationLatitude: double.tryParse(json['destination_latitude']?.toString() ?? '0') ?? 0.0,
       destinationLongitude: double.tryParse(json['destination_longitude']?.toString() ?? '0') ?? 0.0,
       estimatedDistanceKm: double.tryParse(json['estimated_distance_km']?.toString() ?? '0') ?? 0.0,
@@ -238,7 +239,7 @@ class TripHistoryItem {
   });
 
   factory TripHistoryItem.fromJson(Map<String, dynamic> json) {
-    String serviceName = 'Inconnu';
+    String serviceName = 'driver_rides.unknown'.tr();
     if (json['service'] != null && json['service']['name'] != null) {
       serviceName = json['service']['name'].toString();
     }
@@ -246,8 +247,8 @@ class TripHistoryItem {
     return TripHistoryItem(
       id: json['id']?.toString() ?? '',
       status: json['status']?.toString() ?? 'pending',
-      pickupAddress: json['pickup_address']?.toString() ?? 'Adresse inconnue',
-      destinationAddress: json['destination_address']?.toString() ?? 'Adresse inconnue',
+      pickupAddress: json['pickup_address']?.toString() ?? 'models.unknown_address'.tr(),
+      destinationAddress: json['destination_address']?.toString() ?? 'models.unknown_address'.tr(),
       serviceName: serviceName,
       estimatedFare: double.tryParse((json['offered_fare'] ?? json['offeredFare'] ?? json['estimated_fare'] ?? json['estimatedFare'])?.toString() ?? '0') ?? 0.0,
       currency: json['currency']?.toString() ?? 'TND',
@@ -341,7 +342,7 @@ class BidOffer {
           (livreurName?.isNotEmpty == true ? livreurName! : null) ??
           json['driver']?['fullName']?.toString() ??
           json['driver']?['name']?.toString() ??
-          'Livreur',
+          'rdv.courier'.tr(),
       driverPhone: json['driver_phone']?.toString() ??
           json['driverPhone']?.toString() ??
           (livreur is Map ? livreur['phone']?.toString() : null) ??

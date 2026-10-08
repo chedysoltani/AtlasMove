@@ -110,7 +110,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
             Icon(Icons.wifi_off_rounded, color: Colors.grey.shade600, size: 56),
             const SizedBox(height: 16),
             Text(
-              'common.no_data'.tr(), // TODO: add translation key for "Impossible de charger les données"
+              'referral_extra.load_error'.tr(),
               style: TextStyle(color: Colors.grey.shade400, fontSize: 15),
               textAlign: TextAlign.center,
             ),
@@ -173,7 +173,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'referral.share_code'.tr(), // TODO: add translation key for "Partagez-le — gagnez +25 pts par filleul actif"
+                      'referral_extra.share_hint'.tr(),
                       style: const TextStyle(color: Color(0xFF9E9EA7), fontSize: 12, height: 1.3),
                     ),
                   ],
@@ -318,14 +318,14 @@ class _ReferralScreenState extends State<ReferralScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'referral.share_code'.tr(), // TODO: add translation key for "Comment ça marche ?"
+            'referral_extra.how_it_works'.tr(),
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15),
           ),
           const SizedBox(height: 16),
-          _buildStep('1', 'Partagez votre code', 'Envoyez votre code unique à un ami via WhatsApp, SMS ou autre.'),
-          _buildStep('2', 'Il s\'inscrit', 'Votre ami crée son compte ATLAS et entre votre code à l\'inscription.'),
-          _buildStep('3', 'Il complète sa 1ère course', 'Dès sa première course validée, le bonus est automatiquement crédité.'),
-          _buildStep('4', 'Vous gagnez +25 points IA', 'Les points s\'ajoutent à votre soleil de fidélité ATLAS.', isLast: true),
+          _buildStep('1', 'referral_extra.step1_title'.tr(), 'referral_extra.step1_body'.tr()),
+          _buildStep('2', 'referral_extra.step2_title'.tr(), 'referral_extra.step2_body'.tr()),
+          _buildStep('3', 'referral_extra.step3_title'.tr(), 'referral_extra.step3_body'.tr()),
+          _buildStep('4', 'referral_extra.step4_title'.tr(), 'referral_extra.step4_body'.tr(), isLast: true),
         ],
       ),
     );
@@ -405,7 +405,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15),
             ),
             Text(
-              '${referrals.length} au total',
+              'referral_extra.total'.tr(namedArgs: {'count': '${referrals.length}'}),
               style: const TextStyle(color: Color(0xFF9E9EA7), fontSize: 12),
             ),
           ],
@@ -432,12 +432,12 @@ class _ReferralScreenState extends State<ReferralScreen> {
           Icon(Icons.people_outline_rounded, color: Colors.grey.shade700, size: 48),
           const SizedBox(height: 12),
           Text(
-            'common.no_data'.tr(), // TODO: add translation key for "Aucun filleul pour l'instant"
+            'referral_extra.none_yet'.tr(),
             style: TextStyle(color: Colors.grey.shade500, fontSize: 14, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 6),
           Text(
-            'referral.share_code'.tr(), // TODO: add translation key for "Partagez votre code pour commencer à gagner des points !"
+            'referral_extra.share_to_start'.tr(),
             style: TextStyle(color: Colors.grey.shade700, fontSize: 12, height: 1.4),
             textAlign: TextAlign.center,
           ),
@@ -550,7 +550,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
 
   void _shareCode(String code) {
     final message =
-        'Rejoignez-moi sur ATLAS ! 🚀\n\nUtilisez mon code de parrainage pour bénéficier d\'avantages exclusifs :\n\n🎁 Code : $code\n\nTéléchargez l\'app ATLAS et entrez ce code à l\'inscription.';
+        'referral_extra.share_message'.tr(namedArgs: {'code': code});
     Clipboard.setData(ClipboardData(text: message));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -558,7 +558,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
           children: [
             const Icon(Icons.share_rounded, color: Colors.white, size: 18),
             const SizedBox(width: 8),
-            Text('common.copied'.tr()), // TODO: add translation key for "Message copié — collez-le où vous voulez !"
+            Text('referral_extra.message_copied'.tr()),
           ],
         ),
         backgroundColor: const Color(0xFF1A1C2A),

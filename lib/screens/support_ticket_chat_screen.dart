@@ -169,7 +169,7 @@ class _SupportTicketChatScreenState extends State<SupportTicketChatScreen> {
           IconButton(
             onPressed: _load,
             icon: const Icon(Icons.refresh_rounded, color: Colors.white70),
-            tooltip: 'Actualiser',
+            tooltip: 'common.refresh'.tr(),
           ),
         ],
       ),

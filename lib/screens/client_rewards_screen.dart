@@ -33,10 +33,10 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
   late final Animation<Offset> _slideAnim;
 
   final List<Map<String, String>> _destinations = [
-    {'name': 'Santorin, Grèce', 'image': 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?q=80&w=400', 'tag': 'Méditerranée'},
-    {'name': 'Amalfi, Italie', 'image': 'https://images.unsplash.com/photo-1533900298318-6b8da08a523e?q=80&w=400', 'tag': 'Culture'},
-    {'name': 'Marrakech, Maroc', 'image': 'https://images.unsplash.com/photo-1539020140153-e479b8c22e70?q=80&w=400', 'tag': 'Exotique'},
-    {'name': 'Barcelone, Espagne', 'image': 'https://images.unsplash.com/photo-1583422409516-2895a77efded?q=80&w=400', 'tag': 'Plage & Ville'},
+    {'name': 'rewards_extra.dest_santorini', 'image': 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?q=80&w=400', 'tag': 'rewards_extra.tag_med'},
+    {'name': 'rewards_extra.dest_amalfi', 'image': 'https://images.unsplash.com/photo-1533900298318-6b8da08a523e?q=80&w=400', 'tag': 'rewards_extra.tag_culture'},
+    {'name': 'rewards_extra.dest_marrakech', 'image': 'https://images.unsplash.com/photo-1539020140153-e479b8c22e70?q=80&w=400', 'tag': 'rewards_extra.tag_exotic'},
+    {'name': 'rewards_extra.dest_barcelona', 'image': 'https://images.unsplash.com/photo-1583422409516-2895a77efded?q=80&w=400', 'tag': 'rewards_extra.tag_beach_city'},
   ];
 
   @override
@@ -633,8 +633,8 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Cashback 100 USD',
+                Text(
+                  'rewards_extra.cashback_title'.tr(),
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 15,
@@ -643,7 +643,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Après 6 mois consécutifs d\'utilisation régulière, recevez 100 USD en cashback.',
+                  'rewards_extra.cashback_body'.tr(),
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.65),
                     fontSize: 12,
@@ -657,8 +657,8 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                     color: _orange.withOpacity(0.85),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text(
-                    'Offre fidélité · 6 mois',
+                  child: Text(
+                    'rewards_extra.loyalty_offer'.tr(),
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 10,
@@ -707,7 +707,7 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
           ),
           const SizedBox(height: 6),
           Text(
-            'Vos récompenses apparaîtront ici dès votre première course réalisée.',
+            'rewards_extra.empty'.tr(),
             style: GoogleFonts.poppins(fontSize: 12, color: _textSecondary),
             textAlign: TextAlign.center,
           ),
@@ -787,14 +787,14 @@ class _ClientRewardsScreenState extends State<ClientRewardsScreen>
                             color: _orange.withOpacity(0.85),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text(d['tag']!,
+                          child: Text(d['tag']!.tr(),
                               style: GoogleFonts.poppins(
                                   color: Colors.white,
                                   fontSize: 9,
                                   fontWeight: FontWeight.w700)),
                         ),
                         const SizedBox(height: 5),
-                        Text(d['name']!,
+                        Text(d['name']!.tr(),
                             style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
