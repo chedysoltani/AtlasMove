@@ -6,6 +6,7 @@ import '../main.dart' show navigatorKey;
 import '../services/push_notification_service.dart';
 import '../services/onboarding_service.dart';
 import '../services/deep_link_service.dart';
+import '../services/meta_events_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -114,6 +115,9 @@ class _SplashScreenState extends State<SplashScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.consumePendingAction(navigatorKey);
     });
+
+    // iOS : autorisation de suivi (ATT) une fois le premier écran affiché
+    MetaEventsService.instance.requestTrackingAuthorization();
   }
 
   @override

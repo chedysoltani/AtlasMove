@@ -97,5 +97,18 @@
 	<string>48e80f2fe9aba80cb580b748c9b78cc2</string>
 	<key>FacebookDisplayName</key>
 	<string>AtlasMove</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>AtlasMove utilise ces données pour mesurer l&apos;efficacité de ses publicités et vous proposer des offres plus pertinentes. Vos données ne sont pas vendues.</string>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>v9wttpbfk9.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>n38lu8286q.skadnetwork</string>
+		</dict>
+	</array>
 </dict>
 </plist>

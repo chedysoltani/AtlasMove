@@ -18,6 +18,12 @@
 @import app_links;
 #endif
 
+#if __has_include(<app_tracking_transparency/AppTrackingTransparencyPlugin.h>)
+#import <app_tracking_transparency/AppTrackingTransparencyPlugin.h>
+#else
+@import app_tracking_transparency;
+#endif
+
 #if __has_include(<audioplayers_darwin/AudioplayersDarwinPlugin.h>)
 #import <audioplayers_darwin/AudioplayersDarwinPlugin.h>
 #else
@@ -137,6 +143,7 @@
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
   [AgoraRtcNgPlugin registerWithRegistrar:[registry registrarForPlugin:@"AgoraRtcNgPlugin"]];
   [AppLinksIosPlugin registerWithRegistrar:[registry registrarForPlugin:@"AppLinksIosPlugin"]];
+  [AppTrackingTransparencyPlugin registerWithRegistrar:[registry registrarForPlugin:@"AppTrackingTransparencyPlugin"]];
   [AudioplayersDarwinPlugin registerWithRegistrar:[registry registrarForPlugin:@"AudioplayersDarwinPlugin"]];
   [FPPDeviceInfoPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPDeviceInfoPlusPlugin"]];
   [FacebookAppEventsPlugin registerWithRegistrar:[registry registrarForPlugin:@"FacebookAppEventsPlugin"]];

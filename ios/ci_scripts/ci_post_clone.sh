@@ -15,6 +15,7 @@ flutter pub get
 
 # Installer CocoaPods et les dépendances iOS
 HOMEBREW_NO_AUTO_UPDATE=1 brew install cocoapods
-cd ios && pod install
+# --repo-update : index des pods à jour, pour résoudre la dernière version du SDK Facebook (FBSDKCoreKit)
+cd ios && pod install --repo-update
 
 exit 0
