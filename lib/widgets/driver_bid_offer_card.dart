@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 import '../models/trip_models.dart';
+import 'offer_card.dart';
 
-/// Carte d'une offre de chauffeur, côté client : même structure que la carte
-/// de course côté chauffeur (voir `widgets/ride_offers_panel.dart`) — en-tête,
-/// prix bien visible, puis une rangée de grands boutons — dans les couleurs de
-/// l'écran de réservation client.
+/// Offre d'un chauffeur, côté client, dans le même style que les cartes de
+/// course côté chauffeur (coque, prix et boutons partagés : `offer_card.dart`).
 ///
-/// Les actions sont fournies par l'écran ; la carte se contente de bloquer
-/// ses boutons et d'afficher un indicateur pendant l'action en cours.
+/// N'affiche que les données réellement reçues : la note et le véhicule
+/// viennent de [BidOffer.reportedRating] / [BidOffer.reportedVehicle], jamais
+/// des valeurs par défaut du modèle. Les actions restent celles de l'écran ;
+/// la carte bloque seulement ses boutons pendant l'action en cours.
 class DriverBidOfferCard extends StatefulWidget {
   final BidOffer offer;
   final String currency;
@@ -25,13 +26,6 @@ class DriverBidOfferCard extends StatefulWidget {
     required this.onCounter,
     required this.onAccept,
   });
-
-  static const _orange = Color(0xFFFF6B35);
-  static const _orangeLight = Color(0xFFFFF1EB);
-  static const _dark = Color(0xFF0F172A);
-  static const _gray200 = Color(0xFFE2E6EF);
-  static const _gray300 = Color(0xFFCDD3E0);
-  static const _gray600 = Color(0xFF5C6475);
 
   @override
   State<DriverBidOfferCard> createState() => _DriverBidOfferCardState();
@@ -55,30 +49,18 @@ class _DriverBidOfferCardState extends State<DriverBidOfferCard> {
   @override
   Widget build(BuildContext context) {
     final offer = widget.offer;
-    const orange = DriverBidOfferCard._orange;
     final busy = _busy != null;
+    final rating = offer.reportedRating;
+    final vehicle = offer.reportedVehicle;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: DriverBidOfferCard._orangeLight, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return OfferCardShell(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               _Avatar(photoUrl: offer.driverPhoto, name: offer.driverName),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,146 +69,58 @@ class _DriverBidOfferCardState extends State<DriverBidOfferCard> {
                       offer.driverName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w700,
-                        color: DriverBidOfferCard._dark,
-                      ),
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: OfferCardStyle.dark),
                     ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
-                        const SizedBox(width: 2),
-                        Text(
-                          offer.driverRating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: DriverBidOfferCard._gray600,
-                          ),
-                        ),
-                        if (offer.driverVehicle.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          const Icon(Icons.directions_car_rounded, size: 13, color: DriverBidOfferCard._gray600),
-                          const SizedBox(width: 3),
-                          Flexible(
-                            child: Text(
-                              offer.driverVehicle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 12, color: DriverBidOfferCard._gray600),
-                            ),
+                    if (rating != null) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
+                          const SizedBox(width: 2),
+                          Text(
+                            rating.toStringAsFixed(1),
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
                           ),
                         ],
-                      ],
-                    ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: DriverBidOfferCard._orangeLight,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${offer.proposedFare.toStringAsFixed(2)} ${widget.currency}',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: orange,
-                  ),
-                ),
-              ),
+              const SizedBox(width: 8),
+              OfferFareText('${offer.proposedFare.toStringAsFixed(2)} ${widget.currency}'),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _button(
-                  label: 'common.reject'.tr(),
-                  onPressed: busy ? null : () => _run(_Action.reject, widget.onReject),
-                  loading: _busy == _Action.reject,
-                  foreground: DriverBidOfferCard._gray600,
-                  border: DriverBidOfferCard._gray300,
-                ),
+          if (vehicle != null) ...[
+            const SizedBox(height: 10),
+            OfferInfoChip(vehicle, icon: Icons.directions_car_rounded),
+          ],
+          const SizedBox(height: 12),
+          OfferCardActions(
+            onReject: busy ? null : () => _run(_Action.reject, widget.onReject),
+            onAccept: busy ? null : () => _run(_Action.accept, widget.onAccept),
+            rejectLoading: _busy == _Action.reject,
+            acceptLoading: _busy == _Action.accept,
+          ),
+          Align(
+            alignment: Alignment.center,
+            child: TextButton.icon(
+              onPressed: busy ? null : widget.onCounter,
+              style: TextButton.styleFrom(
+                foregroundColor: OfferCardStyle.orange,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: const Size(0, 34),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _button(
-                  label: 'rdv.counter_offer'.tr(),
-                  onPressed: busy ? null : widget.onCounter,
-                  foreground: orange,
-                  border: orange,
-                ),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+              label: Text(
+                'rdv.counter_offer'.tr(),
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _button(
-                  label: 'common.accept'.tr(),
-                  onPressed: busy ? null : () => _run(_Action.accept, widget.onAccept),
-                  loading: _busy == _Action.accept,
-                  filled: true,
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _button({
-    required String label,
-    required VoidCallback? onPressed,
-    bool loading = false,
-    bool filled = false,
-    Color foreground = Colors.white,
-    Color border = DriverBidOfferCard._gray200,
-  }) {
-    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
-    final child = loading
-        ? SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.2,
-              color: filled ? Colors.white : foreground,
-            ),
-          )
-        : FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-          );
-    return SizedBox(
-      height: 42,
-      child: filled
-          ? ElevatedButton(
-              onPressed: onPressed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: DriverBidOfferCard._orange,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: DriverBidOfferCard._orange.withValues(alpha: 0.5),
-                disabledForegroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                shape: shape,
-              ),
-              child: child,
-            )
-          : OutlinedButton(
-              onPressed: onPressed,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: foreground,
-                side: BorderSide(color: onPressed == null ? border.withValues(alpha: 0.5) : border, width: 1.3),
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                shape: shape,
-              ),
-              child: child,
-            ),
     );
   }
 }
@@ -237,33 +131,32 @@ class _Avatar extends StatelessWidget {
 
   const _Avatar({required this.photoUrl, required this.name});
 
+  static const _size = 40.0;
+
   @override
   Widget build(BuildContext context) {
     final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
     final fallback = Center(
       child: Text(
         initial,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-          color: DriverBidOfferCard._orange,
-        ),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: OfferCardStyle.orange),
       ),
     );
     return Container(
-      width: 46,
-      height: 46,
-      decoration: const BoxDecoration(
+      width: _size,
+      height: _size,
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: DriverBidOfferCard._orangeLight,
+        color: Colors.white,
+        border: Border.all(color: OfferCardStyle.border),
       ),
       child: (photoUrl != null && photoUrl!.isNotEmpty)
           ? ClipOval(
               child: Image.network(
                 photoUrl!,
                 fit: BoxFit.cover,
-                width: 46,
-                height: 46,
+                width: _size,
+                height: _size,
                 errorBuilder: (_, __, ___) => fallback,
               ),
             )

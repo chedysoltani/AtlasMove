@@ -18,6 +18,7 @@ import '../services/notification_service.dart';
 import '../services/route_service.dart';
 import 'client_active_ride_screen.dart';
 import '../widgets/driver_bid_offer_card.dart';
+import '../services/firebase_analytics_service.dart';
 import '../map/map_markers.dart';
 import '../map/map_styles.dart';
 
@@ -2622,8 +2623,14 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
     );
   }
 
+  /// Offres encore actionnables : celles refusées ou expirées côté backend
+  /// disparaissent de la liste au rafraîchissement suivant.
+  List<BidOffer> get _visibleDriverOffers =>
+      _driverOffers.where((o) => o.status != 'rejected' && o.status != 'expired').toList();
+
   Widget _buildDriverOffersSection() {
     final currency = _fareEstimate?.currency ?? _tripResponse?.data?.currency ?? 'TND';
+    final offers = _visibleDriverOffers;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2655,24 +2662,24 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
               decoration: BoxDecoration(
-                color: _driverOffers.isEmpty
+                color: offers.isEmpty
                     ? Colors.white.withValues(alpha: 0.08)
                     : _AppColors.primary.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                'booking.offers_count'.tr(namedArgs: {'count': '${_driverOffers.length}'}),
+                'booking.offers_count'.tr(namedArgs: {'count': '${offers.length}'}),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: _driverOffers.isEmpty ? Colors.white54 : _AppColors.primary,
+                  color: offers.isEmpty ? Colors.white54 : _AppColors.primary,
                 ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        if (_driverOffers.isEmpty)
+        if (offers.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 24),
@@ -2707,10 +2714,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
               shrinkWrap: true,
               padding: EdgeInsets.zero,
               physics: const ClampingScrollPhysics(),
-              itemCount: _driverOffers.length,
+              itemCount: offers.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
-                final offer = _driverOffers[index];
+                final offer = offers[index];
                 return DriverBidOfferCard(
                   key: ValueKey(offer.id),
                   offer: offer,
@@ -2729,6 +2736,12 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
   Future<void> _rejectDriverOffer(BidOffer offer) async {
     try {
       await TripService.rejectOffer(offer.id);
+      unawaited(FirebaseAnalyticsService.instance.logOfferRejected(
+        tripId: _tripResponse!.data!.id,
+        offerId: offer.id,
+        fare: offer.proposedFare,
+        currency: _fareEstimate?.currency ?? _tripResponse?.data?.currency ?? 'TND',
+      ));
       final offers = await TripService.getTripOffers(_tripResponse!.data!.id);
       if (!mounted) return;
       setState(() {
@@ -2745,6 +2758,12 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
   Future<void> _acceptDriverOffer(BidOffer offer) async {
     try {
       await TripService.acceptOffer(offer.id);
+      unawaited(FirebaseAnalyticsService.instance.logOfferAccepted(
+        tripId: _tripResponse!.data!.id,
+        offerId: offer.id,
+        fare: offer.proposedFare,
+        currency: _fareEstimate?.currency ?? _tripResponse?.data?.currency ?? 'TND',
+      ));
       _offersTimer?.cancel();
       HapticFeedback.heavyImpact();
       if (!mounted) return;

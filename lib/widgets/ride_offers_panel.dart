@@ -7,8 +7,9 @@ import '../models/new_ride_offer.dart';
 import '../screens/driver_active_ride.dart';
 import '../services/ride_offer_queue.dart';
 import '../services/trip_service.dart';
+import 'offer_card.dart';
 
-const _orange = Color(0xFFFF6600);
+const _orange = OfferCardStyle.orange;
 
 /// Panneau flottant listant toutes les offres de course en attente, une carte
 /// par course — visible par-dessus n'importe quel écran chauffeur (inséré une
@@ -153,13 +154,7 @@ class _OfferCardState extends State<_OfferCard> {
     final offer = widget.offer;
     final remaining = offer.remaining;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF8F2),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFFFE0BD)),
-      ),
+    return OfferCardShell(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -188,18 +183,10 @@ class _OfferCardState extends State<_OfferCard> {
           Row(
             children: [
               if (offer.offeredFare != null)
-                Text(
-                  '${offer.offeredFare!.toStringAsFixed(2)} ${offer.currency}',
-                  style: const TextStyle(color: Color(0xFF16803C), fontWeight: FontWeight.w800, fontSize: 17),
-                ),
+                OfferFareText('${offer.offeredFare!.toStringAsFixed(2)} ${offer.currency}'),
               if (offer.distanceKm != null) ...[
                 const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                  child: Text('${offer.distanceKm!.toStringAsFixed(1)} km',
-                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
-                ),
+                OfferInfoChip('${offer.distanceKm!.toStringAsFixed(1)} km'),
               ],
               const Spacer(),
               if (offer.serviceName != null)
@@ -208,45 +195,10 @@ class _OfferCardState extends State<_OfferCard> {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 42,
-                  child: OutlinedButton(
-                    onPressed: _busy ? null : _refuse,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.grey.shade700,
-                      side: BorderSide(color: Colors.grey.shade300),
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: Text('common.reject'.tr(), style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 42,
-                  child: ElevatedButton(
-                    onPressed: _busy ? null : _accept,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _orange,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: _busy
-                        ? const SizedBox(
-                            width: 18, height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
-                        : Text('common.accept'.tr(), style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                  ),
-                ),
-              ),
-            ],
+          OfferCardActions(
+            onReject: _busy ? null : _refuse,
+            onAccept: _busy ? null : _accept,
+            acceptLoading: _busy,
           ),
         ],
       ),

@@ -38,6 +38,14 @@ class FirebaseAnalyticsService {
         {'type': type},
       );
 
+  /// Le client accepte l'offre d'un chauffeur (après succès de l'appel API).
+  Future<void> logOfferAccepted({required String tripId, required String offerId, required double fare, required String currency}) =>
+      _log('offer_accepted', {'trip_id': tripId, 'offer_id': offerId, 'value': fare, 'currency': currency});
+
+  /// Le client refuse l'offre d'un chauffeur (après succès de l'appel API).
+  Future<void> logOfferRejected({required String tripId, required String offerId, required double fare, required String currency}) =>
+      _log('offer_rejected', {'trip_id': tripId, 'offer_id': offerId, 'value': fare, 'currency': currency});
+
   /// Un évènement Analytics ne doit jamais bloquer ni faire planter l'app.
   Future<void> _log(String name, Map<String, Object> parameters) async {
     if (Firebase.apps.isEmpty) return;
