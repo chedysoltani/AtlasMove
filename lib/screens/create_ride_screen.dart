@@ -17,6 +17,7 @@ import '../services/trip_service.dart';
 import '../services/notification_service.dart';
 import '../services/route_service.dart';
 import 'client_active_ride_screen.dart';
+import '../widgets/driver_bid_offer_card.dart';
 import '../map/map_markers.dart';
 import '../map/map_styles.dart';
 
@@ -2622,6 +2623,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
   }
 
   Widget _buildDriverOffersSection() {
+    final currency = _fareEstimate?.currency ?? _tripResponse?.data?.currency ?? 'TND';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2630,44 +2632,53 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.gavel_rounded, size: 14, color: _AppColors.primary),
-                const SizedBox(width: 6),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: _AppColors.primary.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.gavel_rounded, size: 15, color: _AppColors.primary),
+                ),
+                const SizedBox(width: 8),
                 Text(
                   'booking.driver_found'.tr(),
                   style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: _AppColors.gray900,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                   ),
                 ),
               ],
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
               decoration: BoxDecoration(
-                color: _driverOffers.isEmpty ? _AppColors.gray100 : _AppColors.primary.withOpacity(0.1),
+                color: _driverOffers.isEmpty
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : _AppColors.primary.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 'booking.offers_count'.tr(namedArgs: {'count': '${_driverOffers.length}'}),
                 style: TextStyle(
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: _driverOffers.isEmpty ? _AppColors.gray400 : _AppColors.primary,
+                  color: _driverOffers.isEmpty ? Colors.white54 : _AppColors.primary,
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         if (_driverOffers.isEmpty)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 24),
             decoration: BoxDecoration(
-              color: _AppColors.gray50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _AppColors.gray100),
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Column(
               children: [
@@ -2682,21 +2693,32 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
                 const SizedBox(height: 10),
                 Text(
                   'booking.searching_driver'.tr(),
-                  style: const TextStyle(fontSize: 11, color: _AppColors.gray400),
+                  style: const TextStyle(fontSize: 12, color: Colors.white60),
                 ),
               ],
             ),
           )
         else
-          Container(
-            constraints: const BoxConstraints(maxHeight: 180),
+          // Une carte par offre, comme les cartes de course côté chauffeur ;
+          // la liste défile au-delà d'environ deux cartes.
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.42),
             child: ListView.separated(
               shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              physics: const ClampingScrollPhysics(),
               itemCount: _driverOffers.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final offer = _driverOffers[index];
-                return _buildDriverOfferCard(offer);
+                return DriverBidOfferCard(
+                  key: ValueKey(offer.id),
+                  offer: offer,
+                  currency: currency,
+                  onReject: () => _rejectDriverOffer(offer),
+                  onCounter: () => _showCounterOfferSheet(offer),
+                  onAccept: () => _acceptDriverOffer(offer),
+                );
               },
             ),
           ),
@@ -2704,205 +2726,57 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
     );
   }
 
-  Widget _buildDriverOfferCard(BidOffer offer) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: _AppColors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _AppColors.gray200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+  Future<void> _rejectDriverOffer(BidOffer offer) async {
+    try {
+      await TripService.rejectOffer(offer.id);
+      final offers = await TripService.getTripOffers(_tripResponse!.data!.id);
+      if (!mounted) return;
+      setState(() {
+        _driverOffers = offers;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('common.unknown_error'.tr()), backgroundColor: _AppColors.red),
+      );
+    }
+  }
+
+  Future<void> _acceptDriverOffer(BidOffer offer) async {
+    try {
+      await TripService.acceptOffer(offer.id);
+      _offersTimer?.cancel();
+      HapticFeedback.heavyImpact();
+      if (!mounted) return;
+      final currentPos = ref.read(mapProvider).currentPosition;
+      final finalPickupLat = _pickupCoordinates?.latitude ?? currentPos?.latitude;
+      final finalPickupLng = _pickupCoordinates?.longitude ?? currentPos?.longitude;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ClientActiveRideScreen(
+            tripId: _tripResponse!.data!.id,
+            lockedFare: offer.proposedFare,
+            currency: _selectedService?.currency ?? _tripResponse!.data!.currency,
+            driverName: offer.driverName,
+            driverPhone: offer.driverPhone,
+            driverPhoto: offer.driverPhoto,
+            driverRating: offer.driverRating,
+            driverVehicle: offer.driverVehicle,
+            destination: _destinationController.text,
+            pickupLatitude: finalPickupLat,
+            pickupLongitude: finalPickupLng,
+            destinationLatitude: _destinationCoordinates?.latitude,
+            destinationLongitude: _destinationCoordinates?.longitude,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Photo du livreur / Initiale
-          Container(
-            width: 40, height: 40,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: _AppColors.accentLight,
-            ),
-            child: (offer.driverPhoto != null && offer.driverPhoto!.isNotEmpty)
-                ? ClipOval(
-                    child: Image.network(
-                      offer.driverPhoto!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const Icon(Icons.person, color: _AppColors.accent, size: 20),
-                    ),
-                  )
-                : const Icon(Icons.person, color: _AppColors.accent, size: 20),
-          ),
-          const SizedBox(width: 10),
-          
-          // Détails chauffeur
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      offer.driverName,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: _AppColors.gray900,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Row(
-                      children: [
-                        const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
-                        Text(
-                          offer.driverRating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: _AppColors.gray600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                Text(
-                  offer.driverVehicle,
-                  style: const TextStyle(fontSize: 10, color: _AppColors.gray400),
-                ),
-              ],
-            ),
-          ),
-          
-          // Prix proposé & Actions
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${offer.proposedFare.toStringAsFixed(2)} ${_fareEstimate?.currency ?? _tripResponse?.data?.currency ?? "TND"}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  color: _AppColors.primary,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Décliner
-                  GestureDetector(
-                    onTap: () async {
-                      try {
-                        await TripService.rejectOffer(offer.id);
-                        final offers = await TripService.getTripOffers(_tripResponse!.data!.id);
-                        setState(() {
-                          _driverOffers = offers;
-                        });
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('common.unknown_error'.tr()), backgroundColor: _AppColors.red),
-                        );
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: const BoxDecoration(
-                        color: _AppColors.gray100,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.close, size: 14, color: _AppColors.gray600),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  
-                  // Contre-offre (Counter)
-                  GestureDetector(
-                    onTap: () => _showCounterOfferSheet(offer),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _AppColors.accentLight,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'rdv.refuse'.tr(),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: _AppColors.accentMid,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  
-                  // Accepter
-                  GestureDetector(
-                    onTap: () async {
-                      try {
-                        await TripService.acceptOffer(offer.id);
-                        _offersTimer?.cancel();
-                        HapticFeedback.heavyImpact();
-                        if (!mounted) return;
-                        final currentPos = ref.read(mapProvider).currentPosition;
-                        final finalPickupLat = _pickupCoordinates?.latitude ?? currentPos?.latitude;
-                        final finalPickupLng = _pickupCoordinates?.longitude ?? currentPos?.longitude;
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ClientActiveRideScreen(
-                              tripId: _tripResponse!.data!.id,
-                              lockedFare: offer.proposedFare,
-                              currency: _selectedService?.currency ?? _tripResponse!.data!.currency,
-                              driverName: offer.driverName,
-                              driverPhone: offer.driverPhone,
-                              driverPhoto: offer.driverPhoto,
-                              driverRating: offer.driverRating,
-                              driverVehicle: offer.driverVehicle,
-                              destination: _destinationController.text,
-                              pickupLatitude: finalPickupLat,
-                              pickupLongitude: finalPickupLng,
-                              destinationLatitude: _destinationCoordinates?.latitude,
-                              destinationLongitude: _destinationCoordinates?.longitude,
-                            ),
-                          ),
-                        );
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('common.unknown_error'.tr()), backgroundColor: _AppColors.red),
-                        );
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _AppColors.primary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'driver.accept'.tr(),
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('common.unknown_error'.tr()), backgroundColor: _AppColors.red),
+      );
+    }
   }
 
   void _showCounterOfferSheet(BidOffer offer) {
