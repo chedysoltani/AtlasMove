@@ -105,7 +105,14 @@ class _SignupScreenState extends State<SignupScreen>
           content: Text('auth.welcome_user'.tr(namedArgs: {'name': response.user.fullName})),
           backgroundColor: AppTheme.successColor,
         ));
-        Navigator.pop(context);
+        // Pile vidée : le retour ne ramène ni à l'inscription ni au choix du
+        // type de compte. Connecté d'office (jetons enregistrés par
+        // AuthService.registerClient) → tableau de bord ; sinon → connexion.
+        final loggedIn = response.isComplete && response.token.isNotEmpty;
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          loggedIn ? '/client_dashboard' : '/login',
+          (_) => false,
+        );
       }
     } catch (e) {
       String msg = 'auth_extra.signup_error'.tr();

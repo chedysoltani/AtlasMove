@@ -1207,5 +1207,15 @@
     "cin_required": "Le numéro CIN est obligatoire",
     "license_required": "Le numéro de permis est obligatoire",
     "plate_required": "Le numéro d'immatriculation est obligatoire"
+  },
+  "account_type": {
+    "title": "Comment souhaitez-vous utiliser AtlasMove ?",
+    "subtitle": "Choisissez votre profil pour créer le bon compte.",
+    "client_title": "Je veux me déplacer / commander",
+    "client_body": "Réservez un taxi, faites livrer un colis ou organisez un déménagement.",
+    "driver_title": "Je veux travailler comme chauffeur / livreur",
+    "driver_body": "Recevez des courses et des livraisons près de vous et gagnez de l'argent avec votre véhicule.",
+    "have_account": "J'ai déjà un compte.",
+    "login": "Se connecter"
   }
 }

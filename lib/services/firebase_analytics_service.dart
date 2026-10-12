@@ -7,11 +7,15 @@ import 'package:flutter/widgets.dart';
 /// Les évènements `first_open` et `session_start` sont envoyés automatiquement
 /// par le SDK natif dès que Firebase est initialisé ; `screen_view` est envoyé
 /// par l'observateur de [navigatorObservers], branché sur le `MaterialApp`.
-/// Aucun évènement personnalisé n'est envoyé pour l'instant : [analytics] est
-/// exposé pour les ajouter plus tard depuis un point unique.
+/// Les évènements personnalisés passent tous par ce service.
 class FirebaseAnalyticsService {
   FirebaseAnalyticsService._();
   static final FirebaseAnalyticsService instance = FirebaseAnalyticsService._();
+
+  /// Noms Analytics des écrans dont le nom de route ne convient pas tel quel.
+  static const Map<String, String> _screenNames = {
+    '/account_type': 'account_type_selection',
+  };
 
   /// Accès paresseux : `FirebaseAnalytics.instance` exige que
   /// `Firebase.initializeApp()` ait déjà été appelé (voir main.dart).
@@ -21,5 +25,26 @@ class FirebaseAnalyticsService {
   /// Firebase n'a pas pu être initialisé : ça ne doit jamais bloquer l'app.
   late final List<NavigatorObserver> navigatorObservers = Firebase.apps.isEmpty
       ? const []
-      : [FirebaseAnalyticsObserver(analytics: analytics)];
+      : [
+          FirebaseAnalyticsObserver(
+            analytics: analytics,
+            nameExtractor: (settings) => _screenNames[settings.name] ?? settings.name,
+          ),
+        ];
+
+  /// Choix du type de compte à la fin du guide : `type` = `client` ou `driver`.
+  Future<void> logAccountTypeSelected(String type) => _log(
+        'account_type_selected',
+        {'type': type},
+      );
+
+  /// Un évènement Analytics ne doit jamais bloquer ni faire planter l'app.
+  Future<void> _log(String name, Map<String, Object> parameters) async {
+    if (Firebase.apps.isEmpty) return;
+    try {
+      await analytics.logEvent(name: name, parameters: parameters);
+    } catch (e) {
+      debugPrint('Analytics $name: $e');
+    }
+  }
 }

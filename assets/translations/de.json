@@ -1207,5 +1207,15 @@
     "cin_required": "Ausweisnummer ist erforderlich",
     "license_required": "Führerscheinnummer ist erforderlich",
     "plate_required": "Kennzeichen ist erforderlich"
+  },
+  "account_type": {
+    "title": "Wie möchten Sie AtlasMove nutzen?",
+    "subtitle": "Wählen Sie Ihr Profil, um das passende Konto zu erstellen.",
+    "client_title": "Ich möchte mich fortbewegen / bestellen",
+    "client_body": "Buchen Sie ein Taxi, versenden Sie ein Paket oder organisieren Sie einen Umzug.",
+    "driver_title": "Ich möchte als Fahrer / Kurier arbeiten",
+    "driver_body": "Erhalten Sie Fahrten und Lieferungen in Ihrer Nähe und verdienen Sie Geld mit Ihrem Fahrzeug.",
+    "have_account": "Ich habe bereits ein Konto.",
+    "login": "Anmelden"
   }
 }

@@ -1207,5 +1207,15 @@
     "cin_required": "Il numero del documento è obbligatorio",
     "license_required": "Il numero di patente è obbligatorio",
     "plate_required": "La targa è obbligatoria"
+  },
+  "account_type": {
+    "title": "Come vuoi usare AtlasMove?",
+    "subtitle": "Scegli il tuo profilo per creare l'account giusto.",
+    "client_title": "Voglio spostarmi / ordinare",
+    "client_body": "Prenota un taxi, spedisci un pacco o organizza un trasloco.",
+    "driver_title": "Voglio lavorare come autista / corriere",
+    "driver_body": "Ricevi corse e consegne vicino a te e guadagna con il tuo veicolo.",
+    "have_account": "Ho già un account.",
+    "login": "Accedi"
   }
 }

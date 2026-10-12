@@ -15,6 +15,7 @@ import 'screens/landing_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
+import 'screens/account_type_selection_screen.dart';
 import 'screens/client_dashboard.dart';
 import 'screens/booking_screen.dart';
 import 'screens/otp_verification_screen.dart';
@@ -370,6 +371,8 @@ class AtlasMoveApp extends StatelessWidget {
               );
             },
             '/signup': (context) => const SignupScreen(),
+            AccountTypeSelectionScreen.route: (context) =>
+                const AccountTypeSelectionScreen(),
             '/client_dashboard': (context) => const ClientDashboard(),
             '/client_trip_history': (context) => const ClientTripHistoryScreen(),
             '/booking': (context) => const BookingScreen(),

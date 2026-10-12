@@ -1207,5 +1207,15 @@
     "cin_required": "ID number is required",
     "license_required": "Driving licence number is required",
     "plate_required": "Registration number is required"
+  },
+  "account_type": {
+    "title": "How do you want to use AtlasMove?",
+    "subtitle": "Choose your profile to create the right account.",
+    "client_title": "I want to get around / place orders",
+    "client_body": "Book a taxi, send a parcel or organise a move.",
+    "driver_title": "I want to work as a driver / courier",
+    "driver_body": "Receive rides and deliveries near you and earn money with your vehicle.",
+    "have_account": "I already have an account.",
+    "login": "Sign in"
   }
 }

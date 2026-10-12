@@ -1207,5 +1207,15 @@
     "cin_required": "El número de identidad es obligatorio",
     "license_required": "El número de permiso es obligatorio",
     "plate_required": "La matrícula es obligatoria"
+  },
+  "account_type": {
+    "title": "¿Cómo quieres usar AtlasMove?",
+    "subtitle": "Elige tu perfil para crear la cuenta adecuada.",
+    "client_title": "Quiero desplazarme / hacer pedidos",
+    "client_body": "Reserva un taxi, envía un paquete u organiza una mudanza.",
+    "driver_title": "Quiero trabajar como conductor / repartidor",
+    "driver_body": "Recibe viajes y entregas cerca de ti y gana dinero con tu vehículo.",
+    "have_account": "Ya tengo una cuenta.",
+    "login": "Iniciar sesión"
   }
 }

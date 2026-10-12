@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../services/onboarding_service.dart';
+import 'account_type_selection_screen.dart';
 
 /// Guide de première utilisation : pages à faire défiler, avec « Passer »
 /// toujours visible. Le même écran sert aux trois guides (voir [OnboardingGuide]).
@@ -79,17 +80,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  /// Fin du guide (ou « Passer »). [signup] : l'utilisateur veut créer un compte.
-  void _finish({bool signup = false}) {
+  /// Fin du guide. [login] : l'utilisateur a déjà un compte ; sinon (« Créer
+  /// un compte » ou « Passer ») il choisit d'abord son type de compte.
+  void _finish({bool login = false}) {
     final nav = Navigator.of(context);
     if (!_isIntro) {
       nav.pop();
       return;
     }
     // La présentation remplace l'accueil au premier lancement : on y revient
-    // pour que le bouton retour de l'inscription / connexion y ramène.
+    // pour que le bouton retour du choix de compte / de la connexion y ramène.
+    // Pile obtenue : accueil → choix du type de compte → inscription choisie.
     nav.pushReplacementNamed('/landing');
-    nav.pushNamed(signup ? '/signup' : '/login');
+    nav.pushNamed(login ? '/login' : AccountTypeSelectionScreen.route);
   }
 
   @override
@@ -275,14 +278,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_isLast && _isIntro) {
       return Column(
         children: [
-          _primaryButton('onboarding.create_account'.tr(),
-              () => _finish(signup: true)),
+          _primaryButton('onboarding.create_account'.tr(), _finish),
           const SizedBox(height: 11),
           SizedBox(
             width: double.infinity,
             height: 54,
             child: OutlinedButton(
-              onPressed: _finish,
+              onPressed: () => _finish(login: true),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: Colors.white.withOpacity(0.3), width: 1.5),
                 shape: RoundedRectangleBorder(
