@@ -30,6 +30,11 @@
         tools:node="remove"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
+    <!-- Identifiant publicitaire (Firebase Analytics, Meta App Events) : déclaré
+         explicitement pour ne pas dépendre des manifestes des SDK — requis par la
+         déclaration d'identifiant publicitaire de la Play Console. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
+
     <application
         android:label="atlasmove"
         android:name="${applicationName}"
