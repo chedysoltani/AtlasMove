@@ -832,6 +832,7 @@ class TripService {
         final fullName = driver != null
             ? '${driver['first_name'] ?? ''} ${driver['last_name'] ?? ''}'.trim()
             : '';
+        final vehicle = (driver?['vehicle'] as String? ?? raw['vehicle_description'] as String?)?.trim();
         return AcceptedTripDetail(
           status: raw['status'] as String? ?? '',
           fare: fareRaw is num ? fareRaw.toDouble() : 0.0,
@@ -846,10 +847,8 @@ class TripService {
               driver?['profile_picture'] as String?
                   ?? driver?['photo'] as String?
                   ?? driver?['avatar'] as String?),
-          driverRating: (driver?['rating'] as num?)?.toDouble() ?? 4.5,
-          driverVehicle: driver?['vehicle'] as String?
-              ?? raw['vehicle_description'] as String?
-              ?? '',
+          driverRating: (driver?['rating'] as num?)?.toDouble(),
+          driverVehicle: (vehicle == null || vehicle.isEmpty) ? null : vehicle,
         );
       }
     } catch (e) {
@@ -942,8 +941,9 @@ class AcceptedTripDetail {
   final String driverName;
   final String? driverPhone;
   final String? driverPhoto;
-  final double driverRating;
-  final String driverVehicle;
+  /// Null quand le backend ne les envoie pas (aucune valeur inventée).
+  final double? driverRating;
+  final String? driverVehicle;
 
   const AcceptedTripDetail({
     required this.status,
@@ -952,8 +952,8 @@ class AcceptedTripDetail {
     required this.driverName,
     this.driverPhone,
     this.driverPhoto,
-    required this.driverRating,
-    required this.driverVehicle,
+    this.driverRating,
+    this.driverVehicle,
   });
 }
 

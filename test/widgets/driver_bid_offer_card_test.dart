@@ -18,19 +18,22 @@ Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: SingleChildScroll
 
 void main() {
   group('BidOffer — données réellement reçues', () {
-    test('note et véhicule absents : champs « reported » à null, défauts conservés', () {
+    test('note et véhicule absents : null, aucune valeur inventée', () {
       final o = _offer({});
-      expect(o.reportedRating, isNull);
-      expect(o.reportedVehicle, isNull);
-      // Comportement historique inchangé pour les autres écrans.
-      expect(o.driverRating, 4.8);
-      expect(o.driverVehicle, 'Moto standard');
+      expect(o.driverRating, isNull);
+      expect(o.driverVehicle, isNull);
+    });
+
+    test('note illisible ou véhicule vide : null', () {
+      final o = _offer({'driver_rating': 'n/a', 'driver_vehicle': '   '});
+      expect(o.driverRating, isNull);
+      expect(o.driverVehicle, isNull);
     });
 
     test('note et véhicule présents : repris tels quels', () {
       final o = _offer({'driver_rating': '4.6', 'driver_vehicle': ' Peugeot 208 '});
-      expect(o.reportedRating, 4.6);
-      expect(o.reportedVehicle, 'Peugeot 208');
+      expect(o.driverRating, 4.6);
+      expect(o.driverVehicle, 'Peugeot 208');
     });
   });
 

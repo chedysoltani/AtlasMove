@@ -308,17 +308,12 @@ class BidOffer {
   final String driverName;
   final String? driverPhone;
   final String? driverPhoto;
-  final double driverRating;
-  final String driverVehicle;
+  /// Note et véhicule tels qu'envoyés par le backend ; null s'ils sont absents
+  /// (jamais de valeur inventée — les écrans n'affichent alors rien).
+  final double? driverRating;
+  final String? driverVehicle;
   final double proposedFare;
   final String status; // "pending", "countered", "accepted", "rejected"
-
-  /// Note et véhicule tels qu'envoyés par le backend, null s'ils sont absents.
-  /// [driverRating] et [driverVehicle] y substituent des valeurs par défaut
-  /// (4.8, « Moto standard ») : l'affichage d'une offre utilise ces champs-ci
-  /// pour ne jamais présenter une donnée inventée.
-  final double? reportedRating;
-  final String? reportedVehicle;
 
   BidOffer({
     required this.id,
@@ -327,12 +322,10 @@ class BidOffer {
     required this.driverName,
     this.driverPhone,
     this.driverPhoto,
-    required this.driverRating,
-    required this.driverVehicle,
+    this.driverRating,
+    this.driverVehicle,
     required this.proposedFare,
     required this.status,
-    this.reportedRating,
-    this.reportedVehicle,
   });
 
   factory BidOffer.fromJson(Map<String, dynamic> json) {
@@ -369,12 +362,10 @@ class BidOffer {
           (livreur is Map ? livreur['profile_picture']?.toString() : null) ??
           json['driver']?['profile_picture']?.toString() ??
           json['driver']?['photo']?.toString()),
-      driverRating: double.tryParse((json['driver_rating'] ?? json['driverRating'] ?? json['driver']?['rating'] ?? json['driver']?['stars'])?.toString() ?? '4.8') ?? 4.8,
-      driverVehicle: (json['driver_vehicle'] ?? json['driverVehicle'] ?? json['driver']?['vehicle'] ?? json['driver']?['vehicle_type'])?.toString() ?? 'Moto standard',
+      driverRating: rawRating,
+      driverVehicle: (rawVehicle == null || rawVehicle.isEmpty) ? null : rawVehicle,
       proposedFare: double.tryParse((json['proposed_fare'] ?? json['proposedFare'] ?? json['proposed_price'])?.toString() ?? '0') ?? 0.0,
       status: json['status']?.toString() ?? 'pending',
-      reportedRating: rawRating,
-      reportedVehicle: (rawVehicle == null || rawVehicle.isEmpty) ? null : rawVehicle,
     );
   }
 }

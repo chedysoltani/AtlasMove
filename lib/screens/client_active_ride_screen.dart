@@ -40,8 +40,9 @@ class ClientActiveRideScreen extends ConsumerStatefulWidget {
   final String driverName;
   final String? driverPhone;
   final String? driverPhoto;
-  final double driverRating;
-  final String driverVehicle;
+  /// Null quand le backend ne les fournit pas : rien n'est alors affiché.
+  final double? driverRating;
+  final String? driverVehicle;
   final String destination;
   // Optional — pass for live map; screen degrades gracefully if absent
   final double? pickupLatitude;
@@ -57,8 +58,8 @@ class ClientActiveRideScreen extends ConsumerStatefulWidget {
     required this.driverName,
     this.driverPhone,
     this.driverPhoto,
-    required this.driverRating,
-    required this.driverVehicle,
+    this.driverRating,
+    this.driverVehicle,
     required this.destination,
     this.pickupLatitude,
     this.pickupLongitude,
@@ -885,6 +886,9 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
   }
 
   Widget _buildDriverRow() {
+    final rating = widget.driverRating;
+    final vehicleLabel = widget.driverVehicle?.trim();
+    final vehicle = (vehicleLabel == null || vehicleLabel.isEmpty) ? null : vehicleLabel;
     return Row(
       children: [
         // Avatar
@@ -907,21 +911,33 @@ class _ClientActiveRideScreenState extends ConsumerState<ClientActiveRideScreen>
             children: [
               Text(widget.driverName,
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _C.gray900)),
-              const SizedBox(height: 3),
-              Row(
-                children: [
-                  const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
-                  const SizedBox(width: 3),
-                  Text(widget.driverRating.toStringAsFixed(1),
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _C.gray600)),
-                  const SizedBox(width: 6),
-                  Container(width: 3, height: 3,
-                      decoration: const BoxDecoration(color: _C.gray400, shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
-                  Text(widget.driverVehicle,
-                      style: const TextStyle(fontSize: 11, color: _C.gray400)),
-                ],
-              ),
+              // Note et véhicule : affichés seulement s'ils sont connus.
+              if (rating != null || vehicle != null) ...[
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    if (rating != null) ...[
+                      const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                      const SizedBox(width: 3),
+                      Text(rating.toStringAsFixed(1),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _C.gray600)),
+                    ],
+                    if (rating != null && vehicle != null) ...[
+                      const SizedBox(width: 6),
+                      Container(width: 3, height: 3,
+                          decoration: const BoxDecoration(color: _C.gray400, shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                    ],
+                    if (vehicle != null)
+                      Flexible(
+                        child: Text(vehicle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11, color: _C.gray400)),
+                      ),
+                  ],
+                ),
+              ],
               if (widget.driverPhone != null && widget.driverPhone!.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 GestureDetector(

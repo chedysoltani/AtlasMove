@@ -8,8 +8,8 @@ import 'offer_card.dart';
 /// course côté chauffeur (coque, prix et boutons partagés : `offer_card.dart`).
 ///
 /// N'affiche que les données réellement reçues : la note et le véhicule
-/// viennent de [BidOffer.reportedRating] / [BidOffer.reportedVehicle], jamais
-/// des valeurs par défaut du modèle. Les actions restent celles de l'écran ;
+/// ([BidOffer.driverRating] / [BidOffer.driverVehicle]) sont masqués quand le
+/// backend ne les envoie pas. Les actions restent celles de l'écran ;
 /// la carte bloque seulement ses boutons pendant l'action en cours.
 class DriverBidOfferCard extends StatefulWidget {
   final BidOffer offer;
@@ -50,8 +50,8 @@ class _DriverBidOfferCardState extends State<DriverBidOfferCard> {
   Widget build(BuildContext context) {
     final offer = widget.offer;
     final busy = _busy != null;
-    final rating = offer.reportedRating;
-    final vehicle = offer.reportedVehicle;
+    final rating = offer.driverRating;
+    final vehicle = offer.driverVehicle;
 
     return OfferCardShell(
       child: Column(
