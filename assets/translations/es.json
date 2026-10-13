@@ -1097,7 +1097,7 @@
     "pw_digit": "Debe contener un número",
     "pw_special": "Debe contener un carácter especial",
     "vehicle_info": "Información del vehículo",
-    "cin_hint": "Número de identidad (8 cifras)",
+    "cin_hint": "Número de identidad",
     "exactly_8": "Exactamente 8 cifras",
     "license_number": "Número de permiso de conducir",
     "plate": "Matrícula del vehículo",

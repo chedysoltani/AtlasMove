@@ -1097,7 +1097,7 @@
     "pw_digit": "Deve contenere un numero",
     "pw_special": "Deve contenere un carattere speciale",
     "vehicle_info": "Informazioni sul veicolo",
-    "cin_hint": "Numero documento (8 cifre)",
+    "cin_hint": "Numero documento",
     "exactly_8": "Esattamente 8 cifre",
     "license_number": "Numero di patente",
     "plate": "Targa del veicolo",

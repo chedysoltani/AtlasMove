@@ -119,9 +119,6 @@ class DriverRegisterRequest {
     if (cinNumber.trim().isEmpty) {
       return 'validation.cin_required'.tr();
     }
-    if (!RegExp(r'^\d{8}$').hasMatch(cinNumber.trim())) {
-      return 'driver_reg.exactly_8'.tr();
-    }
 
     // Validation numéro permis
     if (drivingLicenseNumber.trim().isEmpty) {

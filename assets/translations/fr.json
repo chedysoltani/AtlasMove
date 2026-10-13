@@ -1097,7 +1097,7 @@
     "pw_digit": "Doit contenir un chiffre",
     "pw_special": "Doit contenir un caractère spécial",
     "vehicle_info": "Informations véhicule",
-    "cin_hint": "Numéro CIN (8 chiffres)",
+    "cin_hint": "Numéro CIN",
     "exactly_8": "Exactement 8 chiffres",
     "license_number": "Numéro de permis de conduire",
     "plate": "Immatriculation du véhicule",

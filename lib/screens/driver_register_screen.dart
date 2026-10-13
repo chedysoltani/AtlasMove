@@ -466,12 +466,8 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen>
                         hint: 'driver_reg.cin_hint'.tr(),
                         icon: Icons.credit_card_rounded,
                         keyboard: TextInputType.number,
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'auth.field_required'.tr();
-                          if (!RegExp(r'^\d{8}$').hasMatch(v.trim()))
-                            return 'driver_reg.exactly_8'.tr();
-                          return null;
-                        },
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'auth.field_required'.tr() : null,
                       )),
                       const SizedBox(height: 11),
                       _a(5, _field(

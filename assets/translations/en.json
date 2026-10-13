@@ -1097,7 +1097,7 @@
     "pw_digit": "Must contain a digit",
     "pw_special": "Must contain a special character",
     "vehicle_info": "Vehicle information",
-    "cin_hint": "ID number (8 digits)",
+    "cin_hint": "ID number",
     "exactly_8": "Exactly 8 digits",
     "license_number": "Driving licence number",
     "plate": "Vehicle registration number",

@@ -1097,7 +1097,7 @@
     "pw_digit": "Muss eine Ziffer enthalten",
     "pw_special": "Muss ein Sonderzeichen enthalten",
     "vehicle_info": "Fahrzeuginformationen",
-    "cin_hint": "Ausweisnummer (8 Ziffern)",
+    "cin_hint": "Ausweisnummer",
     "exactly_8": "Genau 8 Ziffern",
     "license_number": "Führerscheinnummer",
     "plate": "Kfz-Kennzeichen",
