@@ -91,6 +91,11 @@
 	</array>
 	<key>FlutterDeepLinkingEnabled</key>
 	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
+		<string>https</string>
+	</array>
 	<key>FacebookAppID</key>
 	<string>28523193994013024</string>
 	<key>FacebookClientToken</key>

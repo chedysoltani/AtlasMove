@@ -1133,13 +1133,16 @@
     "whatsapp": "دعم واتساب",
     "whatsapp_cta": "تواصل مع الدعم عبر واتساب",
     "wa_open": "فتح",
-    "wa_greeting": "مرحبًا، أحتاج إلى مساعدة بخصوص تطبيق AtlasMove.",
-    "wa_role": "الدور: {role}",
+    "wa_greeting": "مرحبًا AtlasMove، أحتاج إلى مساعدة.",
+    "wa_role": "نوع الحساب: {role}",
     "wa_user_id": "معرّف المستخدم: {id}",
     "wa_version": "إصدار التطبيق: {version}",
     "wa_not_logged_in": "لم أسجّل الدخول إلى حسابي.",
     "wa_unavailable_title": "تعذّر فتح واتساب",
-    "wa_unavailable_body": "تواصل معنا مباشرة على هذا الرقم أو عبر البريد الإلكتروني."
+    "wa_unavailable_body": "تواصل معنا مباشرة على هذا الرقم أو عبر البريد الإلكتروني.",
+    "wa_subtitle": "رد سريع – للعملاء والسائقين",
+    "wa_platform": "المنصة: {platform}",
+    "wa_unavailable": "تعذّر فتح واتساب. رقمنا: {number}"
   },
   "loading_extra": {
     "map": "جارٍ تحميل الخريطة..."

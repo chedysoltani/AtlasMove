@@ -1133,13 +1133,16 @@
     "whatsapp": "Support WhatsApp",
     "whatsapp_cta": "Contacter le support sur WhatsApp",
     "wa_open": "Ouvrir",
-    "wa_greeting": "Bonjour, j'ai besoin d'aide avec l'application AtlasMove.",
-    "wa_role": "Rôle : {role}",
+    "wa_greeting": "Bonjour AtlasMove, j'ai besoin d'aide.",
+    "wa_role": "Type de compte : {role}",
     "wa_user_id": "ID utilisateur : {id}",
     "wa_version": "Version de l'app : {version}",
     "wa_not_logged_in": "Je ne suis pas connecté à mon compte.",
     "wa_unavailable_title": "Impossible d'ouvrir WhatsApp",
-    "wa_unavailable_body": "Contactez-nous directement à ce numéro ou par e-mail."
+    "wa_unavailable_body": "Contactez-nous directement à ce numéro ou par e-mail.",
+    "wa_subtitle": "Réponse rapide – Clients et chauffeurs",
+    "wa_platform": "Plateforme : {platform}",
+    "wa_unavailable": "Impossible d'ouvrir WhatsApp. Notre numéro : {number}"
   },
   "loading_extra": {
     "map": "Chargement de la carte..."

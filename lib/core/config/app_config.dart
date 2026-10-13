@@ -17,11 +17,6 @@ class AppConfig {
   static const bool enableLogging = true;
   static const bool enableAnalytics = false;
 
-  // Support client
-  /// Numéro WhatsApp Business du support, format international sans « + » ni
-  /// espaces (utilisé dans https://wa.me/<numéro>). Valeur provisoire.
-  static const String supportWhatsAppNumber = '216XXXXXXXX';
-  /// Le bouton WhatsApp et le numéro ne s'affichent qu'une fois le vrai numéro renseigné.
-  static bool get supportWhatsAppEnabled => !supportWhatsAppNumber.contains('X');
+  // Support client (numéro WhatsApp : core/constants/support_constants.dart)
   static const String supportEmail = 'hello@atla.business';
 }

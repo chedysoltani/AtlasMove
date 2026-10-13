@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -5,6 +7,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/config/app_config.dart';
+import '../core/constants/support_constants.dart';
 import '../core/network/http_client.dart';
 import '../core/storage/token_storage.dart';
 import 'support_ticket_chat_screen.dart';
@@ -150,25 +153,28 @@ class _SupportScreenState extends State<SupportScreen>
   bool _openingWhatsApp = false;
 
   /// Ouvre la conversation WhatsApp du support avec un message prérempli
-  /// (rôle, identifiant, version) pour que le support retrouve le compte.
-  /// Si WhatsApp (ou un navigateur) ne peut pas s'ouvrir : numéro et e-mail
-  /// à copier.
+  /// (type de compte, identifiant, version, plateforme) pour que le support
+  /// retrouve le compte. Ordre : app WhatsApp (ou WhatsApp Business), puis
+  /// wa.me dans le navigateur, puis le numéro à copier.
   Future<void> _openWhatsApp() async {
     if (_openingWhatsApp) return;
-    _openingWhatsApp = true;
+    setState(() => _openingWhatsApp = true);
     try {
-      final message = await _whatsAppMessage();
-      final uri = Uri.parse('https://wa.me/${AppConfig.supportWhatsAppNumber}'
-          '?text=${Uri.encodeComponent(message)}');
-      var opened = false;
-      try {
-        opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } catch (e) {
-        debugPrint('WhatsApp launch error: $e');
-      }
-      if (!opened && mounted) _showWhatsAppFallback();
+      final uri = SupportConstants.whatsAppUri(await _whatsAppMessage());
+      if (await _tryLaunch(uri, LaunchMode.externalNonBrowserApplication)) return;
+      if (await _tryLaunch(uri, LaunchMode.externalApplication)) return;
+      if (mounted) _showWhatsAppUnavailable();
     } finally {
-      _openingWhatsApp = false;
+      if (mounted) setState(() => _openingWhatsApp = false);
+    }
+  }
+
+  Future<bool> _tryLaunch(Uri uri, LaunchMode mode) async {
+    try {
+      return await launchUrl(uri, mode: mode);
+    } catch (e) {
+      debugPrint('WhatsApp launch error ($mode): $e');
+      return false;
     }
   }
 
@@ -198,85 +204,37 @@ class _SupportScreenState extends State<SupportScreen>
       lines.add('support_extra.wa_version'.tr(
           namedArgs: {'version': '${info.version} (${info.buildNumber})'}));
     } catch (_) {}
+    lines.add('support_extra.wa_platform'.tr(namedArgs: {
+      'platform': Platform.isIOS
+          ? 'iOS'
+          : Platform.isAndroid ? 'Android' : Platform.operatingSystem,
+    }));
     return lines.join('\n');
   }
 
-  void _showWhatsAppFallback() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('support_extra.wa_unavailable_title'.tr(),
-                  style: GoogleFonts.poppins(
-                      fontSize: 16, fontWeight: FontWeight.w700, color: _textPrim)),
-              const SizedBox(height: 4),
-              Text('support_extra.wa_unavailable_body'.tr(),
-                  style: GoogleFonts.poppins(fontSize: 12.5, color: _textSecond)),
-              const SizedBox(height: 16),
-              _fallbackRow(ctx, Icons.chat_rounded, const Color(0xFF25D366),
-                  'support_extra.whatsapp'.tr(), '+${AppConfig.supportWhatsAppNumber}'),
-              const SizedBox(height: 10),
-              _fallbackRow(ctx, Icons.email_rounded, const Color(0xFF6366F1),
-                  'auth.email'.tr(), AppConfig.supportEmail),
-            ],
+  /// Dernier recours : ni WhatsApp ni le navigateur n'ont pu s'ouvrir.
+  void _showWhatsAppUnavailable() {
+    // Isolé en LTR (U+2066…U+2069) pour rester lisible dans une phrase en arabe.
+    const number = '\u2066${SupportConstants.whatsAppDisplayNumber}\u2069';
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+              'support_extra.wa_unavailable'.tr(namedArgs: {'number': number}),
+              style: GoogleFonts.poppins(fontSize: 13, color: Colors.white)),
+          backgroundColor: _dark,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 8),
+          action: SnackBarAction(
+            label: 'common.copy'.tr(),
+            textColor: _orange,
+            onPressed: () => _copyToClipboard(
+                '+${SupportConstants.whatsAppNumber}', 'support_extra.whatsapp'.tr()),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _fallbackRow(BuildContext sheetContext, IconData icon, Color color,
-      String label, String value) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38, height: 38,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: GoogleFonts.poppins(fontSize: 11, color: _textSecond)),
-                SelectableText(value,
-                    style: GoogleFonts.poppins(
-                        fontSize: 14, fontWeight: FontWeight.w700, color: _textPrim)),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: 'common.copy'.tr(),
-            icon: Icon(Icons.copy_rounded, color: color, size: 20),
-            onPressed: () {
-              // Fermer la feuille d'abord pour que la confirmation soit visible
-              Navigator.pop(sheetContext);
-              _copyToClipboard(value, label);
-            },
-          ),
-        ],
-      ),
-    );
+      );
   }
 
   void _copyToClipboard(String value, String label) {
@@ -454,6 +412,8 @@ class _SupportScreenState extends State<SupportScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _whatsAppCard(),
+        const SizedBox(height: 24),
         _sectionTitle('support.contact_us'.tr(), Icons.headset_mic_rounded),
         const SizedBox(height: 14),
         Row(
@@ -467,26 +427,20 @@ class _SupportScreenState extends State<SupportScreen>
                 onTap: () => _copyToClipboard(AppConfig.supportEmail, 'Email'),
               ),
             ),
-            if (AppConfig.supportWhatsAppEnabled) ...[
-              const SizedBox(width: 12),
-              Expanded(
-                child: _contactCard(
-                  icon: Icons.phone_rounded,
-                  label: 'support.copy_number'.tr(),
-                  value: '+${AppConfig.supportWhatsAppNumber}',
-                  color: _green,
-                  onTap: () => _copyToClipboard(
-                      '+${AppConfig.supportWhatsAppNumber}', 'support.copy_number'.tr()),
-                ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _contactCard(
+                icon: Icons.phone_rounded,
+                label: 'support.copy_number'.tr(),
+                value: '\u2066${SupportConstants.whatsAppDisplayNumber}\u2069',
+                color: _green,
+                onTap: () => _copyToClipboard(
+                    '+${SupportConstants.whatsAppNumber}', 'support.copy_number'.tr()),
               ),
-            ],
+            ),
           ],
         ),
         const SizedBox(height: 12),
-        if (AppConfig.supportWhatsAppEnabled) ...[
-          _whatsAppCard(),
-          const SizedBox(height: 12),
-        ],
         _availabilityBanner(),
       ],
     );
@@ -558,62 +512,92 @@ class _SupportScreenState extends State<SupportScreen>
     );
   }
 
+  /// Carte principale « Contacter le support sur WhatsApp », en tête de page.
+  /// Couleurs fixes (fond sombre, accent orange) : lisible en thème clair
+  /// comme sombre ; la Row s'inverse d'elle-même en RTL.
   Widget _whatsAppCard() {
-    return GestureDetector(
-      onTap: _openWhatsApp,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _border),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 3)),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFF25D366).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(14),
+    return Semantics(
+      button: true,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _openingWhatsApp ? null : _openWhatsApp,
+          borderRadius: BorderRadius.circular(20),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: AlignmentDirectional.topStart,
+                end: AlignmentDirectional.bottomEnd,
+                colors: [_dark, _darkCard],
               ),
-              child: const Icon(Icons.chat_rounded,
-                  color: Color(0xFF25D366), size: 24),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _orange.withOpacity(0.35)),
+              boxShadow: [
+                BoxShadow(
+                    color: _orange.withOpacity(0.18),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6)),
+              ],
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('support_extra.whatsapp_cta'.tr(),
-                      style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: _textPrim)),
-                  Text('support.whatsapp_hint'.tr(),
-                      style: GoogleFonts.poppins(
-                          fontSize: 11, color: _textSecond)),
-                ],
-              ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48, height: 48,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [_orange, _orangeLight],
+                      begin: AlignmentDirectional.topStart,
+                      end: AlignmentDirectional.bottomEnd,
+                    ),
+                  ),
+                  child: const Icon(Icons.chat_rounded,
+                      color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('support_extra.whatsapp_cta'.tr(),
+                          style: GoogleFonts.poppins(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              height: 1.3)),
+                      const SizedBox(height: 3),
+                      Text('support_extra.wa_subtitle'.tr(),
+                          style: GoogleFonts.poppins(
+                              fontSize: 11.5,
+                              color: Colors.white.withOpacity(0.6))),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  constraints: const BoxConstraints(minWidth: 64),
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _orange,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: _openingWhatsApp
+                      ? const SizedBox(
+                          width: 16, height: 16,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : Text('support_extra.wa_open'.tr(),
+                          style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white)),
+                ),
+              ],
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF25D366).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text('support_extra.wa_open'.tr(),
-                  style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF25D366))),
-            ),
-          ],
+          ),
         ),
       ),
     );
