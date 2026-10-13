@@ -1,6 +1,6 @@
 name: atlasmove
 description: Plateforme de transport et livraison - Alternative à Uber
-version: 1.0.4+13
+version: 1.0.4+14
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
