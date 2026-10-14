@@ -27,8 +27,13 @@ import 'screens/driver_rides.dart';
 import 'screens/driver_active_ride.dart';
 import 'screens/driver_earnings.dart';
 import 'screens/driver_profile.dart';
-import 'screens/driver_register_screen.dart';
 import 'screens/driver_register_test_screen.dart';
+import 'screens/driver_signup_screen.dart';
+import 'screens/driver_otp_screen.dart';
+import 'screens/driver_login_screen.dart';
+import 'screens/driver_dossier_screen.dart';
+import 'screens/driver_suspended_screen.dart';
+import 'services/driver_account_store.dart';
 import 'screens/client_trip_history_screen.dart';
 import 'providers/auth_provider.dart';
 import 'screens/services_screen.dart';
@@ -90,6 +95,8 @@ void main() async {
   // Canaux Android + tap sur une notification "nouvelle course" / "appel entrant"
   await PushNotificationService.initialize();
   FirebaseMessaging.onMessage.listen(PushNotificationService.handleForegroundMessage);
+  // Push affiché par le système puis tapé, app en arrière-plan (dossier chauffeur)
+  FirebaseMessaging.onMessageOpenedApp.listen(PushNotificationService.handleOpenedMessage);
 
   // Meta App Events : installation / ouverture loguées automatiquement par le SDK natif
   MetaEventsService.instance.init();
@@ -145,10 +152,12 @@ void main() async {
     NotificationService().disconnect();
     CallService().disconnect();
     LocationTrackingService().stopLocationTracking();
+    // Chauffeur : connexion par téléphone (la plupart n'ont pas de mot de passe).
+    final isDriver = HttpClient.lastExpiredRole == 'delivery';
     navigatorKey.currentState?.pushNamedAndRemoveUntil(
-      '/login',
+      isDriver ? DriverLoginScreen.route : '/login',
       (route) => false,
-      arguments: {'sessionExpired': true},
+      arguments: isDriver ? null : {'sessionExpired': true},
     );
     Future.delayed(const Duration(seconds: 3), () => _sessionExpiredNavigating = false);
   };
@@ -169,6 +178,11 @@ void main() async {
     final context = navigatorKey.currentContext;
     if (context != null) {
       NotificationSheet.showInAppBanner(context, item);
+    }
+    // Étape du dossier chauffeur (document refusé, compte activé…) : on
+    // recharge le profil, « Mon dossier » se met à jour ou se ferme.
+    if (item.metadata['category'] == 'driver_onboarding') {
+      DriverAccountStore.instance.refreshQuietly();
     }
   };
 
@@ -390,7 +404,15 @@ class AtlasMoveApp extends StatelessWidget {
             '/driver_rides': (context) => const DriverRidesScreen(),
             '/driver_earnings': (context) => const DriverEarningsScreen(),
             '/driver_profile': (context) => const DriverProfileScreen(),
-            '/driver_register': (context) => const DriverRegisterScreen(),
+            // Parcours chauffeur v2 : inscription courte, code WhatsApp,
+            // connexion par téléphone, dossier, compte suspendu.
+            DriverSignupScreen.route: (context) => const DriverSignupScreen(),
+            DriverOtpScreen.route: (context) => DriverOtpScreen(
+                args: ModalRoute.of(context)!.settings.arguments as DriverOtpArgs),
+            DriverLoginScreen.route: (context) => DriverLoginScreen(
+                args: ModalRoute.of(context)?.settings.arguments as DriverLoginArgs?),
+            DriverDossierScreen.route: (context) => const DriverDossierScreen(),
+            DriverSuspendedScreen.route: (context) => const DriverSuspendedScreen(),
             '/driver_register_test': (context) => const DriverRegisterTestScreen(),
             '/services': (context) => const ServicesScreen(),
             '/services_catalogue': (context) => const ServicesCatalogueScreen(),

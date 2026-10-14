@@ -41,6 +41,8 @@ dependencies:
   app_links: ^7.0.0
   url_launcher: ^6.3.3
   package_info_plus: ^9.0.1
+  # Compression JPEG des documents chauffeur (pur Dart, sans code natif)
+  image: ^4.3.0
 
 
 dev_dependencies:

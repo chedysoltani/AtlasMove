@@ -18,6 +18,11 @@ class TokenStorage {
   static const _rememberMeKey = 'remember_me';
   static const _savedIdentifierKey = 'saved_identifier';
 
+  // Session ouverte par le parcours chauffeur v2 : son refresh passe par
+  // /v2/driver/auth/refresh (voir HttpClient._doRefresh). Effacé au logout.
+  static const _sessionApiKey = 'session_api';
+  static const sessionApiDriverV2 = 'driver_v2';
+
   // Repli quand le token n'est pas un JWT lisible : TTL présumé 15 min, refresh à 13 min.
   static const int _refreshBeforeExpirySeconds = 780;
 
@@ -85,6 +90,12 @@ class TokenStorage {
     ]);
   }
 
+  static Future<void> saveSessionApi(String? api) => api == null
+      ? _storage.delete(key: _sessionApiKey)
+      : _storage.write(key: _sessionApiKey, value: api);
+
+  static Future<String?> getSessionApi() => _read(_sessionApiKey);
+
   static Future<bool> isAccessTokenExpiringSoon() async {
     final savedAtStr = await _read(_tokenSavedAtKey);
     if (savedAtStr == null) return false;
@@ -100,6 +111,7 @@ class TokenStorage {
       _storage.delete(key: _userIdKey),
       _storage.delete(key: _userRoleKey),
       _storage.delete(key: _tokenSavedAtKey),
+      _storage.delete(key: _sessionApiKey),
       // Marquer que l'utilisateur a explicitement demandé la déconnexion
       _storage.write(key: _explicitLogoutKey, value: 'true'),
     ]);

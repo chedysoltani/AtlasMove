@@ -46,6 +46,10 @@ class FirebaseAnalyticsService {
   Future<void> logOfferRejected({required String tripId, required String offerId, required double fare, required String currency}) =>
       _log('offer_rejected', {'trip_id': tripId, 'offer_id': offerId, 'value': fare, 'currency': currency});
 
+  /// Évènement libre (parcours chauffeur : voir driver_onboarding_analytics.dart).
+  Future<void> logEvent(String name, Map<String, Object> parameters) =>
+      _log(name, parameters);
+
   /// Un évènement Analytics ne doit jamais bloquer ni faire planter l'app.
   Future<void> _log(String name, Map<String, Object> parameters) async {
     if (Firebase.apps.isEmpty) return;

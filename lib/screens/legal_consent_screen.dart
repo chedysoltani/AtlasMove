@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:easy_localization/easy_localization.dart';
+import '../services/driver_account_store.dart';
 import '../services/legal_service.dart';
 import '../core/storage/token_storage.dart';
 
@@ -69,7 +70,10 @@ class _LegalConsentScreenState extends State<LegalConsentScreen>
       if (!mounted) return;
       final role = await TokenStorage.getUserRole();
       final isDriver = role == 'livreur' || role == 'delivery';
-      final destination = isDriver ? '/driver_main' : '/client_dashboard';
+      // Chauffeur : selon le statut du compte (dossier, écran principal, suspendu…).
+      final destination = isDriver
+          ? await DriverAccountStore.instance.resolveHomeRoute()
+          : '/client_dashboard';
       if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil(
         destination,

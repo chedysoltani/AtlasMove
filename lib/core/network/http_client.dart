@@ -60,6 +60,8 @@ class HttpClient {
     '/auth/forgot-password',
     '/auth/logout',
     '/m/auth/logout',
+    // Parcours chauffeur v2 : 401 = mauvais code / mot de passe
+    '/v2/driver/auth/',
   ];
 
   static bool _isAuthEndpoint(String endpoint) =>
@@ -164,8 +166,13 @@ class HttpClient {
     return exp.isAfter(_serverNowUtc.add(_expirySkew));
   }
 
+  /// Rôle de la session qui vient d'expirer (lu avant l'effacement) : un
+  /// chauffeur est renvoyé vers la connexion par téléphone, pas vers /login.
+  static String? lastExpiredRole;
+
   /// Le serveur a refusé le refresh token : session terminée, retour au login.
   static Future<void> handleSessionInvalid() async {
+    lastExpiredRole = await TokenStorage.getUserRole();
     await TokenStorage.clearTokens();
     onSessionExpired?.call();
   }
@@ -423,7 +430,12 @@ class HttpClient {
         try {
           final errorBody = jsonDecode(response.body);
           final msg = (errorBody['message'] ?? errorBody['error'] ?? '').toString().toLowerCase();
-          if (msg.contains('legal') || msg.contains('agreement') ||
+          // Routes qui renvoient un code d'erreur stable (chauffeurs v2) : on se
+          // fie au code, pas aux mots du message (ex. ACCOUNT_SUSPENDED).
+          final code = errorBody is Map ? errorBody['code']?.toString() : null;
+          if (code != null) {
+            if (code == 'LEGAL_ACCEPTANCE_REQUIRED') onLegalConsentRequired?.call();
+          } else if (msg.contains('legal') || msg.contains('agreement') ||
               msg.contains('privacy') || msg.contains('terms') ||
               msg.contains('accepted') ||
               // French keywords
@@ -470,22 +482,38 @@ class HttpClient {
     try {
       final deviceId = await TokenStorage.getOrCreateDeviceId();
       final platform = Platform.isIOS ? 'ios' : 'android';
-      final response = await http.post(
-        Uri.parse('$baseUrl/m/auth/refresh'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $refreshToken',
-          'X-Device-Id': deviceId,
-          'X-Platform': platform,
-          'X-App-Version': appVersion,
-          'X-Remember-Me': (await TokenStorage.getRememberMe()).toString(),
-        },
-        body: jsonEncode({
-          'refreshToken': refreshToken,
-          'deviceId': deviceId,
-        }),
-      ).timeout(_refreshTimeout);
+      // Session chauffeur v2 : route de refresh du contrat chauffeurs (mêmes
+      // X-Device-Id et X-Platform qu'à la connexion). Sinon, route historique.
+      final driverV2 =
+          await TokenStorage.getSessionApi() == TokenStorage.sessionApiDriverV2;
+      final response = driverV2
+          ? await http.post(
+              Uri.parse('$baseUrl/v2/driver/auth/refresh'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Device-Id': deviceId,
+                'X-Platform': platform,
+                'X-App-Version': appVersion,
+              },
+              body: jsonEncode({'refresh_token': refreshToken}),
+            ).timeout(_refreshTimeout)
+          : await http.post(
+              Uri.parse('$baseUrl/m/auth/refresh'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': 'Bearer $refreshToken',
+                'X-Device-Id': deviceId,
+                'X-Platform': platform,
+                'X-App-Version': appVersion,
+                'X-Remember-Me': (await TokenStorage.getRememberMe()).toString(),
+              },
+              body: jsonEncode({
+                'refreshToken': refreshToken,
+                'deviceId': deviceId,
+              }),
+            ).timeout(_refreshTimeout);
 
       _syncClock(response.headers);
       SafeLog.d('🔄 Refresh status: ${response.statusCode}');

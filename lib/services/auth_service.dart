@@ -176,6 +176,8 @@ class AuthService {
             userId: authResponse.user.id,
             role: authResponse.user.role.name,
           );
+          // Session ouverte par la route historique : refresh historique.
+          await TokenStorage.saveSessionApi(null);
           AuthSession.instance.onTokensChanged();
           // Enregistrer le token FCM après login réussi (spec: POST /users/devices)
           DeviceTokenService().registerDevice().catchError((_) {});
@@ -439,6 +441,8 @@ class AuthService {
             userId: authResponse.user.id,
             role: _explicitRole(responseData),
           );
+          // Session ouverte par la route historique : refresh historique.
+          await TokenStorage.saveSessionApi(null);
           AuthSession.instance.onTokensChanged();
           // Enregistrer le token FCM comme après un login sans OTP
           DeviceTokenService().registerDevice().catchError((_) {});

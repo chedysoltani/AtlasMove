@@ -8,6 +8,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart' as provider_pkg;
 import '../services/auth_service.dart';
+import '../services/driver_account_store.dart';
 import '../models/responses/auth_response.dart';
 import '../models/user.dart';
 import '../providers/auth_provider.dart';
@@ -210,9 +211,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
       await Future.delayed(const Duration(milliseconds: 900));
       if (!mounted) return;
 
+      // Chauffeur : selon le statut du compte (dossier, écran principal, suspendu…).
       final destination = response.user.role == UserRole.delivery
-          ? '/driver_main'
+          ? await DriverAccountStore.instance.resolveHomeRoute()
           : '/client_dashboard';
+      if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil(destination, (_) => false);
     } catch (e) {
       if (!mounted) return;

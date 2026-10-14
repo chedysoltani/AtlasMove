@@ -12,6 +12,7 @@ import '../models/new_ride_offer.dart';
 import '../screens/driver_active_ride.dart';
 import '../screens/incoming_call_screen.dart';
 import 'call_service.dart';
+import 'driver_account_store.dart';
 import 'ride_offer_queue.dart';
 import 'system_strings.dart';
 import 'trip_service.dart';
@@ -64,6 +65,68 @@ class PushNotificationService {
     sound: RawResourceAndroidNotificationSound('new_rdv'),
     enableVibration: true,
   );
+
+  /// Étapes du dossier chauffeur (document refusé, compte activé…).
+  static const AndroidNotificationChannel _accountChannel = AndroidNotificationChannel(
+    'driver_account_channel',
+    'AtlasMove',
+    importance: Importance.high,
+  );
+
+  /// Notification « dossier chauffeur » (contrat chauffeurs v2, section 6) :
+  /// `data.event = new_notification`, `data.payload` = la notification en JSON,
+  /// avec `metadata.category = driver_onboarding`. Renvoie les données utiles
+  /// au tap (`type: driver_onboarding`), ou null pour tout autre message.
+  static Map<String, dynamic>? driverOnboardingData(Map<String, dynamic> data) {
+    if (data['event'] != 'new_notification') return null;
+    try {
+      final raw = data['payload'];
+      final payload = raw is String ? jsonDecode(raw) : raw;
+      if (payload is! Map) return null;
+      var metadata = payload['metadata'];
+      if (metadata is String) metadata = jsonDecode(metadata);
+      if (metadata is! Map || metadata['category'] != 'driver_onboarding') return null;
+      return {
+        'type': 'driver_onboarding',
+        'event': metadata['event']?.toString(),
+        'title': payload['title']?.toString() ?? '',
+        'message': (payload['message'] ?? payload['body'])?.toString() ?? '',
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> _showDriverOnboardingNotification(Map<String, dynamic> data) async {
+    final title = data['title']?.toString() ?? '';
+    final body = data['message']?.toString() ?? '';
+    if (title.isEmpty && body.isEmpty) return;
+    await _plugin.show(
+      id: ('driver_onboarding_${data['event']}').hashCode & 0x7fffffff,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          _accountChannel.id,
+          _accountChannel.name,
+          importance: Importance.high,
+          priority: Priority.high,
+          styleInformation: BigTextStyleInformation(body),
+        ),
+        iOS: const DarwinNotificationDetails(interruptionLevel: InterruptionLevel.active),
+      ),
+      payload: jsonEncode(data),
+    );
+  }
+
+  /// Push affiché par le système puis tapé (`onMessageOpenedApp` /
+  /// `getInitialMessage`) : même traitement qu'un tap sur une notification locale.
+  static void handleOpenedMessage(RemoteMessage message) {
+    final data = driverOnboardingData(message.data);
+    if (data == null) return;
+    _pendingAction = {'actionId': null, 'data': data};
+    unawaited(_tryConsumeNow());
+  }
 
   /// Écrans/actions en attente d'un contexte de navigation prêt (boot terminé).
   static Map<String, dynamic>? _pendingAction;
@@ -118,6 +181,7 @@ class PushNotificationService {
     await android?.createNotificationChannel(_rideChannel);
     await android?.createNotificationChannel(_callChannel);
     await android?.createNotificationChannel(_rdvChannel);
+    await android?.createNotificationChannel(_accountChannel);
 
     // L'app a été ouverte en tapant sur une notification alors qu'elle était tuée.
     final launchDetails = await _plugin.getNotificationAppLaunchDetails();
@@ -125,6 +189,12 @@ class PushNotificationService {
     if (launchDetails?.didNotificationLaunchApp == true && launchResponse != null) {
       _queueFromResponse(launchResponse);
     }
+
+    // Idem pour un push affiché par le système (dossier chauffeur).
+    try {
+      final initial = await FirebaseMessaging.instance.getInitialMessage();
+      if (initial != null) handleOpenedMessage(initial);
+    } catch (_) {}
   }
 
   // ── Firebase Messaging : premier plan / arrière-plan ────────────────────────
@@ -137,6 +207,12 @@ class PushNotificationService {
   /// vérifiant qu'aucune carte/écran n'existe déjà pour ce tripId/callId.
   static Future<void> handleForegroundMessage(RemoteMessage message) async {
     final data = message.data;
+    // Dossier chauffeur : la bannière in-app arrive par socket ; on recharge
+    // le profil pour que « Mon dossier » se mette à jour.
+    if (driverOnboardingData(data) != null) {
+      unawaited(DriverAccountStore.instance.refreshQuietly());
+      return;
+    }
     switch (data['type']) {
       case 'new_ride':
         final tripId = (data['trip_id'] ?? data['tripId'])?.toString();
@@ -171,6 +247,13 @@ class PushNotificationService {
     await _ensureLocalNotificationsForIsolate();
 
     final data = message.data;
+    final onboarding = driverOnboardingData(data);
+    if (onboarding != null) {
+      // Push data-only : on construit la notification ; si le système l'a
+      // déjà affichée (bloc `notification`), on ne la double pas.
+      if (message.notification == null) await _showDriverOnboardingNotification(onboarding);
+      return;
+    }
     switch (data['type']) {
       case 'new_ride':
         await showNewRideNotification(data);
@@ -201,6 +284,7 @@ class PushNotificationService {
     await android?.createNotificationChannel(_rideChannel);
     await android?.createNotificationChannel(_callChannel);
     await android?.createNotificationChannel(_rdvChannel);
+    await android?.createNotificationChannel(_accountChannel);
   }
 
   // ── Construction des notifications ──────────────────────────────────────────
@@ -389,6 +473,15 @@ class PushNotificationService {
     final data = Map<String, dynamic>.from(action['data'] as Map? ?? {});
     final actionId = action['actionId'] as String?;
     final type = data['type']?.toString();
+
+    // Dossier chauffeur (document refusé, compte activé…) : l'écran qui
+    // correspond au statut à jour — « Mon dossier » ou l'écran principal.
+    if (type == 'driver_onboarding') {
+      if (await TokenStorage.getUserRole() != 'delivery') return;
+      final route = await DriverAccountStore.instance.resolveHomeRoute();
+      navigatorKey.currentState?.pushNamedAndRemoveUntil(route, (_) => false);
+      return;
+    }
 
     if (type == 'new_ride' || actionId == 'accept_ride') {
       final tripId = (data['trip_id'] ?? data['tripId'])?.toString();

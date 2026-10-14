@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:atlasmove/core/auth/auth_session.dart';
 import 'package:atlasmove/core/auth/jwt_utils.dart';
@@ -212,16 +213,110 @@ void main() {
       expect(r.destination, BootDestination.landing);
     });
 
-    test('access token valide + rôle → dashboard sans aucun appel réseau', () async {
+    test('access token valide + rôle client → dashboard sans aucun appel réseau', () async {
       await TokenStorage.saveAuthTokens(
-          accessToken: jwt(validFor: const Duration(minutes: 10)), refreshToken: 'r', role: 'delivery');
+          accessToken: jwt(validFor: const Duration(minutes: 10)), refreshToken: 'r', role: 'client');
       final backend = FakeBackend(validAccess: 'x', nextAccess: 'y');
 
       final r = await withBackend(backend, AuthSession.restore);
 
-      expect(r.destination, BootDestination.driver);
-      expect(r.route, '/driver_main');
+      expect(r.destination, BootDestination.client);
+      expect(r.route, '/client_dashboard');
       expect(backend.refreshCalls + backend.apiCalls, 0);
+    });
+
+    // Chauffeur : jamais directement sur /driver_main — un seul appel à
+    // GET /v2/driver/me (sans refresh) décide de l'écran selon le statut.
+    for (final (status, nextAction, expected) in [
+      ('active', 'NONE', '/driver_main'),
+      ('pending_documents', 'UPLOAD_DOCUMENTS', '/driver_dossier'),
+      ('pending_review', 'WAIT_FOR_REVIEW', '/driver_dossier'),
+      ('rejected', 'CONTACT_SUPPORT', '/driver_dossier'),
+    ]) {
+      test('chauffeur $status → $expected', () async {
+        SharedPreferences.setMockInitialValues({});
+        final access = jwt(validFor: const Duration(minutes: 10));
+        await TokenStorage.saveAuthTokens(accessToken: access, refreshToken: 'r', role: 'delivery');
+        final calls = <String>[];
+
+        final r = await http.runWithClient(AuthSession.restore, () => MockClient((req) async {
+              calls.add(req.url.path);
+              expect(req.headers['Authorization'], 'Bearer $access');
+              return http.Response(
+                  jsonEncode({'data': {'id': 'd1', 'account_status': status, 'next_action': nextAction}}),
+                  200);
+            }));
+
+        expect(r.destination, BootDestination.driver);
+        expect(r.route, expected);
+        expect(calls, ['/api/v1/v2/driver/me']);
+      });
+    }
+
+    test('session chauffeur v2 : refresh par /v2/driver/auth/refresh, reste connecté', () async {
+      SharedPreferences.setMockInitialValues({});
+      await TokenStorage.saveAuthTokens(
+          accessToken: jwt(validFor: const Duration(minutes: -5)), refreshToken: 'r-v2', role: 'delivery');
+      await TokenStorage.saveSessionApi(TokenStorage.sessionApiDriverV2);
+      final fresh = jwt(validFor: const Duration(minutes: 15));
+      final calls = <String>[];
+
+      final r = await http.runWithClient(AuthSession.restore, () => MockClient((req) async {
+            calls.add(req.url.path);
+            if (req.url.path.endsWith('/v2/driver/auth/refresh')) {
+              expect(jsonDecode(req.body), {'refresh_token': 'r-v2'});
+              expect(req.headers['X-Device-Id'], isNotEmpty);
+              return http.Response(
+                  jsonEncode({'data': {'access_token': fresh, 'refresh_token': 'r-v2-next'}}), 200);
+            }
+            return http.Response(
+                jsonEncode({'data': {'id': 'd1', 'account_status': 'pending_review', 'next_action': 'WAIT_FOR_REVIEW'}}),
+                200);
+          }));
+
+      expect(calls.first, '/api/v1/v2/driver/auth/refresh');
+      expect(calls, isNot(contains('/api/v1/m/auth/refresh')));
+      expect(r.route, '/driver_dossier');
+      expect(await TokenStorage.getRefreshToken(), 'r-v2-next');
+    });
+
+    test('session chauffeur refusée au démarrage → connexion par téléphone', () async {
+      SharedPreferences.setMockInitialValues({});
+      await TokenStorage.saveAuthTokens(
+          accessToken: jwt(validFor: const Duration(minutes: -5)), refreshToken: 'r', role: 'delivery');
+      await TokenStorage.saveSessionApi(TokenStorage.sessionApiDriverV2);
+
+      final r = await http.runWithClient(AuthSession.restore, () => MockClient((req) async =>
+          http.Response(jsonEncode({'code': 'REFRESH_TOKEN_INVALID', 'message': 'x'}), 401)));
+
+      expect(r.destination, BootDestination.login);
+      expect(r.route, '/driver_login');
+    });
+
+    test('chauffeur suspendu (403 ACCOUNT_SUSPENDED) → écran suspendu', () async {
+      SharedPreferences.setMockInitialValues({});
+      await TokenStorage.saveAuthTokens(
+          accessToken: jwt(validFor: const Duration(minutes: 10)), refreshToken: 'r', role: 'delivery');
+
+      final r = await http.runWithClient(AuthSession.restore, () => MockClient((req) async =>
+          http.Response(jsonEncode({'statusCode': 403, 'code': 'ACCOUNT_SUSPENDED', 'message': 'Compte suspendu'}), 403)));
+
+      expect(r.route, '/driver_suspended');
+    });
+
+    test('chauffeur hors-ligne : dernier statut connu, jamais /driver_main par défaut', () async {
+      SharedPreferences.setMockInitialValues({});
+      await TokenStorage.saveAuthTokens(
+          accessToken: jwt(validFor: const Duration(minutes: 10)), refreshToken: 'r',
+          userId: 'd1', role: 'delivery');
+      Future<BootResult> offline() => http.runWithClient(AuthSession.restore,
+          () => MockClient((req) async => throw const SocketException('offline')));
+
+      expect((await offline()).route, '/driver_dossier', reason: 'statut inconnu');
+      expect(await TokenStorage.hasSession(), isTrue, reason: 'pas de déconnexion');
+
+      SharedPreferences.setMockInitialValues({'driver_last_status_v1': 'd1:active'});
+      expect((await offline()).route, '/driver_main', reason: 'déjà vu actif');
     });
 
     test('access token expiré depuis des jours → refresh silencieux, reste connecté', () async {

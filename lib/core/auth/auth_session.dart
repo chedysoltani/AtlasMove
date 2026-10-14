@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../services/call_service.dart';
 import '../../services/device_token_service.dart';
+import '../../services/driver_account_store.dart';
 import '../../services/location_foreground_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/profile_service.dart';
@@ -24,9 +25,14 @@ class BootResult {
   /// Le refresh n'a pas pu aboutir (hors-ligne…) : on reste connecté et on réessaiera.
   final bool offline;
 
-  const BootResult(this.destination, {this.sessionExpired = false, this.offline = false});
+  /// Chauffeur : écran choisi selon le statut du compte (dossier, principal, suspendu…).
+  final String? driverRoute;
+
+  const BootResult(this.destination,
+      {this.sessionExpired = false, this.offline = false, this.driverRoute});
 
   String get route {
+    if (driverRoute != null) return driverRoute!;
     switch (destination) {
       case BootDestination.client:
         return '/client_dashboard';
@@ -105,8 +111,11 @@ class AuthSession with WidgetsBindingObserver {
           onTimeout: () => RefreshOutcome.transient,
         );
         if (outcome == RefreshOutcome.invalid) {
+          // Chauffeur : retour à la connexion par téléphone, pas au formulaire e-mail.
+          final wasDriver = await TokenStorage.getUserRole() == 'delivery';
           await TokenStorage.clearTokens();
-          return const BootResult(BootDestination.login, sessionExpired: true);
+          return BootResult(BootDestination.login,
+              sessionExpired: true, driverRoute: wasDriver ? '/driver_login' : null);
         }
         offline = outcome == RefreshOutcome.transient;
       }
@@ -118,10 +127,17 @@ class AuthSession with WidgetsBindingObserver {
         return BootResult(BootDestination.login, offline: offline);
       }
       instance.onTokensChanged();
-      return BootResult(
-        role == 'delivery' ? BootDestination.driver : BootDestination.client,
-        offline: offline,
-      );
+      if (role == 'delivery') {
+        // Jamais directement sur /driver_main : un chauffeur en attente de
+        // validation doit arriver sur « Mon dossier » (GET /v2/driver/me).
+        final route = await DriverAccountStore.instance.resolveHomeRoute();
+        if (route == DriverAccountStore.routeLogin) {
+          return const BootResult(BootDestination.login,
+              sessionExpired: true, driverRoute: '/driver_login');
+        }
+        return BootResult(BootDestination.driver, offline: offline, driverRoute: route);
+      }
+      return BootResult(BootDestination.client, offline: offline);
     } catch (e) {
       // Une erreur inattendue au démarrage ne doit jamais effacer la session.
       SafeLog.d('AuthSession.restore: ${e.runtimeType}');
@@ -249,6 +265,7 @@ class AuthSession with WidgetsBindingObserver {
     // 3. Sockets
     NotificationService().disconnect();
     CallService().disconnect();
+    DriverAccountStore.instance.clear();
 
     // 4. Stockage local
     if (!await TokenStorage.getRememberMe()) {

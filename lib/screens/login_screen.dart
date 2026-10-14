@@ -8,6 +8,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../models/user.dart';
 import '../providers/auth_provider.dart';
 import '../services/auth_service.dart';
+import '../services/driver_account_store.dart';
 import '../models/responses/auth_response.dart';
 import 'package:geolocator/geolocator.dart';
 import '../core/network/http_client.dart';
@@ -176,8 +177,10 @@ class _LoginScreenState extends State<LoginScreen>
             Navigator.of(context)
                 .pushNamedAndRemoveUntil('/client_dashboard', (_) => false);
           } else if (response.user.role == UserRole.delivery) {
-            Navigator.of(context)
-                .pushNamedAndRemoveUntil('/driver_main', (_) => false);
+            // Selon le statut du compte : dossier, écran principal, suspendu…
+            final route = await DriverAccountStore.instance.resolveHomeRoute();
+            if (!mounted) return;
+            Navigator.of(context).pushNamedAndRemoveUntil(route, (_) => false);
           }
         }
       } else {
@@ -763,6 +766,20 @@ class _LoginScreenState extends State<LoginScreen>
                 fontSize: 13, fontWeight: FontWeight.w600, color: _orange)),
             ),
           ],
+        ),
+        const SizedBox(height: 14),
+        // Chauffeurs : connexion par téléphone (code WhatsApp ou mot de passe).
+        OutlinedButton.icon(
+          onPressed: () => Navigator.pushNamed(context, '/driver_login'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: _orange,
+            side: BorderSide(color: _orange.withOpacity(0.5)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          ),
+          icon: const Icon(Icons.phone_iphone_rounded, size: 18),
+          label: Text('driver_v2.driver_phone_login'.tr(), style: GoogleFonts.poppins(
+            fontSize: 13, fontWeight: FontWeight.w600, color: _orange)),
         ),
       ],
     );

@@ -1,15 +1,11 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../core/config/app_config.dart';
 import '../core/constants/support_constants.dart';
 import '../core/network/http_client.dart';
-import '../core/storage/token_storage.dart';
+import '../services/support_whatsapp.dart';
 import 'support_ticket_chat_screen.dart';
 
 const _orange = Color(0xFFFF6B35);
@@ -152,64 +148,16 @@ class _SupportScreenState extends State<SupportScreen>
 
   bool _openingWhatsApp = false;
 
-  /// Ouvre la conversation WhatsApp du support avec un message prérempli
-  /// (type de compte, identifiant, version, plateforme) pour que le support
-  /// retrouve le compte. Ordre : app WhatsApp (ou WhatsApp Business), puis
-  /// wa.me dans le navigateur, puis le numéro à copier.
+  /// Ouvre la conversation WhatsApp du support (voir SupportWhatsApp) ; en
+  /// dernier recours, le numéro à copier.
   Future<void> _openWhatsApp() async {
     if (_openingWhatsApp) return;
     setState(() => _openingWhatsApp = true);
     try {
-      final uri = SupportConstants.whatsAppUri(await _whatsAppMessage());
-      if (await _tryLaunch(uri, LaunchMode.externalNonBrowserApplication)) return;
-      if (await _tryLaunch(uri, LaunchMode.externalApplication)) return;
-      if (mounted) _showWhatsAppUnavailable();
+      if (!await SupportWhatsApp.open() && mounted) _showWhatsAppUnavailable();
     } finally {
       if (mounted) setState(() => _openingWhatsApp = false);
     }
-  }
-
-  Future<bool> _tryLaunch(Uri uri, LaunchMode mode) async {
-    try {
-      return await launchUrl(uri, mode: mode);
-    } catch (e) {
-      debugPrint('WhatsApp launch error ($mode): $e');
-      return false;
-    }
-  }
-
-  Future<String> _whatsAppMessage() async {
-    final lines = <String>['support_extra.wa_greeting'.tr()];
-    try {
-      final loggedIn = await TokenStorage.hasSession() &&
-          !await TokenStorage.wasExplicitlyLoggedOut();
-      if (loggedIn) {
-        final role = await TokenStorage.getUserRole();
-        final userId = await TokenStorage.getUserId();
-        if (role != null && role.isNotEmpty) {
-          final roleLabel = (role == 'delivery' || role == 'driver')
-              ? 'rdv.driver'.tr()
-              : 'auth.client'.tr();
-          lines.add('support_extra.wa_role'.tr(namedArgs: {'role': roleLabel}));
-        }
-        if (userId != null && userId.isNotEmpty) {
-          lines.add('support_extra.wa_user_id'.tr(namedArgs: {'id': userId}));
-        }
-      } else {
-        lines.add('support_extra.wa_not_logged_in'.tr());
-      }
-    } catch (_) {}
-    try {
-      final info = await PackageInfo.fromPlatform();
-      lines.add('support_extra.wa_version'.tr(
-          namedArgs: {'version': '${info.version} (${info.buildNumber})'}));
-    } catch (_) {}
-    lines.add('support_extra.wa_platform'.tr(namedArgs: {
-      'platform': Platform.isIOS
-          ? 'iOS'
-          : Platform.isAndroid ? 'Android' : Platform.operatingSystem,
-    }));
-    return lines.join('\n');
   }
 
   /// Dernier recours : ni WhatsApp ni le navigateur n'ont pu s'ouvrir.
