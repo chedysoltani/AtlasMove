@@ -263,7 +263,9 @@
     "computed_on_rides": "Calcolato sulle tue corse completate",
     "annual": "Annuale",
     "annual_part": "Quota annuale",
-    "annual_explainer": "Questo importo è calcolato sul tuo fatturato annuo totale e versato una volta all'anno."
+    "annual_explainer": "Questo importo è calcolato sul tuo fatturato annuo totale e versato una volta all'anno.",
+    "atlasmove_commission": "Commissione AtlasMove",
+    "commission_explainer": "Commissione AtlasMove: {rate} del tuo fatturato, convertita e calcolata in USD."
   },
   "driver": {
     "dashboard_title": "Dashboard",

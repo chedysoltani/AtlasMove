@@ -263,7 +263,9 @@
     "computed_on_rides": "Berechnet auf Ihre abgeschlossenen Fahrten",
     "annual": "Jährlich",
     "annual_part": "Jahresanteil",
-    "annual_explainer": "Dieser Betrag wird auf Ihren gesamten Jahresumsatz berechnet und einmal jährlich ausgezahlt."
+    "annual_explainer": "Dieser Betrag wird auf Ihren gesamten Jahresumsatz berechnet und einmal jährlich ausgezahlt.",
+    "atlasmove_commission": "AtlasMove-Provision",
+    "commission_explainer": "AtlasMove-Provision: {rate} Ihres Umsatzes, umgerechnet und berechnet in USD."
   },
   "driver": {
     "dashboard_title": "Armaturenbrett",

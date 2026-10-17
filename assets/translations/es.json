@@ -263,7 +263,9 @@
     "computed_on_rides": "Calculado sobre tus viajes completados",
     "annual": "Anual",
     "annual_part": "Parte anual",
-    "annual_explainer": "Este importe se calcula sobre tu facturación anual total y se paga una vez al año."
+    "annual_explainer": "Este importe se calcula sobre tu facturación anual total y se paga una vez al año.",
+    "atlasmove_commission": "Comisión AtlasMove",
+    "commission_explainer": "Comisión AtlasMove: {rate} de tu facturación, convertida y calculada en USD."
   },
   "driver": {
     "dashboard_title": "Panel de Control",

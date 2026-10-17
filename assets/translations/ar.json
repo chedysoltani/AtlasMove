@@ -263,7 +263,9 @@
     "computed_on_rides": "محسوب على رحلاتك المكتملة",
     "annual": "سنوي",
     "annual_part": "الحصة السنوية",
-    "annual_explainer": "يُحسب هذا المبلغ على إجمالي رقم أعمالك السنوي ويُدفع مرة واحدة في السنة."
+    "annual_explainer": "يُحسب هذا المبلغ على إجمالي رقم أعمالك السنوي ويُدفع مرة واحدة في السنة.",
+    "atlasmove_commission": "عمولة AtlasMove",
+    "commission_explainer": "عمولة AtlasMove: {rate} من رقم أعمالك، محوّلة ومحسوبة بالدولار الأمريكي."
   },
   "driver": {
     "dashboard_title": "لوحة القيادة",

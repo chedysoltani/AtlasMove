@@ -263,7 +263,9 @@
     "computed_on_rides": "Calculé sur vos courses complétées",
     "annual": "Annuel",
     "annual_part": "Part annuelle",
-    "annual_explainer": "Ce montant est calculé sur votre chiffre d'affaires annuel total et versé une fois par an."
+    "annual_explainer": "Ce montant est calculé sur votre chiffre d'affaires annuel total et versé une fois par an.",
+    "atlasmove_commission": "Commission AtlasMove",
+    "commission_explainer": "Commission AtlasMove : {rate} de votre chiffre d'affaires, convertie et calculée en USD."
   },
   "driver": {
     "dashboard_title": "Tableau de Bord",

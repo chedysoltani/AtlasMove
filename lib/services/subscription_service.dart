@@ -3,8 +3,16 @@ import '../core/network/http_client.dart';
 import '../models/driver_subscription_models.dart';
 
 class PrivilegeService {
-  static Future<PrivilegeDashboard> getDashboard() async {
-    final response = await HttpClient.get('/m/livreur/subscription/dashboard');
+  /// [latitude]/[longitude] : le backend résout la devise de la zone du
+  /// chauffeur (ses revenus) ; les revenus AtlasMove restent en USD.
+  static Future<PrivilegeDashboard> getDashboard({double? latitude, double? longitude}) async {
+    final response = await HttpClient.get(
+      '/m/livreur/subscription/dashboard',
+      queryParams: {
+        if (latitude != null) 'latitude': latitude.toString(),
+        if (longitude != null) 'longitude': longitude.toString(),
+      },
+    );
     final json = response.json;
     final outer = (json['data'] as Map<String, dynamic>?) ?? json;
     final data = (outer['data'] as Map<String, dynamic>?) ?? outer;

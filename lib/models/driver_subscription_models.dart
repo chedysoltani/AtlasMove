@@ -63,6 +63,14 @@ class PrivilegeFinancials {
   final double totalCommissionPaid;
   final double totalDriverEarnings;
 
+  /// Revenus du chauffeur : devise de sa zone ([currency]). Les revenus
+  /// AtlasMove (commission, abonnement) sont toujours exprimés en USD : le
+  /// backend envoie les montants convertis et/ou le taux 1 [currency] = [usdRate] USD.
+  final double? usdRate;
+  final double? totalDriverEarningsUsd;
+  final double? totalCommissionPaidUsd;
+  final double? totalSpentSubscriptionsUsd;
+
   const PrivilegeFinancials({
     required this.totalSpentSubscriptions,
     required this.currency,
@@ -70,7 +78,21 @@ class PrivilegeFinancials {
     required this.totalTripsCompleted,
     required this.totalCommissionPaid,
     required this.totalDriverEarnings,
+    this.usdRate,
+    this.totalDriverEarningsUsd,
+    this.totalCommissionPaidUsd,
+    this.totalSpentSubscriptionsUsd,
   });
+
+  /// Conversion en USD ; null si la devise n'est pas l'USD et qu'aucun taux n'est connu.
+  double? toUsd(double amount) {
+    if (currency.toUpperCase() == 'USD') return amount;
+    return usdRate != null ? amount * usdRate! : null;
+  }
+
+  double? get driverEarningsUsd => totalDriverEarningsUsd ?? toUsd(totalDriverEarnings);
+  double? get commissionPaidUsd => totalCommissionPaidUsd ?? toUsd(totalCommissionPaid);
+  double? get spentSubscriptionsUsd => totalSpentSubscriptionsUsd ?? toUsd(totalSpentSubscriptions);
 
   factory PrivilegeFinancials.fromJson(Map<String, dynamic> json) {
     return PrivilegeFinancials(
@@ -80,6 +102,10 @@ class PrivilegeFinancials {
       totalTripsCompleted: int.tryParse(json['totalTripsCompleted']?.toString() ?? '0') ?? 0,
       totalCommissionPaid: double.tryParse(json['totalCommissionPaid']?.toString() ?? '0') ?? 0.0,
       totalDriverEarnings: double.tryParse(json['totalDriverEarnings']?.toString() ?? '0') ?? 0.0,
+      usdRate: double.tryParse(json['usdRate']?.toString() ?? ''),
+      totalDriverEarningsUsd: double.tryParse(json['totalDriverEarningsUsd']?.toString() ?? ''),
+      totalCommissionPaidUsd: double.tryParse(json['totalCommissionPaidUsd']?.toString() ?? ''),
+      totalSpentSubscriptionsUsd: double.tryParse(json['totalSpentSubscriptionsUsd']?.toString() ?? ''),
     );
   }
 }

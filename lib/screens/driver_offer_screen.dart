@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import '../models/driver_subscription_models.dart';
 import '../services/subscription_service.dart';
 import '../services/driver_billing_service.dart';
+import '../services/location_service.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/service_models.dart';
 
 class DriverOfferScreen extends StatefulWidget {
@@ -61,7 +63,16 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
       _error = null;
     });
     try {
-      final data = await PrivilegeService.getDashboard();
+      // Position → devise de la zone du chauffeur (ses revenus)
+      Position? pos = LocationService().currentPosition;
+      try {
+        pos ??= await LocationService().getCurrentPosition().timeout(
+            const Duration(seconds: 3), onTimeout: () => null);
+      } catch (_) {}
+      final data = await PrivilegeService.getDashboard(
+        latitude: pos?.latitude,
+        longitude: pos?.longitude,
+      );
       if (mounted) {
         setState(() {
           _data = data;
@@ -120,6 +131,17 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
 
   String _commissionRateLabel(double rate) =>
       '${(rate * 100).toStringAsFixed(0)}%';
+
+  /// Revenus AtlasMove (commission, abonnement) : toujours en USD ; montant
+  /// dans la devise du chauffeur tant que le backend n'envoie ni USD ni taux.
+  String _atlasMoveAmount(double? usd, double local, String currency) => usd != null
+      ? '${usd.toStringAsFixed(2)} USD'
+      : '${local.toStringAsFixed(2)} $currency';
+
+  // Calcul de la carte du bas : commission 10 % (services à commission) ou
+  // 2 % (Taxi Économique), appliqué au CA converti en USD.
+  double get _atlasMoveRate =>
+      _isTaxiProfile ? BillingRule.annualShareSubscription : BillingRule.commissionRate;
 
   IconData _rewardIcon(String type) =>
       type == 'travel' ? Icons.flight_rounded : Icons.account_balance_wallet_rounded;
@@ -784,7 +806,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
               _finRow(
                 icon: Icons.pie_chart_rounded,
                 label: 'privilege.commission_paid'.tr(namedArgs: {'rate': _commissionRateLabel(f.commissionRate)}),
-                value: '${f.totalCommissionPaid.toStringAsFixed(2)} ${f.currency}',
+                value: _atlasMoveAmount(f.commissionPaidUsd, f.totalCommissionPaid, f.currency),
                 color: _orange,
               ),
               if (_isTaxiProfile) ...[
@@ -792,7 +814,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                 _finRow(
                   icon: Icons.receipt_long_rounded,
                   label: 'privilege.subscriptions_paid'.tr(),
-                  value: '${f.totalSpentSubscriptions.toStringAsFixed(2)} ${f.currency}',
+                  value: _atlasMoveAmount(f.spentSubscriptionsUsd, f.totalSpentSubscriptions, f.currency),
                   color: const Color(0xFF3B82F6),
                 ),
               ],
@@ -880,8 +902,13 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
   // ── Annual Revenue Share ───────────────────────────────────────────────────
 
   Widget _buildAnnualRevenueSection(PrivilegeFinancials f) {
-    final annualShare = f.totalDriverEarnings * _annualShareRate;
+    // Titre : part annuelle (3 % / 2 %) ; calcul : revenu AtlasMove en USD
     final rate = {'rate': _commissionRateLabel(_annualShareRate)};
+    final revenueUsd = f.driverEarningsUsd;
+    final revenue = revenueUsd ?? f.totalDriverEarnings;
+    final revenueCurrency = revenueUsd != null ? 'USD' : f.currency;
+    final atlasMoveShare = revenue * _atlasMoveRate;
+    final showLocal = revenueUsd != null && f.currency.toUpperCase() != 'USD';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -982,13 +1009,21 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            '${f.totalDriverEarnings.toStringAsFixed(2)} ${f.currency}',
+                            '${revenue.toStringAsFixed(2)} $revenueCurrency',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
+                          if (showLocal)
+                            Text(
+                              '${f.totalDriverEarnings.toStringAsFixed(2)} ${f.currency}',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 10,
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -999,7 +1034,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        '× ${_commissionRateLabel(_annualShareRate)}',
+                        '× ${_commissionRateLabel(_atlasMoveRate)}',
                         style: TextStyle(
                           color: Color(0xFF10B981),
                           fontSize: 13,
@@ -1013,7 +1048,9 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            'privilege.annual_part'.tr(),
+                            _isTaxiProfile
+                                ? 'privilege.annual_part'.tr()
+                                : 'privilege.atlasmove_commission'.tr(),
                             style: TextStyle(
                               color: Color(0xFFA7F3D0),
                               fontSize: 10,
@@ -1021,7 +1058,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            '${annualShare.toStringAsFixed(2)} ${f.currency}',
+                            '${atlasMoveShare.toStringAsFixed(2)} $revenueCurrency',
                             style: const TextStyle(
                               color: Color(0xFF10B981),
                               fontSize: 14,
@@ -1043,7 +1080,10 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'privilege.annual_explainer'.tr(),
+                      _isTaxiProfile
+                          ? 'privilege.annual_explainer'.tr()
+                          : 'privilege.commission_explainer'
+                              .tr(namedArgs: {'rate': _commissionRateLabel(_atlasMoveRate)}),
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.6),
                         fontSize: 11,

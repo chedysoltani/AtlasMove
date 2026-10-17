@@ -263,7 +263,9 @@
     "computed_on_rides": "Calculated on your completed rides",
     "annual": "Annual",
     "annual_part": "Annual share",
-    "annual_explainer": "This amount is calculated on your total annual revenue and paid once a year."
+    "annual_explainer": "This amount is calculated on your total annual revenue and paid once a year.",
+    "atlasmove_commission": "AtlasMove commission",
+    "commission_explainer": "AtlasMove commission: {rate} of your revenue, converted and calculated in USD."
   },
   "driver": {
     "dashboard_title": "Dashboard",
