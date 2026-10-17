@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/service_models.dart';
 import '../core/config/api_config.dart';
+import '../providers/locale_provider.dart';
 
 
 class ServiceApi {
@@ -16,6 +17,8 @@ class ServiceApi {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'User-Agent': 'AtlasMove/1.0 (Flutter)',
+      // Le backend renvoie name/description dans la langue choisie (fallback fr)
+      'Accept-Language': LocaleProvider.currentCode,
     };
     
     if (token != null && token.isNotEmpty) {
@@ -61,7 +64,7 @@ class ServiceApi {
 
   static Future<List<ServiceCategory>> getCategories({required String token}) async {
     try {
-      final uri = Uri.parse('$_baseUrl/services/categories');
+      final uri = Uri.parse('$_baseUrl/api/v1/services/categories');
 
       final response = await http.get(
         uri,

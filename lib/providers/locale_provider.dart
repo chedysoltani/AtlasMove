@@ -34,13 +34,20 @@ class LocaleProvider extends ChangeNotifier {
     'es': '🇪🇸',
   };
 
+  /// Langue choisie, lisible sans await (en-tête Accept-Language des requêtes API).
+  /// Chargée au démarrage par getSavedLocale(), mise à jour par saveLocale().
+  static String _currentCode = 'fr';
+  static String get currentCode => _currentCode;
+
   static Future<Locale> getSavedLocale() async {
     final prefs = await SharedPreferences.getInstance();
     final code = prefs.getString(_key) ?? 'fr';
+    _currentCode = code;
     return Locale(code);
   }
 
   static Future<void> saveLocale(String code) async {
+    _currentCode = code;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, code);
   }

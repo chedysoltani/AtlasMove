@@ -3,6 +3,7 @@ import '../models/service_models.dart';
 import '../services/service_api.dart';
 import '../core/network/http_client.dart';
 import '../core/storage/token_storage.dart';
+import 'locale_provider.dart';
 
 // Provider pour récupérer le token depuis le stockage sécurisé
 final tokenProvider = AsyncNotifierProvider<TokenNotifier, String?>(() {
@@ -41,6 +42,8 @@ final catalogueProvider = AsyncNotifierProvider<CatalogueNotifier, ServiceCatalo
 
 class CatalogueNotifier extends AsyncNotifier<ServiceCatalogue> {
   bool _isLoading = false;
+  // Langue du catalogue affiché : noms/descriptions traduits par le backend
+  String? _loadedLocale;
 
   @override
   ServiceCatalogue build() {
@@ -51,12 +54,15 @@ class CatalogueNotifier extends AsyncNotifier<ServiceCatalogue> {
     if (_isLoading) return;
     _isLoading = true;
 
-    if (state.value == null || state.value!.data.isEmpty) {
+    final locale = LocaleProvider.currentCode;
+    // Langue changée depuis le dernier chargement : on n'affiche pas l'ancienne
+    if (state.value == null || state.value!.data.isEmpty || _loadedLocale != locale) {
       state = const AsyncValue.loading();
     }
 
     try {
       final catalogue = await _fetchWithFallback(latitude: latitude, longitude: longitude);
+      _loadedLocale = locale;
       state = AsyncValue.data(catalogue);
     } catch (e, stack) {
       if (state.value != null && state.value!.data.isNotEmpty) return;

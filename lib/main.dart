@@ -81,6 +81,8 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
+  // Langue choisie au premier lancement : envoyée au backend (Accept-Language)
+  await LocaleProvider.getSavedLocale();
 
   // Initialiser Firebase (requis pour FCM)
   try {

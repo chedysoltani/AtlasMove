@@ -8,6 +8,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../auth/jwt_utils.dart';
 import '../storage/token_storage.dart';
 import '../utils/safe_log.dart';
+import '../../providers/locale_provider.dart';
 
 /// Devine le Content-Type d'un fichier à partir de son extension.
 /// Le serveur rejette les uploads dont le Content-Type n'est pas explicitement
@@ -110,6 +111,8 @@ class HttpClient {
       'X-Device-Id': deviceId,
       'X-Platform': platform,
       'X-App-Version': appVersion,
+      // Le backend traduit les services/catégories dans la langue choisie
+      'Accept-Language': LocaleProvider.currentCode,
     };
 
     // Préférence « Se souvenir de moi » : le backend peut adapter la durée de
