@@ -59,6 +59,7 @@
     "history": "Historique",
     "revenue": "Revenus",
     "subscription": "Abonnement",
+    "commission": "Commission",
     "privilege": "Privilège"
   },
   "lang": {
@@ -161,6 +162,21 @@
     "drivers_stat": "Livreurs",
     "available_stat": "Disponible"
   },
+  "commission": {
+    "title": "Ma commission",
+    "badge": "SANS ABONNEMENT",
+    "of_revenue": "du chiffre d'affaires",
+    "tagline": "Pas d'abonnement mensuel : vous payez seulement une part de ce que vous gagnez.",
+    "feature_no_subscription": "Aucun abonnement de 90 $ à payer",
+    "feature_auto": "{rate} calculés automatiquement sur vos courses terminées",
+    "feature_monthly": "À régler chaque mois pour garder l'accès à vos services",
+    "feature_details": "Le détail par service est disponible dans « Gains »",
+    "this_month": "Commission de {month}",
+    "on_revenue": "Sur un chiffre d'affaires de {amount}",
+    "nothing_due": "Rien à payer pour l'instant",
+    "unavailable": "Montant indisponible pour le moment",
+    "see_earnings": "Voir le détail dans Gains"
+  },
   "sub": {
     "title": "Mon Abonnement",
     "active": "Abonnement Premium Actif",
@@ -242,8 +258,8 @@
     "load_error": "Impossible de charger le tableau de bord",
     "months_progress": "{done} / {total} mois",
     "monthly_explainer": "Chaque mois, vous payez {rate} de commission sur vos courses + un abonnement de 90 USD.",
-    "annual_share_title": "2% Chiffre d'Affaires Annuel",
-    "annual_share_short": "2% de votre CA annuel",
+    "annual_share_title": "{rate} Chiffre d'Affaires Annuel",
+    "annual_share_short": "{rate} de votre CA annuel",
     "computed_on_rides": "Calculé sur vos courses complétées",
     "annual": "Annuel",
     "annual_part": "Part annuelle",
@@ -641,7 +657,8 @@
     "propose_fare": "Proposer votre tarif",
     "send_offer": "Envoyer l'offre",
     "counter_fare": "Proposer votre contre-tarif :",
-    "subscription_required": "Abonnement requis pour accepter des courses"
+    "subscription_required": "Abonnement requis pour accepter des courses",
+    "commission_required": "Accès suspendu : vérifiez votre commission AtlasMove"
   },
   "sub_payment": {
     "title": "Paiement Abonnement",
@@ -846,7 +863,7 @@
     "revenue": "Chiffre d'affaires",
     "rdv_completed": "{count} rendez-vous terminés",
     "commission_label": "Commission AtlasMove ({rate}%)",
-    "delivery_only": "Applicable aux services de livraison uniquement",
+    "delivery_only": "Tous les services, sauf Taxi Économique",
     "amount_due": "Montant dû",
     "paid": "Payée",
     "pay_before": "À régler avant la fin du mois pour maintenir l'accès à vos services.",

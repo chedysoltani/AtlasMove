@@ -59,6 +59,7 @@
     "history": "Verlauf",
     "revenue": "Einnahmen",
     "subscription": "Abo",
+    "commission": "Provision",
     "privilege": "Privileg"
   },
   "lang": {
@@ -161,6 +162,21 @@
     "drivers_stat": "Fahrer",
     "available_stat": "Verfügbar"
   },
+  "commission": {
+    "title": "Meine Provision",
+    "badge": "OHNE ABO",
+    "of_revenue": "vom Umsatz",
+    "tagline": "Kein Monatsabo: Sie zahlen nur einen Anteil an dem, was Sie verdienen.",
+    "feature_no_subscription": "Kein 90-$-Abo zu zahlen",
+    "feature_auto": "{rate} automatisch auf Ihre abgeschlossenen Fahrten berechnet",
+    "feature_monthly": "Monatlich zu zahlen, um den Zugang zu Ihren Diensten zu behalten",
+    "feature_details": "Details pro Dienst finden Sie unter „Einnahmen“",
+    "this_month": "Provision für {month}",
+    "on_revenue": "Bei einem Umsatz von {amount}",
+    "nothing_due": "Derzeit nichts zu zahlen",
+    "unavailable": "Betrag derzeit nicht verfügbar",
+    "see_earnings": "Details unter Einnahmen ansehen"
+  },
   "sub": {
     "title": "Mein Abonnement",
     "active": "Premium-Abonnement Aktiv",
@@ -242,8 +258,8 @@
     "load_error": "Dashboard konnte nicht geladen werden",
     "months_progress": "{done} / {total} Monate",
     "monthly_explainer": "Jeden Monat zahlen Sie {rate} Provision auf Ihre Fahrten + ein Abonnement von 90 USD.",
-    "annual_share_title": "2 % des Jahresumsatzes",
-    "annual_share_short": "2 % Ihres Jahresumsatzes",
+    "annual_share_title": "{rate} des Jahresumsatzes",
+    "annual_share_short": "{rate} Ihres Jahresumsatzes",
     "computed_on_rides": "Berechnet auf Ihre abgeschlossenen Fahrten",
     "annual": "Jährlich",
     "annual_part": "Jahresanteil",
@@ -641,7 +657,8 @@
     "propose_fare": "Ihren Preis vorschlagen",
     "send_offer": "Angebot senden",
     "counter_fare": "Ihren Gegenpreis vorschlagen:",
-    "subscription_required": "Abonnement erforderlich, um Fahrten anzunehmen"
+    "subscription_required": "Abonnement erforderlich, um Fahrten anzunehmen",
+    "commission_required": "Zugang gesperrt: Prüfen Sie Ihre AtlasMove-Provision"
   },
   "sub_payment": {
     "title": "Abonnement-Zahlung",
@@ -846,7 +863,7 @@
     "revenue": "Umsatz",
     "rdv_completed": "{count} Termine abgeschlossen",
     "commission_label": "AtlasMove-Provision ({rate} %)",
-    "delivery_only": "Gilt nur für Lieferdienste",
+    "delivery_only": "Alle Dienste außer Spar-Taxi",
     "amount_due": "Fälliger Betrag",
     "paid": "Bezahlt",
     "pay_before": "Vor Monatsende zu begleichen, um den Zugang zu Ihren Diensten zu behalten.",

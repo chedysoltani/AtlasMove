@@ -495,7 +495,8 @@ class _DriverEarningsScreenState extends State<DriverEarningsScreen> {
   }
 
   Widget _buildBreakdownItem(CommissionBreakdownItem item) {
-    final isTaxi = item.isTaxiType;
+    // Taxi Économique (abonnement) : exempté de la commission 10 %
+    final isTaxi = item.isSubscriptionService;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),

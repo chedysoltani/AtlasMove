@@ -59,6 +59,7 @@
     "history": "Historial",
     "revenue": "Ingresos",
     "subscription": "Suscripción",
+    "commission": "Comisión",
     "privilege": "Privilegio"
   },
   "lang": {
@@ -161,6 +162,21 @@
     "drivers_stat": "Repartidores",
     "available_stat": "Disponible"
   },
+  "commission": {
+    "title": "Mi comisión",
+    "badge": "SIN SUSCRIPCIÓN",
+    "of_revenue": "de la facturación",
+    "tagline": "Sin suscripción mensual: solo pagas una parte de lo que ganas.",
+    "feature_no_subscription": "Sin suscripción de 90 $ que pagar",
+    "feature_auto": "{rate} calculado automáticamente sobre tus viajes completados",
+    "feature_monthly": "A pagar cada mes para mantener el acceso a tus servicios",
+    "feature_details": "El detalle por servicio está disponible en «Ganancias»",
+    "this_month": "Comisión de {month}",
+    "on_revenue": "Sobre una facturación de {amount}",
+    "nothing_due": "Nada que pagar por ahora",
+    "unavailable": "Importe no disponible por el momento",
+    "see_earnings": "Ver el detalle en Ganancias"
+  },
   "sub": {
     "title": "Mi Suscripción",
     "active": "Suscripción Premium Activa",
@@ -242,8 +258,8 @@
     "load_error": "No se pudo cargar el panel",
     "months_progress": "{done} / {total} meses",
     "monthly_explainer": "Cada mes pagas una comisión del {rate} sobre tus viajes + una suscripción de 90 USD.",
-    "annual_share_title": "2 % de la facturación anual",
-    "annual_share_short": "2 % de tu facturación anual",
+    "annual_share_title": "{rate} de la facturación anual",
+    "annual_share_short": "{rate} de tu facturación anual",
     "computed_on_rides": "Calculado sobre tus viajes completados",
     "annual": "Anual",
     "annual_part": "Parte anual",
@@ -641,7 +657,8 @@
     "propose_fare": "Proponer tu tarifa",
     "send_offer": "Enviar oferta",
     "counter_fare": "Propón tu contratarifa:",
-    "subscription_required": "Se requiere suscripción para aceptar viajes"
+    "subscription_required": "Se requiere suscripción para aceptar viajes",
+    "commission_required": "Acceso suspendido: revisa tu comisión de AtlasMove"
   },
   "sub_payment": {
     "title": "Pago de suscripción",
@@ -846,7 +863,7 @@
     "revenue": "Facturación",
     "rdv_completed": "{count} citas completadas",
     "commission_label": "Comisión AtlasMove ({rate} %)",
-    "delivery_only": "Aplicable solo a servicios de entrega",
+    "delivery_only": "Todos los servicios excepto Taxi Económico",
     "amount_due": "Importe adeudado",
     "paid": "Pagada",
     "pay_before": "A pagar antes de fin de mes para mantener el acceso a tus servicios.",

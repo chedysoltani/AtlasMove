@@ -48,6 +48,7 @@ import 'services/notification_service.dart';
 import 'widgets/notification_sheet.dart';
 import 'models/notification_model.dart';
 import 'screens/driver_subscription_screen.dart';
+import 'screens/driver_commission_screen.dart';
 import 'screens/delete_account_screen.dart';
 import 'screens/language_selection_screen.dart';
 import 'screens/referral_screen.dart';
@@ -424,6 +425,7 @@ class AtlasMoveApp extends StatelessWidget {
             '/client_rewards': (context) => const ClientRewardsScreen(),
             '/cards': (context) => const CardsListScreen(),
             '/driver_subscription': (context) => const DriverSubscriptionScreen(),
+            '/driver_commission': (context) => const DriverCommissionScreen(),
             '/delete_account': (context) => const DeleteAccountScreen(),
             '/language': (context) => const LanguageSelectionScreen(),
             '/referral': (context) => const ReferralScreen(),

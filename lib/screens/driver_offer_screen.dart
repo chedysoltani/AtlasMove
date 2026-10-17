@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/driver_subscription_models.dart';
 import '../services/subscription_service.dart';
+import '../services/driver_billing_service.dart';
+import '../models/service_models.dart';
 
 class DriverOfferScreen extends StatefulWidget {
   const DriverOfferScreen({super.key});
@@ -38,10 +40,17 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut));
     _load();
+    DriverBillingService.instance.isSubscription.addListener(_onBillingChanged);
+    DriverBillingService.instance.refresh();
+  }
+
+  void _onBillingChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    DriverBillingService.instance.isSubscription.removeListener(_onBillingChanged);
     _fadeCtrl.dispose();
     super.dispose();
   }
@@ -98,9 +107,16 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
     }
   }
 
-  // Taxi = has subscription spending; logistics = commission only
+  // Taxi Économique = abonnement 90 USD ; autres services = commission 10 %.
+  // Service encore inconnu : on se fie aux abonnements déjà payés.
   bool get _isTaxiProfile =>
+      DriverBillingService.instance.isSubscription.value ??
       (_data?.financials.totalSpentSubscriptions ?? 0) > 0;
+
+  // Part du CA annuel : 2 % (Taxi Économique) ou 3 % (services à commission)
+  double get _annualShareRate => _isTaxiProfile
+      ? BillingRule.annualShareSubscription
+      : BillingRule.annualShareCommission;
 
   String _commissionRateLabel(double rate) =>
       '${(rate * 100).toStringAsFixed(0)}%';
@@ -864,11 +880,12 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
   // ── Annual Revenue Share ───────────────────────────────────────────────────
 
   Widget _buildAnnualRevenueSection(PrivilegeFinancials f) {
-    final annualShare = f.totalDriverEarnings * 0.02;
+    final annualShare = f.totalDriverEarnings * _annualShareRate;
+    final rate = {'rate': _commissionRateLabel(_annualShareRate)};
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionLabel('privilege.annual_share_title'.tr()),
+        _sectionLabel('privilege.annual_share_title'.tr(namedArgs: rate)),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(18),
@@ -907,7 +924,7 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'privilege.annual_share_short'.tr(),
+                          'privilege.annual_share_short'.tr(namedArgs: rate),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 15,
@@ -981,8 +998,8 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
                         color: const Color(0xFF10B981).withOpacity(0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
-                        '× 2%',
+                      child: Text(
+                        '× ${_commissionRateLabel(_annualShareRate)}',
                         style: TextStyle(
                           color: Color(0xFF10B981),
                           fontSize: 13,

@@ -59,6 +59,7 @@
     "history": "السجل",
     "revenue": "الإيرادات",
     "subscription": "الاشتراك",
+    "commission": "العمولة",
     "privilege": "الامتياز"
   },
   "lang": {
@@ -161,6 +162,21 @@
     "drivers_stat": "سائق",
     "available_stat": "متاح"
   },
+  "commission": {
+    "title": "عمولتي",
+    "badge": "بدون اشتراك",
+    "of_revenue": "من رقم الأعمال",
+    "tagline": "لا يوجد اشتراك شهري: تدفع فقط جزءًا مما تكسبه.",
+    "feature_no_subscription": "لا يوجد اشتراك 90 $ للدفع",
+    "feature_auto": "{rate} تُحسب تلقائيًا على رحلاتك المكتملة",
+    "feature_monthly": "تُدفع كل شهر للحفاظ على الوصول إلى خدماتك",
+    "feature_details": "تفاصيل كل خدمة متوفرة في «الأرباح»",
+    "this_month": "عمولة {month}",
+    "on_revenue": "على رقم أعمال قدره {amount}",
+    "nothing_due": "لا شيء للدفع حاليًا",
+    "unavailable": "المبلغ غير متوفر حاليًا",
+    "see_earnings": "عرض التفاصيل في الأرباح"
+  },
   "sub": {
     "title": "اشتراكي",
     "active": "الاشتراك المميز نشط",
@@ -242,8 +258,8 @@
     "load_error": "تعذر تحميل لوحة القيادة",
     "months_progress": "{done} / {total} شهر",
     "monthly_explainer": "كل شهر، تدفع عمولة {rate} على رحلاتك + اشتراكًا بقيمة 90 دولارًا.",
-    "annual_share_title": "2% من رقم الأعمال السنوي",
-    "annual_share_short": "2% من رقم أعمالك السنوي",
+    "annual_share_title": "{rate} من رقم الأعمال السنوي",
+    "annual_share_short": "{rate} من رقم أعمالك السنوي",
     "computed_on_rides": "محسوب على رحلاتك المكتملة",
     "annual": "سنوي",
     "annual_part": "الحصة السنوية",
@@ -641,7 +657,8 @@
     "propose_fare": "اقترح سعرك",
     "send_offer": "إرسال العرض",
     "counter_fare": "اقترح سعرك المضاد:",
-    "subscription_required": "يلزم اشتراك لقبول الرحلات"
+    "subscription_required": "يلزم اشتراك لقبول الرحلات",
+    "commission_required": "تم تعليق الوصول: تحقق من عمولة AtlasMove"
   },
   "sub_payment": {
     "title": "دفع الاشتراك",
@@ -846,7 +863,7 @@
     "revenue": "رقم الأعمال",
     "rdv_completed": "{count} موعد مكتمل",
     "commission_label": "عمولة AtlasMove ({rate}%)",
-    "delivery_only": "تنطبق على خدمات التوصيل فقط",
+    "delivery_only": "جميع الخدمات باستثناء التاكسي الاقتصادي",
     "amount_due": "المبلغ المستحق",
     "paid": "مدفوعة",
     "pay_before": "يجب الدفع قبل نهاية الشهر للحفاظ على الوصول إلى خدماتك.",

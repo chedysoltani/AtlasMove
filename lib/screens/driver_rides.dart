@@ -8,6 +8,7 @@ import '../widgets/custom_button.dart';
 import '../services/location_service.dart';
 import '../services/trip_service.dart';
 import '../services/driver_service.dart';
+import '../services/driver_billing_service.dart';
 import '../core/network/http_client.dart';
 import '../models/trip_models.dart';
 import 'driver_active_ride.dart';
@@ -1061,15 +1062,20 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
       } on ForbiddenException {
         if (mounted) {
           setState(() => _acceptingTripId = null);
+          // Taxi Économique : abonnement requis ; autres services : commission 10 %
+          final commission = DriverBillingService.instance.isCommission;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('driver_rides.subscription_required'.tr()),
+              content: Text(commission
+                  ? 'driver_rides.commission_required'.tr()
+                  : 'driver_rides.subscription_required'.tr()),
               backgroundColor: const Color(0xFFEA580C),
               duration: const Duration(seconds: 4),
               action: SnackBarAction(
-                label: 'S\'abonner',
+                label: commission ? 'nav.commission'.tr() : 'S\'abonner',
                 textColor: Colors.white,
-                onPressed: () => Navigator.pushNamed(context, '/driver_subscription'),
+                onPressed: () => Navigator.pushNamed(
+                    context, commission ? '/driver_commission' : '/driver_subscription'),
               ),
             ),
           );

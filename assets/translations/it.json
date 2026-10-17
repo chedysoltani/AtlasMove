@@ -59,6 +59,7 @@
     "history": "Cronologia",
     "revenue": "Entrate",
     "subscription": "Abbonamento",
+    "commission": "Commissione",
     "privilege": "Privilegio"
   },
   "lang": {
@@ -161,6 +162,21 @@
     "drivers_stat": "Corrieri",
     "available_stat": "Disponibile"
   },
+  "commission": {
+    "title": "La mia commissione",
+    "badge": "SENZA ABBONAMENTO",
+    "of_revenue": "del fatturato",
+    "tagline": "Nessun abbonamento mensile: paghi solo una parte di ciò che guadagni.",
+    "feature_no_subscription": "Nessun abbonamento da 90 $ da pagare",
+    "feature_auto": "{rate} calcolato automaticamente sulle corse completate",
+    "feature_monthly": "Da pagare ogni mese per mantenere l'accesso ai tuoi servizi",
+    "feature_details": "Il dettaglio per servizio è disponibile in «Guadagni»",
+    "this_month": "Commissione di {month}",
+    "on_revenue": "Su un fatturato di {amount}",
+    "nothing_due": "Niente da pagare per ora",
+    "unavailable": "Importo non disponibile al momento",
+    "see_earnings": "Vedi il dettaglio in Guadagni"
+  },
   "sub": {
     "title": "Il Mio Abbonamento",
     "active": "Abbonamento Premium Attivo",
@@ -242,8 +258,8 @@
     "load_error": "Impossibile caricare la dashboard",
     "months_progress": "{done} / {total} mesi",
     "monthly_explainer": "Ogni mese paghi una commissione del {rate} sulle tue corse + un abbonamento di 90 USD.",
-    "annual_share_title": "2% del fatturato annuo",
-    "annual_share_short": "2% del tuo fatturato annuo",
+    "annual_share_title": "{rate} del fatturato annuo",
+    "annual_share_short": "{rate} del tuo fatturato annuo",
     "computed_on_rides": "Calcolato sulle tue corse completate",
     "annual": "Annuale",
     "annual_part": "Quota annuale",
@@ -641,7 +657,8 @@
     "propose_fare": "Proponi la tua tariffa",
     "send_offer": "Invia offerta",
     "counter_fare": "Proponi la tua controtariffa:",
-    "subscription_required": "Abbonamento richiesto per accettare corse"
+    "subscription_required": "Abbonamento richiesto per accettare corse",
+    "commission_required": "Accesso sospeso: verifica la tua commissione AtlasMove"
   },
   "sub_payment": {
     "title": "Pagamento abbonamento",
@@ -846,7 +863,7 @@
     "revenue": "Fatturato",
     "rdv_completed": "{count} appuntamenti completati",
     "commission_label": "Commissione AtlasMove ({rate}%)",
-    "delivery_only": "Valida solo per i servizi di consegna",
+    "delivery_only": "Tutti i servizi tranne Taxi Economico",
     "amount_due": "Importo dovuto",
     "paid": "Pagata",
     "pay_before": "Da saldare entro fine mese per mantenere l'accesso ai tuoi servizi.",

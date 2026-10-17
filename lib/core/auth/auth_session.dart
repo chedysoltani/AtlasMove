@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../../services/call_service.dart';
 import '../../services/device_token_service.dart';
 import '../../services/driver_account_store.dart';
+import '../../services/driver_billing_service.dart';
 import '../../services/location_foreground_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/profile_service.dart';
@@ -234,6 +235,9 @@ class AuthSession with WidgetsBindingObserver {
     _proactiveTimer?.cancel();
     _retryTimer?.cancel();
     _retryAttempt = 0;
+
+    // Mode de facturation (abonnement / commission) propre au chauffeur déconnecté
+    DriverBillingService.instance.reset();
 
     // 1. Services de fond (tracking GPS + foreground service)
     try {

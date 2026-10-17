@@ -195,6 +195,8 @@ class ServiceAssignment {
   final String serviceId;
   final String serviceName;
   final String? transportType;
+  /// `subscription_plus_rate` ou `commission`, si le backend l'envoie.
+  final String? billingModel;
   final String driverId;
   final String status;
   final String? documentUrl;
@@ -209,6 +211,7 @@ class ServiceAssignment {
     required this.serviceId,
     required this.serviceName,
     this.transportType,
+    this.billingModel,
     required this.driverId,
     required this.status,
     this.documentUrl,
@@ -257,9 +260,11 @@ class ServiceAssignment {
       // Parsing du service avec null safety
       String serviceName = 'Service inconnu';
       String? transportType;
+      String? billingModel = assignmentData['billing_model']?.toString();
       final service = assignmentData['service'];
       if (service is Map<String, dynamic>) {
         serviceName = service['name']?.toString() ?? 'Service inconnu';
+        billingModel ??= service['billing_model']?.toString();
         // transport_type peut être direct sur service OU nested dans service.category
         transportType = service['transport_type']?.toString();
         if (transportType == null) {
@@ -316,6 +321,7 @@ class ServiceAssignment {
         serviceId: serviceId,
         serviceName: serviceName,
         transportType: transportType,
+        billingModel: billingModel,
         driverId: driverId,
         status: status,
         documentUrl: documentUrl?.isEmpty ?? true ? null : documentUrl,
@@ -352,6 +358,10 @@ class ServiceAssignment {
   bool get isApproved => status == 'APPROVED';
   bool get isRejected => status == 'REJECTED';
   bool get isActive => isApproved && (rejectedAt == null);
+
+  /// Abonnement 90 USD (Taxi Économique) ; sinon commission 10 %.
+  bool get isSubscriptionBilling =>
+      BillingRule.isSubscription(billingModel: billingModel, serviceId: serviceId);
 }
 
 class PaginatedServicesResponse {
@@ -630,12 +640,37 @@ class TransportTypeConstants {
     ferry, tracteurAgricole, tracteur, chariotElevateur, camionToupie,
   };
 
-  // Taxi-type slugs: EXCLUDED from 10% commission (passenger transport)
-  static const Set<String> taxiSlugs = {
-    taxiStandard, taxi, vtc, voiture, motoTaxi, moto,
-    tukTuk, minibusCollectif, busCharter, bus, transfertAeroport,
-    transportScolaire, voitureLuxe, covoiturage, taxiNautique,
-  };
+}
+
+/// Modèle de revenus AtlasMove — règle unique utilisée par toute l'app :
+/// - Taxi Économique : abonnement 90 USD / mois (+ 2 % du CA) ;
+/// - tous les autres services (Taxi Confort, VTC, moto, livraison, camion…) :
+///   commission de 10 % du chiffre d'affaires, sans abonnement.
+class BillingRule {
+  BillingRule._();
+
+  /// Valeurs de `billing_model` renvoyées par le backend.
+  static const String subscriptionModel = 'subscription_plus_rate';
+  static const String commissionModel = 'commission';
+
+  /// Service « Taxi Économique ». Le backend ne renvoie pas encore de
+  /// `billing_model` côté chauffeur, et Taxi Confort partage le même type
+  /// `taxi` : l'identifiant du service est le seul repère fiable.
+  static const String taxiEconomiqueServiceId = 'c5e3b66b-788d-4b79-a4fe-e7951b62d8ad';
+
+  static const double commissionRate = 0.10;
+
+  /// Part du CA annuel affichée dans le Programme Privilège.
+  static const double annualShareSubscription = 0.02;
+  static const double annualShareCommission = 0.03;
+
+  /// `billing_model` du backend en priorité, sinon le service Taxi Économique.
+  static bool isSubscription({String? billingModel, String? serviceId}) {
+    if (billingModel != null && billingModel.isNotEmpty) {
+      return billingModel == subscriptionModel;
+    }
+    return serviceId == taxiEconomiqueServiceId;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

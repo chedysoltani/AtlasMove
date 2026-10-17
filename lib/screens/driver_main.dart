@@ -9,6 +9,7 @@ import 'driver_rendezvous_screen.dart';
 import '../services/trip_service.dart';
 import '../models/trip_models.dart';
 import '../services/onboarding_service.dart';
+import '../services/driver_billing_service.dart';
 
 class DriverMainScreen extends StatefulWidget {
   const DriverMainScreen({super.key});
@@ -43,6 +44,8 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
       const DriverRendezvousScreen(),
     ];
     WidgetsBinding.instance.addObserver(this);
+    // Abonnement (Taxi Économique) ou commission 10 % : décide de l'onglet ci-dessous
+    DriverBillingService.instance.refresh();
     // Check for active trip when screen is first loaded
     // TEMPORARILY DISABLED: uncomment to enable active trip checking on startup
     // _checkActiveTrip();
@@ -148,8 +151,16 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
                   label: 'nav.rides'.tr(), index: 1),
               _buildNavItem(icon: Icons.calendar_month_rounded,
                   label: 'nav.rdv'.tr(), index: 2),
-              _buildNavAction(icon: Icons.card_membership_rounded,
-                  label: 'nav.subscription'.tr(), route: '/driver_subscription'),
+              // Taxi Économique : abonnement 90 USD ; autres services : commission 10 %.
+              // Service encore inconnu : on garde l'onglet Abonnement.
+              ValueListenableBuilder<bool?>(
+                valueListenable: DriverBillingService.instance.isSubscription,
+                builder: (_, isSubscription, __) => isSubscription == false
+                    ? _buildNavAction(icon: Icons.percent_rounded,
+                        label: 'nav.commission'.tr(), route: '/driver_commission')
+                    : _buildNavAction(icon: Icons.card_membership_rounded,
+                        label: 'nav.subscription'.tr(), route: '/driver_subscription'),
+              ),
               _buildNavAction(icon: Icons.star_rounded,
                   label: 'nav.privilege'.tr(), route: '/driver_offer'),
             ],

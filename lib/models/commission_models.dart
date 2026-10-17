@@ -2,6 +2,8 @@ import '../models/service_models.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 class CommissionBreakdownItem {
+  final String? serviceId;
+  final String? billingModel;
   final String serviceName;
   final String transportType;
   final int completedCount;
@@ -10,6 +12,8 @@ class CommissionBreakdownItem {
   final String currency;
 
   const CommissionBreakdownItem({
+    this.serviceId,
+    this.billingModel,
     required this.serviceName,
     required this.transportType,
     required this.completedCount,
@@ -18,10 +22,20 @@ class CommissionBreakdownItem {
     required this.currency,
   });
 
-  bool get isTaxiType => TransportTypeConstants.taxiSlugs.contains(transportType);
+  /// Service à l'abonnement (Taxi Économique) : exempté de la commission 10 %.
+  /// Sans `billing_model` ni `service_id` dans la réponse, on se fie au montant
+  /// calculé par le backend (commission nulle sur un CA non nul).
+  bool get isSubscriptionService {
+    if ((billingModel ?? '').isNotEmpty || (serviceId ?? '').isNotEmpty) {
+      return BillingRule.isSubscription(billingModel: billingModel, serviceId: serviceId);
+    }
+    return revenue > 0 && commission <= 0;
+  }
 
   factory CommissionBreakdownItem.fromJson(Map<String, dynamic> json) {
     return CommissionBreakdownItem(
+      serviceId: json['service_id']?.toString(),
+      billingModel: json['billing_model']?.toString(),
       serviceName: json['service_name']?.toString() ?? '',
       transportType: json['transport_type']?.toString() ?? '',
       completedCount: int.tryParse(json['completed_count']?.toString() ?? '0') ?? 0,
@@ -94,27 +108,30 @@ class DriverCommissionStats {
       final fare = (rdv.finalFare ?? rdv.estimatedFare ?? 0.0) as double;
       if (fare <= 0) continue;
       final type = (rdv.serviceTransportType ?? '') as String;
-      if (TransportTypeConstants.taxiSlugs.contains(type)) continue;
+      // Taxi Économique : à l'abonnement, pas de commission
+      if (BillingRule.isSubscription(serviceId: rdv.serviceId as String?)) continue;
 
       total += fare;
       final key = rdv.serviceId as String;
       final existing = map[key];
       if (existing != null) {
         map[key] = CommissionBreakdownItem(
+          serviceId: key,
           serviceName: existing.serviceName,
           transportType: existing.transportType,
           completedCount: existing.completedCount + 1,
           revenue: existing.revenue + fare,
-          commission: (existing.revenue + fare) * 0.10,
+          commission: (existing.revenue + fare) * BillingRule.commissionRate,
           currency: currency,
         );
       } else {
         map[key] = CommissionBreakdownItem(
+          serviceId: key,
           serviceName: rdv.serviceName as String,
           transportType: type,
           completedCount: 1,
           revenue: fare,
-          commission: fare * 0.10,
+          commission: fare * BillingRule.commissionRate,
           currency: currency,
         );
       }

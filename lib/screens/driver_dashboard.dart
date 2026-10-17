@@ -15,10 +15,10 @@ import '../services/notification_service.dart';
 import '../services/call_service.dart';
 import '../services/trip_service.dart';
 import '../services/subscription_service.dart';
+import '../services/driver_billing_service.dart';
 import '../services/driver_service.dart';
 import '../services/location_service.dart';
 import '../services/service_api.dart';
-import '../models/service_models.dart';
 import '../core/network/http_client.dart';
 import '../core/storage/token_storage.dart';
 import '../widgets/notification_sheet.dart';
@@ -95,6 +95,7 @@ class _DriverDashboardState extends State<DriverDashboard>
       _loadDriverServiceType();
       _loadDailyStats();
     });
+    DriverBillingService.instance.isSubscription.addListener(_onBillingChanged);
     NotificationService().initialize();
     try {
       CallService().connectSocket();
@@ -111,6 +112,7 @@ class _DriverDashboardState extends State<DriverDashboard>
   @override
   void dispose() {
     DriverService.isOnlineNotifier.removeListener(_onAvailabilityChanged);
+    DriverBillingService.instance.isSubscription.removeListener(_onBillingChanged);
     _mapController?.dispose();
     _positionSub?.cancel();
     _driverMarker.dispose();
@@ -237,7 +239,14 @@ class _DriverDashboardState extends State<DriverDashboard>
     } catch (_) {}
   }
 
+  void _onBillingChanged() {
+    if (mounted) setState(() {});
+  }
+
   bool get _canGoOnline {
+    // Chauffeurs à commission (tout sauf Taxi Économique) : pas d'abonnement
+    // requis ; le backend reste seul juge (403 géré dans _toggleOnline).
+    if (_isCommissionDriver) return true;
     final sub = _subService.subscription;
     if (sub == null) return false;
     return sub.isValid;
@@ -251,7 +260,7 @@ class _DriverDashboardState extends State<DriverDashboard>
 
     // Block going online if subscription is not valid
     if (newStatus && !_canGoOnline) {
-      Navigator.pushNamed(context, '/driver_subscription');
+      Navigator.pushNamed(context, _bannerRoute);
       return;
     }
 
@@ -272,9 +281,10 @@ class _DriverDashboardState extends State<DriverDashboard>
         );
       }
     } on ForbiddenException {
-      // Safety net: subscription expired between the local check and the API call.
+      // Safety net: subscription expired between the local check and the API call
+      // (chauffeur à commission : refus du backend, ex. commission impayée).
       await _subService.fetchStatus();
-      if (mounted) Navigator.pushNamed(context, '/driver_subscription');
+      if (mounted) Navigator.pushNamed(context, _bannerRoute);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -327,6 +337,8 @@ class _DriverDashboardState extends State<DriverDashboard>
             child: AnimatedBuilder(
               animation: _subService,
               builder: (_, __) {
+                // Bandeaux d'abonnement : Taxi Économique uniquement
+                if (_isCommissionDriver) return const SizedBox.shrink();
                 final sub = _subService.subscription;
                 if (sub == null) return const SizedBox.shrink();
                 if (sub.isPastDue) return _buildPastDueBanner();
@@ -992,14 +1004,11 @@ class _DriverDashboardState extends State<DriverDashboard>
     } catch (_) {}
   }
 
-  bool get _isTaxiDriver =>
-      _driverTransportType != null &&
-      TransportTypeConstants.taxiSlugs.contains(_driverTransportType);
+  // Taxi Économique = abonnement 90 USD ; tous les autres services = commission 10 %
+  bool get _isCommissionDriver => DriverBillingService.instance.isCommission;
 
   String get _bannerRoute =>
-      (_driverTransportType == null || _isTaxiDriver)
-          ? '/driver_subscription'
-          : '/driver_earnings';
+      _isCommissionDriver ? '/driver_commission' : '/driver_subscription';
 
   void _showMenu() {
     showModalBottomSheet(
@@ -1056,13 +1065,13 @@ class _DriverDashboardState extends State<DriverDashboard>
             // "Mon Abonnement" et "Programme Privilège" ont déménagé dans la
             // barre de navigation du bas — on ne les duplique plus ici.
             // Exception : le rappel "Commission 10%" reste ici pour les
-            // chauffeurs non-taxi, qui n'ont pas d'abonnement à proprement
-            // parler (paiement par commission, pas par plan).
-            if (!_isTaxiDriver)
+            // chauffeurs à commission (tout sauf Taxi Économique), qui n'ont
+            // pas d'abonnement (paiement par commission, pas par plan).
+            if (_isCommissionDriver)
               _buildMenuTile(Icons.percent_rounded, 'driver_dashboard.commission_menu'.tr(),
                   'driver_dashboard.commission_menu_sub'.tr(), () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, '/driver_earnings');
+                Navigator.pushNamed(context, '/driver_commission');
               }),
             _buildMenuTile(Icons.work_outline_rounded, 'driver.services_menu'.tr(),
                 'driver.services_subtitle'.tr(), () {

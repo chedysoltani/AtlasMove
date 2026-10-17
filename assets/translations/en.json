@@ -59,6 +59,7 @@
     "history": "History",
     "revenue": "Revenue",
     "subscription": "Subscription",
+    "commission": "Commission",
     "privilege": "Privilege"
   },
   "lang": {
@@ -161,6 +162,21 @@
     "drivers_stat": "Couriers",
     "available_stat": "Available"
   },
+  "commission": {
+    "title": "My commission",
+    "badge": "NO SUBSCRIPTION",
+    "of_revenue": "of revenue",
+    "tagline": "No monthly subscription: you only pay a share of what you earn.",
+    "feature_no_subscription": "No $90 subscription to pay",
+    "feature_auto": "{rate} calculated automatically on your completed rides",
+    "feature_monthly": "Payable every month to keep access to your services",
+    "feature_details": "Per-service details are available in “Earnings”",
+    "this_month": "Commission for {month}",
+    "on_revenue": "On revenue of {amount}",
+    "nothing_due": "Nothing to pay for now",
+    "unavailable": "Amount unavailable right now",
+    "see_earnings": "See details in Earnings"
+  },
   "sub": {
     "title": "My Subscription",
     "active": "Premium Subscription Active",
@@ -242,8 +258,8 @@
     "load_error": "Unable to load the dashboard",
     "months_progress": "{done} / {total} months",
     "monthly_explainer": "Each month, you pay {rate} commission on your rides + a 90 USD subscription.",
-    "annual_share_title": "2% of Annual Revenue",
-    "annual_share_short": "2% of your annual revenue",
+    "annual_share_title": "{rate} of Annual Revenue",
+    "annual_share_short": "{rate} of your annual revenue",
     "computed_on_rides": "Calculated on your completed rides",
     "annual": "Annual",
     "annual_part": "Annual share",
@@ -641,7 +657,8 @@
     "propose_fare": "Offer your fare",
     "send_offer": "Send offer",
     "counter_fare": "Offer your counter-fare:",
-    "subscription_required": "Subscription required to accept rides"
+    "subscription_required": "Subscription required to accept rides",
+    "commission_required": "Access suspended: check your AtlasMove commission"
   },
   "sub_payment": {
     "title": "Subscription Payment",
@@ -846,7 +863,7 @@
     "revenue": "Revenue",
     "rdv_completed": "{count} appointments completed",
     "commission_label": "AtlasMove commission ({rate}%)",
-    "delivery_only": "Applies to delivery services only",
+    "delivery_only": "All services except Economy Taxi",
     "amount_due": "Amount due",
     "paid": "Paid",
     "pay_before": "To be paid before the end of the month to keep access to your services.",
