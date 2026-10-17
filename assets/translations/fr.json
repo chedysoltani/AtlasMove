@@ -1240,6 +1240,13 @@
     "have_account": "J'ai déjà un compte.",
     "login": "Se connecter"
   },
+  "driver_gate": {
+    "missing_docs": "Documents à envoyer :",
+    "open_dossier": "Voir mon dossier",
+    "banner_tap": "Appuyez pour voir votre dossier",
+    "locked_title": "Disponible après validation de votre dossier",
+    "locked_body": "Les courses et les rendez-vous s'afficheront ici dès que vos documents auront été vérifiés."
+  },
   "driver_v2": {
     "signup_title": "Devenir chauffeur",
     "signup_subtitle": "Créez votre compte en 1 minute. Vous enverrez vos documents ensuite.",

@@ -16,8 +16,9 @@ import '../widgets/driver_onboarding_ui.dart';
 /// renvoi, raison du refus), délai de validation et aide WhatsApp.
 ///
 /// Rechargé à l'ouverture, en tirant vers le bas, et à chaque notification
-/// « dossier » (voir DriverAccountStore). Compte activé ou suspendu : on
-/// quitte l'écran vers la bonne destination.
+/// « dossier » (voir DriverAccountStore). Ouvert par-dessus l'app chauffeur
+/// (bandeau, blocage « en ligne ») : retour possible. Compte activé : on
+/// revient à l'app ; compte suspendu : écran de suspension.
 class DriverDossierScreen extends StatefulWidget {
   static const route = '/driver_dossier';
 
@@ -58,10 +59,14 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
   void _onProfileChanged() {
     final p = _store.profile.value;
     if (!mounted || p == null) return;
-    final route = DriverAccountStore.routeFor(p);
-    if (route != DriverDossierScreen.route && !_leaving) {
+    if ((p.isSuspended || p.isActive) && !_leaving) {
       _leaving = true;
-      Navigator.of(context).pushNamedAndRemoveUntil(route, (_) => false);
+      final nav = Navigator.of(context);
+      if (p.isActive && nav.canPop()) {
+        nav.pop();
+      } else {
+        nav.pushNamedAndRemoveUntil(DriverAccountStore.routeFor(p), (_) => false);
+      }
       return;
     }
     setState(() {});
@@ -179,15 +184,17 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
   @override
   Widget build(BuildContext context) {
     final profile = _store.profile.value;
+    // Ouvert depuis l'app chauffeur : retour possible. Écran racine : pas de
+    // retour vers l'inscription ou la connexion.
+    final canGoBack = Navigator.of(context).canPop();
     return PopScope(
-      // Pas de retour vers l'inscription ou la connexion.
-      canPop: false,
+      canPop: canGoBack,
       child: DriverOnboardingScaffold(
         title: 'driver_v2.dossier_title'.tr(),
         subtitle: profile == null
             ? null
             : 'driver_v2.dossier_hello'.tr(namedArgs: {'name': profile.firstName}),
-        showBack: false,
+        showBack: canGoBack,
         onRefresh: _refresh,
         trailing: IconButton(
           tooltip: 'driver_v2.logout'.tr(),

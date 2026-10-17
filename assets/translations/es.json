@@ -177,6 +177,13 @@
     "unavailable": "Importe no disponible por el momento",
     "see_earnings": "Ver el detalle en Ganancias"
   },
+  "driver_gate": {
+    "missing_docs": "Documentos por enviar:",
+    "open_dossier": "Ver mi expediente",
+    "banner_tap": "Toca para ver tu expediente",
+    "locked_title": "Disponible tras validar tu expediente",
+    "locked_body": "Los viajes y las citas aparecerán aquí en cuanto se hayan verificado tus documentos."
+  },
   "sub": {
     "title": "Mi Suscripción",
     "active": "Suscripción Premium Activa",

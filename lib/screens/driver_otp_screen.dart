@@ -180,8 +180,14 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
       await DriverAccountStore.instance.startSession(session);
       if (!mounted) return;
       HapticFeedback.mediumImpact();
-      Navigator.of(context).pushNamedAndRemoveUntil(
-          DriverAccountStore.routeFor(session.driver), (_) => false);
+      final nav = Navigator.of(context);
+      final route = DriverAccountStore.routeFor(session.driver);
+      nav.pushNamedAndRemoveUntil(route, (_) => false);
+      // Compte à compléter : « Mon dossier » par-dessus l'app (retour possible),
+      // pour envoyer les documents tout de suite.
+      if (route == DriverAccountStore.routeMain && !session.driver.isActive) {
+        nav.pushNamed(DriverAccountStore.routeDossier);
+      }
     } on DriverApiException catch (e) {
       DriverOnboardingAnalytics.registrationError(step: step, errorCode: e.code);
       if (!mounted) return;

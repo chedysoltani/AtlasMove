@@ -16,6 +16,8 @@ import '../services/call_service.dart';
 import '../services/trip_service.dart';
 import '../services/subscription_service.dart';
 import '../services/driver_billing_service.dart';
+import '../services/driver_account_store.dart';
+import '../widgets/driver_dossier_gate.dart';
 import '../services/driver_service.dart';
 import '../services/location_service.dart';
 import '../services/service_api.dart';
@@ -94,6 +96,8 @@ class _DriverDashboardState extends State<DriverDashboard>
       DriverService.loadAvailability();
       _loadDriverServiceType();
       _loadDailyStats();
+      // Statut du dossier à jour (bandeau, blocage de la mise en ligne)
+      DriverAccountStore.instance.refreshQuietly();
     });
     DriverBillingService.instance.isSubscription.addListener(_onBillingChanged);
     NotificationService().initialize();
@@ -258,6 +262,14 @@ class _DriverDashboardState extends State<DriverDashboard>
 
     final newStatus = !_isOnline;
 
+    // Dossier d'abord : documents envoyés et validés avant tout travail
+    if (newStatus) {
+      setState(() => _isTogglingOnline = true);
+      final canWork = await DriverDossierGate.ensureCanWork(context);
+      if (mounted) setState(() => _isTogglingOnline = false);
+      if (!canWork || !mounted) return;
+    }
+
     // Block going online if subscription is not valid
     if (newStatus && !_canGoOnline) {
       Navigator.pushNamed(context, _bannerRoute);
@@ -280,7 +292,12 @@ class _DriverDashboardState extends State<DriverDashboard>
           ),
         );
       }
-    } on ForbiddenException {
+    } on ForbiddenException catch (e) {
+      if (DriverDossierGate.isDocumentsRequired(e)) {
+        // Dossier pas (ou plus) validé côté serveur
+        if (mounted) await DriverDossierGate.handleDocumentsRequired(context);
+        return;
+      }
       // Safety net: subscription expired between the local check and the API call
       // (chauffeur à commission : refus du backend, ex. commission impayée).
       await _subService.fetchStatus();
@@ -335,8 +352,10 @@ class _DriverDashboardState extends State<DriverDashboard>
             left: 0,
             right: 0,
             child: AnimatedBuilder(
-              animation: _subService,
+              animation: Listenable.merge([_subService, DriverAccountStore.instance.profile]),
               builder: (_, __) {
+                // Dossier non validé : ce bandeau passe avant tout le reste
+                if (!DriverDossierGate.canWorkCached) return const DriverDossierBanner();
                 // Bandeaux d'abonnement : Taxi Économique uniquement
                 if (_isCommissionDriver) return const SizedBox.shrink();
                 final sub = _subService.subscription;

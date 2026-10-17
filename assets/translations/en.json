@@ -1240,6 +1240,13 @@
     "have_account": "I already have an account.",
     "login": "Sign in"
   },
+  "driver_gate": {
+    "missing_docs": "Documents to send:",
+    "open_dossier": "View my file",
+    "banner_tap": "Tap to view your file",
+    "locked_title": "Available once your file is approved",
+    "locked_body": "Rides and appointments will appear here as soon as your documents have been verified."
+  },
   "driver_v2": {
     "signup_title": "Become a driver",
     "signup_subtitle": "Create your account in 1 minute. You'll send your documents afterwards.",

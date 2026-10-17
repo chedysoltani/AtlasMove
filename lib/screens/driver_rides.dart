@@ -9,6 +9,9 @@ import '../services/location_service.dart';
 import '../services/trip_service.dart';
 import '../services/driver_service.dart';
 import '../services/driver_billing_service.dart';
+import '../services/driver_account_store.dart';
+import '../models/driver_onboarding.dart';
+import '../widgets/driver_dossier_gate.dart';
 import '../core/network/http_client.dart';
 import '../models/trip_models.dart';
 import 'driver_active_ride.dart';
@@ -140,6 +143,11 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
   }
 
   Future<void> _fetchAvailableTrips() async {
+    // Dossier non validé : aucune course (ni adresse, ni client) n'est chargée
+    if (!DriverDossierGate.canWorkCached) {
+      setState(() => _isLoading = false);
+      return;
+    }
     setState(() {
       _isLoading = true;
       _error = null;
@@ -224,7 +232,11 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
       ),
       body: SafeArea(
         top: false,
-        child: ValueListenableBuilder<bool>(
+        child: ValueListenableBuilder<DriverProfile?>(
+        valueListenable: DriverAccountStore.instance.profile,
+        builder: (_, profile, __) => profile != null && !profile.isActive
+            ? const DriverDossierLockedView()
+            : ValueListenableBuilder<bool>(
         valueListenable: DriverService.isOnlineNotifier,
         builder: (_, isOnline, __) {
           if (!isOnline) return _buildOfflineScreen();
@@ -276,6 +288,7 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
             ],
           );
         },
+      ),
       ),
       ),
     );
@@ -1059,8 +1072,11 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
             ),
           );
         }
-      } on ForbiddenException {
-        if (mounted) {
+      } on ForbiddenException catch (e) {
+        if (mounted && DriverDossierGate.isDocumentsRequired(e)) {
+          setState(() => _acceptingTripId = null);
+          await DriverDossierGate.handleDocumentsRequired(context);
+        } else if (mounted) {
           setState(() => _acceptingTripId = null);
           // Taxi Économique : abonnement requis ; autres services : commission 10 %
           final commission = DriverBillingService.instance.isCommission;

@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/rendezvous_models.dart';
 import '../services/rendezvous_service.dart';
+import '../services/driver_account_store.dart';
+import '../widgets/driver_dossier_gate.dart';
 import '../utils/fare_calculator.dart';
 import 'rendezvous_negotiation_screen.dart';
 
@@ -333,6 +335,7 @@ class _AvailableTabState extends State<_AvailableTab>
   void initState() {
     super.initState();
     _load();
+    DriverAccountStore.instance.profile.addListener(_onProfileChanged);
     _scrollCtrl.addListener(_onScroll);
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 15),
@@ -342,9 +345,17 @@ class _AvailableTabState extends State<_AvailableTab>
 
   @override
   void dispose() {
+    DriverAccountStore.instance.profile.removeListener(_onProfileChanged);
     _refreshTimer?.cancel();
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  // Dossier validé pendant que l'écran est ouvert : la liste se charge.
+  void _onProfileChanged() {
+    if (!mounted) return;
+    setState(() {});
+    if (DriverDossierGate.canWorkCached && _items.isEmpty && !_isLoading) _refresh();
   }
 
   void _onScroll() {
@@ -355,6 +366,11 @@ class _AvailableTabState extends State<_AvailableTab>
   }
 
   Future<void> _load({bool refresh = false}) async {
+    // Dossier non validé : aucun rendez-vous (ni adresse, ni client) n'est chargé
+    if (!DriverDossierGate.canWorkCached) {
+      if (_isLoading) setState(() => _isLoading = false);
+      return;
+    }
     if (_isLoading && !refresh) return;
     setState(() {
       _isLoading = true;
@@ -409,6 +425,7 @@ class _AvailableTabState extends State<_AvailableTab>
 
   Future<void> _accept(Rendezvous rdv) async {
     HapticFeedback.lightImpact();
+    if (!await DriverDossierGate.ensureCanWork(context) || !mounted) return;
     setState(() => _acceptingIds.add(rdv.id));
     try {
       await RendezvousService.acceptBooking(
@@ -423,13 +440,18 @@ class _AvailableTabState extends State<_AvailableTab>
         widget.onAccepted?.call();
       }
     } catch (e) {
-      if (mounted) _showSnack(context, '${'common.error'.tr()} : $e', success: false);
+      if (mounted && DriverDossierGate.isDocumentsRequired(e)) {
+        await DriverDossierGate.handleDocumentsRequired(context);
+      } else if (mounted) {
+        _showSnack(context, '${'common.error'.tr()} : $e', success: false);
+      }
     } finally {
       if (mounted) setState(() => _acceptingIds.remove(rdv.id));
     }
   }
 
   Future<void> _propose(Rendezvous rdv) async {
+    if (!await DriverDossierGate.ensureCanWork(context) || !mounted) return;
     final currency = rdv.currency ?? 'TND';
     final decimals = const {'EUR', 'GBP', 'USD'}.contains(currency) ? 2 : 3;
     final ctrl = TextEditingController(
@@ -511,6 +533,7 @@ class _AvailableTabState extends State<_AvailableTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (!DriverDossierGate.canWorkCached) return const DriverDossierLockedView();
     if (_isLoading) return _loader();
     if (_error != null) return _errorView();
     if (_items.isEmpty) return _emptyView();

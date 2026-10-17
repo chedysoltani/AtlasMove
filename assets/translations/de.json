@@ -177,6 +177,13 @@
     "unavailable": "Betrag derzeit nicht verfügbar",
     "see_earnings": "Details unter Einnahmen ansehen"
   },
+  "driver_gate": {
+    "missing_docs": "Zu sendende Dokumente:",
+    "open_dossier": "Meine Unterlagen ansehen",
+    "banner_tap": "Tippen, um Ihre Unterlagen zu sehen",
+    "locked_title": "Verfügbar nach Prüfung Ihrer Unterlagen",
+    "locked_body": "Fahrten und Termine erscheinen hier, sobald Ihre Dokumente geprüft wurden."
+  },
   "sub": {
     "title": "Mein Abonnement",
     "active": "Premium-Abonnement Aktiv",

@@ -177,6 +177,13 @@
     "unavailable": "Importo non disponibile al momento",
     "see_earnings": "Vedi il dettaglio in Guadagni"
   },
+  "driver_gate": {
+    "missing_docs": "Documenti da inviare:",
+    "open_dossier": "Vedi il mio fascicolo",
+    "banner_tap": "Tocca per vedere il tuo fascicolo",
+    "locked_title": "Disponibile dopo la convalida del tuo fascicolo",
+    "locked_body": "Le corse e gli appuntamenti appariranno qui non appena i tuoi documenti saranno stati verificati."
+  },
   "sub": {
     "title": "Il Mio Abbonamento",
     "active": "Abbonamento Premium Attivo",

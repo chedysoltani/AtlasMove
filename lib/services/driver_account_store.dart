@@ -33,11 +33,13 @@ class DriverAccountStore {
 
   final ValueNotifier<DriverProfile?> profile = ValueNotifier(null);
 
-  /// Route d'un profil connu.
+  /// Route d'un profil connu. Dossier incomplet, en vérification ou refusé :
+  /// le chauffeur accède quand même à l'app, mais ne peut ni se mettre en
+  /// ligne ni accepter de course / rendez-vous (voir DriverDossierGate).
+  /// Seul un compte suspendu reste bloqué.
   static String routeFor(DriverProfile p) {
     if (p.isSuspended) return routeSuspended;
-    if (p.isActive || p.nextAction == DriverNextAction.none) return routeMain;
-    return routeDossier;
+    return routeMain;
   }
 
   /// Recharge le profil et le publie.
@@ -85,8 +87,8 @@ class DriverAccountStore {
   /// - réponse du serveur → selon le statut ;
   /// - suspendu → écran d'information ; CGU à accepter → /legal_consent ;
   ///   compte client → tableau de bord client ; session refusée → /login ;
-  /// - pas de réseau → d'après le dernier statut connu : seul un compte déjà
-  ///   vu `active` va sur /driver_main, sinon « Mon dossier » (qui réessaie).
+  /// - pas de réseau → /driver_main : le travail reste bloqué par
+  ///   DriverDossierGate et par le backend tant que le dossier n'est pas validé.
   Future<String> resolveHomeRoute() async {
     try {
       // Réseau très lent au lancement : on n'attend pas indéfiniment.
@@ -106,21 +108,9 @@ class DriverAccountStore {
       if (!e.isNetwork) {
         DriverOnboardingAnalytics.registrationError(step: 'status', errorCode: e.code);
       }
-      return await _lastKnownStatusIsActive() ? routeMain : routeDossier;
+      return routeMain;
     } catch (_) {
-      return await _lastKnownStatusIsActive() ? routeMain : routeDossier;
-    }
-  }
-
-  Future<bool> _lastKnownStatusIsActive() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final last = prefs.getString(_lastStatusKey);
-      final userId = await TokenStorage.getUserId();
-      if (last == null || userId == null) return false;
-      return last == '$userId:${DriverAccountStatus.active}';
-    } catch (_) {
-      return false;
+      return routeMain;
     }
   }
 
