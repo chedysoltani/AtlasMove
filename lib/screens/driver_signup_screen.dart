@@ -831,7 +831,9 @@ class _ServicePickerSheetState extends State<_ServicePickerSheet> {
                         }
                         final s = row as Service;
                         final selected = s.id == widget.selectedId;
-                        final image = (s.iconUrl?.isNotEmpty ?? false) ? s.iconUrl : s.imageUrl;
+                        // Photo du service, comme le catalogue : les icon_url du backend
+                        // sont des SVG (non affichables par Image.network) sur un CDN fictif.
+                        final image = s.imageUrl;
                         return ListTile(
                           selected: selected,
                           selectedTileColor: DriverUi.orange.withOpacity(0.08),
