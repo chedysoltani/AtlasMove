@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../models/rendezvous_models.dart';
 import '../services/rendezvous_service.dart';
+import '../widgets/driver_dossier_gate.dart';
 import '../utils/fare_calculator.dart';
 
 const _orange = Color(0xFFFF6B35);
@@ -72,6 +73,8 @@ class _RendezvousNegotiationScreenState
       _showSnack('rdv.offer_accepted_confirmed'.tr(), success: true);
       await _load();
     } catch (e) {
+      // Chauffeur non éligible (dossier, commission, abonnement, service…)
+      if (mounted && await DriverDossierGate.handleBlocked(context, e)) return;
       _showSnack('common.error_detail'.tr(namedArgs: {'error': '$e'}), success: false);
     } finally {
       if (mounted) setState(() => _actingIds.remove(offer.id));
@@ -155,6 +158,7 @@ class _RendezvousNegotiationScreenState
       _showSnack('rdv.counter_sent'.tr(namedArgs: {'amount': FareCalculator.formatFare(value, currency)}));
       await _load();
     } catch (e) {
+      if (mounted && await DriverDossierGate.handleBlocked(context, e)) return;
       _showSnack('common.error_detail'.tr(namedArgs: {'error': '$e'}), success: false);
     } finally {
       if (mounted) setState(() => _actingIds.remove(offer.id));

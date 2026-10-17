@@ -293,9 +293,9 @@ class _DriverDashboardState extends State<DriverDashboard>
         );
       }
     } on ForbiddenException catch (e) {
-      if (DriverDossierGate.isDocumentsRequired(e)) {
-        // Dossier pas (ou plus) validé côté serveur
-        if (mounted) await DriverDossierGate.handleDocumentsRequired(context);
+      // Refus d'éligibilité du backend : dossier, suspension, commission
+      // impayée, abonnement, aucun service approuvé
+      if (mounted && await DriverDossierGate.handleBlocked(context, e, goingOnline: true)) {
         return;
       }
       // Safety net: subscription expired between the local check and the API call

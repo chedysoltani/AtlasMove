@@ -1245,7 +1245,12 @@
     "open_dossier": "Voir mon dossier",
     "banner_tap": "Appuyez pour voir votre dossier",
     "locked_title": "Disponible après validation de votre dossier",
-    "locked_body": "Les courses et les rendez-vous s'afficheront ici dès que vos documents auront été vérifiés."
+    "locked_body": "Les courses et les rendez-vous s'afficheront ici dès que vos documents auront été vérifiés.",
+    "view": "Voir",
+    "commission_unpaid": "Commission du mois précédent impayée : réglez-la pour vous remettre en ligne et accepter des courses.",
+    "subscription_required": "Abonnement requis pour vous mettre en ligne et accepter des courses.",
+    "no_approved_service": "Aucun service approuvé sur votre compte : attendez la validation de votre service.",
+    "service_mismatch": "Cette course ne correspond pas à votre service."
   },
   "driver_v2": {
     "signup_title": "Devenir chauffeur",

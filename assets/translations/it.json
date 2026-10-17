@@ -182,7 +182,12 @@
     "open_dossier": "Vedi il mio fascicolo",
     "banner_tap": "Tocca per vedere il tuo fascicolo",
     "locked_title": "Disponibile dopo la convalida del tuo fascicolo",
-    "locked_body": "Le corse e gli appuntamenti appariranno qui non appena i tuoi documenti saranno stati verificati."
+    "locked_body": "Le corse e gli appuntamenti appariranno qui non appena i tuoi documenti saranno stati verificati.",
+    "view": "Vedi",
+    "commission_unpaid": "Commissione del mese scorso non pagata: saldala per tornare online e accettare corse.",
+    "subscription_required": "Serve un abbonamento per andare online e accettare corse.",
+    "no_approved_service": "Nessun servizio approvato sul tuo account: attendi l'approvazione del tuo servizio.",
+    "service_mismatch": "Questa corsa non corrisponde al tuo servizio."
   },
   "sub": {
     "title": "Il Mio Abbonamento",

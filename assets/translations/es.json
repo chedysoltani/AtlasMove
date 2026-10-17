@@ -182,7 +182,12 @@
     "open_dossier": "Ver mi expediente",
     "banner_tap": "Toca para ver tu expediente",
     "locked_title": "Disponible tras validar tu expediente",
-    "locked_body": "Los viajes y las citas aparecerán aquí en cuanto se hayan verificado tus documentos."
+    "locked_body": "Los viajes y las citas aparecerán aquí en cuanto se hayan verificado tus documentos.",
+    "view": "Ver",
+    "commission_unpaid": "Comisión del mes anterior impagada: págala para volver a conectarte y aceptar viajes.",
+    "subscription_required": "Se requiere una suscripción para conectarte y aceptar viajes.",
+    "no_approved_service": "No hay ningún servicio aprobado en tu cuenta: espera la aprobación de tu servicio.",
+    "service_mismatch": "Este viaje no corresponde a tu servicio."
   },
   "sub": {
     "title": "Mi Suscripción",

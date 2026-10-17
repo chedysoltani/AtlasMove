@@ -440,9 +440,8 @@ class _AvailableTabState extends State<_AvailableTab>
         widget.onAccepted?.call();
       }
     } catch (e) {
-      if (mounted && DriverDossierGate.isDocumentsRequired(e)) {
-        await DriverDossierGate.handleDocumentsRequired(context);
-      } else if (mounted) {
+      // Refus d'éligibilité (dossier, commission, abonnement, service non assigné…)
+      if (mounted && !await DriverDossierGate.handleBlocked(context, e) && mounted) {
         _showSnack(context, '${'common.error'.tr()} : $e', success: false);
       }
     } finally {
@@ -526,7 +525,9 @@ class _AvailableTabState extends State<_AvailableTab>
             'rdv.offer_sent'.tr(namedArgs: {'price': FareCalculator.formatFare(confirmed, currency)}));
       }
     } catch (e) {
-      if (mounted) _showSnack(context, '${'common.error'.tr()} : $e', success: false);
+      if (mounted && !await DriverDossierGate.handleBlocked(context, e) && mounted) {
+        _showSnack(context, '${'common.error'.tr()} : $e', success: false);
+      }
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../core/network/http_client.dart';
 import '../models/driver_onboarding.dart';
 import '../services/driver_account_store.dart';
+import '../services/rendezvous_service.dart';
 import 'driver_onboarding_ui.dart';
 
 /// Accès au travail d'un chauffeur selon son dossier (`account_status`).
@@ -39,19 +40,81 @@ class DriverDossierGate {
     return false;
   }
 
-  /// Refus du backend parce que le dossier n'est pas validé.
-  static bool isDocumentsRequired(Object error) {
-    if (error is! ApiException) return false;
+  // Codes 403 de la règle d'éligibilité du backend, dans l'ordre où il les vérifie.
+  static const documentsRequired = 'DOCUMENTS_REQUIRED';
+  static const accountSuspended = 'ACCOUNT_SUSPENDED';
+  static const commissionUnpaid = 'COMMISSION_UNPAID';
+  static const subscriptionRequired = 'SUBSCRIPTION_REQUIRED';
+  static const serviceNotAssigned = 'SERVICE_NOT_ASSIGNED';
+
+  /// Code du refus : `code` au premier niveau, sinon `error.code` (en
+  /// minuscules pour certains codes, d'où la mise en majuscules).
+  static String? blockCode(Object error) {
+    if (error is RendezvousException) return error.code;
+    if (error is! ApiException) return null;
     try {
       final json = error.response?.json;
-      if (json == null) return false;
+      if (json == null) return null;
       final nested = json['error'];
-      final code = json['code'] ??
-          json['error_code'] ??
-          (nested is Map ? nested['code'] : null);
-      return code?.toString() == 'DOCUMENTS_REQUIRED';
+      final code = json['code'] ?? (nested is Map ? nested['code'] : null);
+      return code?.toString().toUpperCase();
     } catch (_) {
-      return false;
+      return null;
+    }
+  }
+
+  /// Refus du backend parce que le dossier n'est pas validé.
+  static bool isDocumentsRequired(Object error) => blockCode(error) == documentsRequired;
+
+  /// Réagit à un refus d'éligibilité ; `false` si l'erreur n'en est pas un
+  /// (l'appelant garde alors son propre traitement).
+  /// [goingOnline] : refus à la mise en ligne plutôt que sur une course précise.
+  static Future<bool> handleBlocked(BuildContext context, Object error,
+      {bool goingOnline = false}) async {
+    final code = blockCode(error);
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    void snack(String message, {String? route}) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFEA580C),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        action: route == null
+            ? null
+            : SnackBarAction(
+                label: 'driver_gate.view'.tr(),
+                textColor: Colors.white,
+                onPressed: () => nav.pushNamed(route),
+              ),
+      ));
+    }
+
+    switch (code) {
+      case documentsRequired:
+        await handleDocumentsRequired(context);
+        return true;
+      case accountSuspended:
+        nav.pushNamedAndRemoveUntil(DriverAccountStore.routeSuspended, (_) => false);
+        return true;
+      case commissionUnpaid:
+        snack('driver_gate.commission_unpaid'.tr());
+        nav.pushNamed('/driver_commission');
+        return true;
+      case subscriptionRequired:
+        snack('driver_gate.subscription_required'.tr());
+        nav.pushNamed('/driver_subscription');
+        return true;
+      case serviceNotAssigned:
+        if (goingOnline) {
+          snack('driver_gate.no_approved_service'.tr(), route: '/services_assignments');
+        } else {
+          snack('driver_gate.service_mismatch'.tr());
+        }
+        return true;
+      default:
+        return false;
     }
   }
 

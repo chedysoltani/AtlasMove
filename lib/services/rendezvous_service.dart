@@ -67,7 +67,7 @@ class RendezvousService {
     } catch (e) {
       debugPrint('ERREUR bookRendezvous: $e');
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     } finally {
       debugPrint('=== RendezvousService.bookRendezvous() END ===');
     }
@@ -94,7 +94,7 @@ class RendezvousService {
     } catch (e) {
       debugPrint('ERREUR getClientHistory: $e');
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -111,7 +111,7 @@ class RendezvousService {
     } catch (e) {
       debugPrint('ERREUR cancelRendezvous: $e');
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -138,7 +138,7 @@ class RendezvousService {
     } catch (e) {
       debugPrint('ERREUR getDriverHistory: $e');
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -163,7 +163,7 @@ class RendezvousService {
     } catch (e) {
       debugPrint('ERREUR getAvailableBookings: $e');
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -210,7 +210,7 @@ class RendezvousService {
     } catch (e) {
       debugPrint('ERREUR getDriverSchedule: $e');
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -238,7 +238,7 @@ class RendezvousService {
     } catch (e) {
       debugPrint('ERREUR acceptBooking: $e');
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -258,7 +258,7 @@ class RendezvousService {
     } catch (e) {
       debugPrint('ERREUR proposeOffer: $e');
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -275,7 +275,7 @@ class RendezvousService {
     } catch (e) {
       debugPrint('ERREUR completeRendezvous: $e');
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -292,7 +292,7 @@ class RendezvousService {
     } catch (e) {
       debugPrint('ERREUR rejectBooking: $e');
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -347,7 +347,7 @@ class RendezvousService {
       );
     } catch (e) {
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -363,7 +363,7 @@ class RendezvousService {
       }
     } catch (e) {
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -379,7 +379,7 @@ class RendezvousService {
       }
     } catch (e) {
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -398,7 +398,7 @@ class RendezvousService {
       }
     } catch (e) {
       if (e is RendezvousException) rethrow;
-      throw RendezvousException(message: e.toString());
+      throw RendezvousException.from(e);
     }
   }
 
@@ -416,8 +416,29 @@ class RendezvousService {
 class RendezvousException implements Exception {
   final String message;
   final int? statusCode;
+  /// Code métier du backend (`DOCUMENTS_REQUIRED`, `SERVICE_NOT_ASSIGNED`…).
+  final String? code;
 
-  const RendezvousException({required this.message, this.statusCode});
+  const RendezvousException({required this.message, this.statusCode, this.code});
+
+  /// Erreur quelconque → RendezvousException, en gardant statut et code
+  /// d'une réponse API (sinon le refus 403 du backend serait illisible).
+  factory RendezvousException.from(Object e) {
+    if (e is ApiException) {
+      String? code;
+      try {
+        final json = e.response?.json;
+        final nested = json?['error'];
+        code = (json?['code'] ?? (nested is Map ? nested['code'] : null))?.toString();
+      } catch (_) {}
+      return RendezvousException(
+        message: e.message,
+        statusCode: e.response?.statusCode,
+        code: code?.toUpperCase(),
+      );
+    }
+    return RendezvousException(message: e.toString());
+  }
 
   @override
   String toString() => message;

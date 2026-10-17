@@ -182,7 +182,12 @@
     "open_dossier": "Meine Unterlagen ansehen",
     "banner_tap": "Tippen, um Ihre Unterlagen zu sehen",
     "locked_title": "Verfügbar nach Prüfung Ihrer Unterlagen",
-    "locked_body": "Fahrten und Termine erscheinen hier, sobald Ihre Dokumente geprüft wurden."
+    "locked_body": "Fahrten und Termine erscheinen hier, sobald Ihre Dokumente geprüft wurden.",
+    "view": "Ansehen",
+    "commission_unpaid": "Provision des Vormonats unbezahlt: Bezahlen Sie sie, um wieder online zu gehen und Fahrten anzunehmen.",
+    "subscription_required": "Ein Abo ist erforderlich, um online zu gehen und Fahrten anzunehmen.",
+    "no_approved_service": "Kein genehmigter Dienst in Ihrem Konto: Warten Sie auf die Genehmigung Ihres Dienstes.",
+    "service_mismatch": "Diese Fahrt passt nicht zu Ihrem Dienst."
   },
   "sub": {
     "title": "Mein Abonnement",

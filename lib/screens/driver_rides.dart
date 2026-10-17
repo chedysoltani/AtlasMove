@@ -835,6 +835,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                             backgroundColor: Colors.green,
                           ));
                         } catch (e) {
+                          if (!mounted) return;
+                          if (await DriverDossierGate.handleBlocked(context, e)) return;
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text('common.unknown_error'.tr()),
                             backgroundColor: Colors.red,
@@ -964,6 +966,8 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
                   // Start polling until client accepts or rejects
                   _startBidAcceptancePolling(trip, currentBid);
                 } catch (e) {
+                  if (!mounted) return;
+                  if (await DriverDossierGate.handleBlocked(context, e)) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('common.unknown_error'.tr()),
@@ -1073,11 +1077,11 @@ class _DriverRidesScreenState extends State<DriverRidesScreen>
           );
         }
       } on ForbiddenException catch (e) {
-        if (mounted && DriverDossierGate.isDocumentsRequired(e)) {
-          setState(() => _acceptingTripId = null);
-          await DriverDossierGate.handleDocumentsRequired(context);
+        if (mounted) setState(() => _acceptingTripId = null);
+        // Refus d'éligibilité (dossier, commission, abonnement, service non assigné…)
+        if (mounted && await DriverDossierGate.handleBlocked(context, e)) {
+          // déjà expliqué
         } else if (mounted) {
-          setState(() => _acceptingTripId = null);
           // Taxi Économique : abonnement requis ; autres services : commission 10 %
           final commission = DriverBillingService.instance.isCommission;
           ScaffoldMessenger.of(context).showSnackBar(

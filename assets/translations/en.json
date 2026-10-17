@@ -1245,7 +1245,12 @@
     "open_dossier": "View my file",
     "banner_tap": "Tap to view your file",
     "locked_title": "Available once your file is approved",
-    "locked_body": "Rides and appointments will appear here as soon as your documents have been verified."
+    "locked_body": "Rides and appointments will appear here as soon as your documents have been verified.",
+    "view": "View",
+    "commission_unpaid": "Last month's commission is unpaid: pay it to go online and accept rides again.",
+    "subscription_required": "A subscription is required to go online and accept rides.",
+    "no_approved_service": "No approved service on your account: wait for your service to be approved.",
+    "service_mismatch": "This ride does not match your service."
   },
   "driver_v2": {
     "signup_title": "Become a driver",

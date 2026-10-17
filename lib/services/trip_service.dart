@@ -663,6 +663,8 @@ class TripService {
         throw Exception(response.json['message'] ?? 'Failed to submit offer');
       }
       debugPrint('✅ Driver offer submitted successfully');
+    } on ApiException {
+      rethrow; // refus 403 (DOCUMENTS_REQUIRED, SERVICE_NOT_ASSIGNED…) lisible par l'écran
     } catch (e) {
       debugPrint('❌ Erreur lors de la soumission de l\'offre: $e');
       throw Exception(e.toString());
