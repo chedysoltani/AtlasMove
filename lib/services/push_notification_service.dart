@@ -13,6 +13,7 @@ import '../screens/driver_active_ride.dart';
 import '../screens/incoming_call_screen.dart';
 import 'call_service.dart';
 import 'driver_account_store.dart';
+import '../widgets/driver_dossier_gate.dart';
 import 'ride_offer_queue.dart';
 import 'system_strings.dart';
 import 'trip_service.dart';
@@ -497,6 +498,9 @@ class PushNotificationService {
           }
         } catch (e) {
           debugPrint('PushNotificationService: accept_ride depuis notif: ${e.runtimeType}');
+          // Chauffeur devenu inéligible depuis la notification : on explique pourquoi
+          final ctx = navigatorKey.currentContext;
+          if (ctx != null && ctx.mounted) await DriverDossierGate.handleBlocked(ctx, e);
         }
       } else {
         // Tap sur le corps : l'offre rejoint la file, affichée comme une carte

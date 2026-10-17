@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 
 import '../core/network/http_client.dart';
+import 'driver_dossier_gate.dart';
 import '../main.dart' show navigatorKey;
 import '../models/new_ride_offer.dart';
 import '../screens/driver_active_ride.dart';
@@ -128,6 +129,9 @@ class _OfferCardState extends State<_OfferCard> {
         nav.push(MaterialPageRoute(builder: (_) => DriverActiveRideScreen(trip: trip)));
       }
     } on ApiException catch (e) {
+      // Refus d'éligibilité (dossier, commission, abonnement, service…)
+      final ctx = navigatorKey.currentContext;
+      if (ctx != null && await DriverDossierGate.handleBlocked(ctx, e)) return;
       _showError(e.response?.statusCode == 409
           ? 'ride_offer.already_taken'.tr()
           : 'ride_offer.accept_error'.tr());
