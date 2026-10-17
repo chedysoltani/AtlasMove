@@ -10,6 +10,7 @@ import '../services/trip_service.dart';
 import '../models/trip_models.dart';
 import '../services/onboarding_service.dart';
 import '../services/driver_billing_service.dart';
+import '../services/driver_account_store.dart';
 
 class DriverMainScreen extends StatefulWidget {
   const DriverMainScreen({super.key});
@@ -66,6 +67,10 @@ class _DriverMainScreenState extends State<DriverMainScreen> with WidgetsBinding
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // Dossier validé pendant que l'app était en arrière-plan (notification
+      // manquée) : statut rechargé, puis onglet Abonnement / Commission à jour.
+      DriverAccountStore.instance.refreshQuietly();
+      DriverBillingService.instance.refresh();
       // TEMPORARILY DISABLED: uncomment to enable active trip checking on resume
       // _checkActiveTrip();
     }

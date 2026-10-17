@@ -637,6 +637,9 @@ class _DriverOfferScreenState extends State<DriverOfferScreen>
   Widget _buildRewardsSection(List<PrivilegeReward> rewards) {
     final driverRewards = rewards
         .where((r) => r.id != 'cashback_100_usd_mock' && r.type != 'travel')
+        // Chauffeur à commission : pas les récompenses de l'offre Taxi
+        // Économique (ex. cashback 50 %) ; il garde son cashback de 3 % du CA.
+        .where((r) => _isTaxiProfile || !r.isSubscriptionReward)
         .toList();
     if (driverRewards.isEmpty) return const SizedBox();
     return Column(

@@ -120,6 +120,9 @@ class PrivilegeReward {
   final int remainingMonths;
   final double completionPercentage;
   final String status;
+  /// Modèle de facturation visé (`subscription_plus_rate` / `commission`),
+  /// si le backend le précise.
+  final String? billingModel;
 
   const PrivilegeReward({
     required this.id,
@@ -131,7 +134,18 @@ class PrivilegeReward {
     required this.remainingMonths,
     required this.completionPercentage,
     required this.status,
+    this.billingModel,
   });
+
+  /// Récompense de l'offre Taxi Économique (abonnement), ex. « Cashback 50 % ».
+  /// Sans `billing_model`, on la reconnaît à son texte.
+  bool get isSubscriptionReward {
+    if (billingModel != null && billingModel!.isNotEmpty) {
+      return billingModel == 'subscription_plus_rate';
+    }
+    final text = '$id $title $subtitle'.toLowerCase();
+    return RegExp(r'50\s*%|abonnement|subscription').hasMatch(text);
+  }
 
   factory PrivilegeReward.fromJson(Map<String, dynamic> json) {
     return PrivilegeReward(
@@ -144,6 +158,7 @@ class PrivilegeReward {
       remainingMonths: int.tryParse(json['remainingMonths']?.toString() ?? '0') ?? 0,
       completionPercentage: double.tryParse(json['completionPercentage']?.toString() ?? '0') ?? 0.0,
       status: json['status']?.toString() ?? 'in_progress',
+      billingModel: (json['billing_model'] ?? json['billingModel'])?.toString(),
     );
   }
 }
