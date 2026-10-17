@@ -243,7 +243,7 @@
     "reward_obtained": "Earned",
     "financial_summary": "Financial summary",
     "total_earnings": "Total earnings",
-    "commission_paid": "Commission paid ({rate})",
+    "commission_paid": "Commission due ({rate})",
     "subscriptions_paid": "Subscriptions paid",
     "total_trips": "Total rides",
     "score": "{score} pts",

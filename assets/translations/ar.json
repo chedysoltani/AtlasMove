@@ -243,7 +243,7 @@
     "reward_obtained": "تم الحصول عليه",
     "financial_summary": "الملخص المالي",
     "total_earnings": "الأرباح الإجمالية",
-    "commission_paid": "العمولة المدفوعة ({rate})",
+    "commission_paid": "العمولة المستحقة ({rate})",
     "subscriptions_paid": "الاشتراكات المدفوعة",
     "total_trips": "إجمالي الرحلات",
     "score": "{score} نقطة",

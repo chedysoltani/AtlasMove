@@ -243,7 +243,7 @@
     "reward_obtained": "Ottenuto",
     "financial_summary": "Riepilogo finanziario",
     "total_earnings": "Guadagni totali",
-    "commission_paid": "Commissione pagata ({rate})",
+    "commission_paid": "Commissione dovuta ({rate})",
     "subscriptions_paid": "Abbonamenti pagati",
     "total_trips": "Corse totali",
     "score": "{score} pts",

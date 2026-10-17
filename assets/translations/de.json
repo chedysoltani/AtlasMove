@@ -243,7 +243,7 @@
     "reward_obtained": "Erhalten",
     "financial_summary": "Finanzübersicht",
     "total_earnings": "Gesamteinnahmen",
-    "commission_paid": "Gezahlte Provision ({rate})",
+    "commission_paid": "Fällige Provision ({rate})",
     "subscriptions_paid": "Bezahlte Abonnements",
     "total_trips": "Gesamtfahrten",
     "score": "{score} Pkt.",
