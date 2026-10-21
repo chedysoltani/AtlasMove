@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -47,6 +49,7 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
   void initState() {
     super.initState();
     _store.profile.addListener(_onProfileChanged);
+    DriverOnboardingAnalytics.documentScreenViewed();
     _refresh();
   }
 
@@ -110,13 +113,16 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
       return;
     }
     if (photo == null || !mounted) return;
+    DriverOnboardingAnalytics.documentUploadStarted(doc.type);
 
     if (await photo.file.length() > DriverOnboardingApi.maxFileBytes) {
       DriverOnboardingAnalytics.registrationError(step: 'upload', errorCode: 'FILE_TOO_LARGE');
+      DriverOnboardingAnalytics.documentUploadFailed(doc.type, reason: 'size');
       setState(() => state.error = 'driver_v2.errors.FILE_TOO_LARGE'.tr());
       return;
     }
 
+    final wasComplete = _requiredDocsSent(_store.profile.value);
     setState(() { state.running = true; state.error = null; state.progress = 0; });
     try {
       final profile = await DriverOnboardingApi.uploadDocument(
@@ -133,6 +139,10 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
       } else {
         await _store.refresh();
       }
+      final updated = _store.profile.value;
+      if (!wasComplete && updated != null && _requiredDocsSent(updated)) {
+        unawaited(DriverOnboardingAnalytics.documentsCompleted(updated.id));
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('driver_v2.document_sent'.tr(namedArgs: {'document': doc.label})),
@@ -142,16 +152,41 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
       }
     } on DriverApiException catch (e) {
       DriverOnboardingAnalytics.registrationError(step: 'upload', errorCode: e.code);
+      DriverOnboardingAnalytics.documentUploadFailed(doc.type,
+          reason: _failureReason(e), httpStatus: e.statusCode);
       if (mounted) {
         setState(() => state.error = e.isNetwork ? 'driver_v2.upload_network_error'.tr() : e.message);
       }
+    } catch (e) {
+      // Fichier illisible sur l'appareil, réponse inattendue… : jamais muet.
+      debugPrint('Driver document upload: ${e.runtimeType}');
+      DriverOnboardingAnalytics.documentUploadFailed(doc.type, reason: 'unknown');
+      if (mounted) setState(() => state.error = 'driver_v2.errors.generic'.tr());
     } finally {
       if (mounted) setState(() => state.running = false);
     }
   }
 
+  /// Tous les documents obligatoires envoyés (ni manquants, ni refusés).
+  static bool _requiredDocsSent(DriverProfile? p) {
+    final required = p?.documents.where((d) => d.required).toList() ?? const <DriverDocument>[];
+    return required.isNotEmpty && required.every((d) => !d.isMissing && !d.isRejected);
+  }
+
+  /// Motif d'échec pour Analytics : `size`, `format`, `network`, `server` ou `unknown`.
+  static String _failureReason(DriverApiException e) {
+    if (e.code == 'FILE_TOO_LARGE' || e.statusCode == 413) return 'size';
+    if (e.code == 'FILE_TYPE_NOT_ALLOWED' || e.code == 'FILE_UNREADABLE' || e.statusCode == 415) {
+      return 'format';
+    }
+    if (e.isRetryable) return 'network';
+    if ((e.statusCode ?? 0) >= 500 || e.code == 'INTERNAL_ERROR') return 'server';
+    return 'unknown';
+  }
+
   Future<void> _openWhatsApp() async {
     if (_openingWhatsApp) return;
+    DriverOnboardingAnalytics.documentHelpWhatsAppClicked();
     setState(() => _openingWhatsApp = true);
     try {
       if (!await SupportWhatsApp.open() && mounted) {

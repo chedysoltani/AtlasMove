@@ -341,6 +341,26 @@ class _DriverSignupScreenState extends State<DriverSignupScreen> {
       _vehicleType != null &&
       _acceptTerms;
 
+  /// Champs en erreur (noms Analytics), dans l'ordre du formulaire.
+  List<String> get _invalidFields {
+    bool badText(TextEditingController c, int max) {
+      final v = c.text.trim();
+      return v.isEmpty || v.length > max;
+    }
+
+    return [
+      if (_country == null) 'country',
+      if (!_phoneCheck.isValid) 'phone',
+      if (!_emailValid) 'email',
+      if (_vehicleType == null) 'vehicle_type',
+      if (_catalogue.isNotEmpty && _findService(_serviceId) == null) 'service',
+      if (badText(_firstNameCtrl, 50)) 'first_name',
+      if (badText(_lastNameCtrl, 50)) 'last_name',
+      if (badText(_cityCtrl, 120)) 'city',
+      if (!_acceptTerms) 'terms',
+    ];
+  }
+
   // ── Envoi ─────────────────────────────────────────────────────────────────
 
   Future<void> _submit() async {
@@ -348,8 +368,10 @@ class _DriverSignupScreenState extends State<DriverSignupScreen> {
     setState(() { _showErrors = true; _serverFieldErrors = {}; _error = null; _errorCode = null; });
     if (!_formValid) {
       DriverOnboardingAnalytics.registrationError(step: 'form', errorCode: 'LOCAL_VALIDATION');
+      _invalidFields.forEach(DriverOnboardingAnalytics.signupFormError);
       return;
     }
+    DriverOnboardingAnalytics.signupFormSubmitted();
     final options = _options!;
     final phone = _phoneCheck.e164!;
     final country = _country!;
@@ -360,6 +382,7 @@ class _DriverSignupScreenState extends State<DriverSignupScreen> {
     try {
       final otp = await DriverOnboardingApi.sendOtp(
           phone: phone, country: country, purpose: 'register', email: email);
+      DriverOnboardingAnalytics.otpSent(purpose: 'register', channel: otp.channel);
       if (!mounted) return;
       final fieldErrors = await Navigator.of(context).pushNamed(
         DriverOtpScreen.route,
@@ -381,10 +404,12 @@ class _DriverSignupScreenState extends State<DriverSignupScreen> {
       );
       // Retour de l'écran du code avec des erreurs de saisie à corriger.
       if (fieldErrors is Map<String, String> && mounted) {
+        fieldErrors.keys.forEach(DriverOnboardingAnalytics.signupFormError);
         setState(() => _serverFieldErrors = fieldErrors);
       }
     } on DriverApiException catch (e) {
       DriverOnboardingAnalytics.registrationError(step: 'otp_send', errorCode: e.code);
+      DriverOnboardingAnalytics.otpFailed(purpose: 'register', stage: 'send', reason: e.code);
       if (!mounted) return;
       setState(() {
         _errorCode = e.code;
@@ -411,6 +436,7 @@ class _DriverSignupScreenState extends State<DriverSignupScreen> {
         // Erreur rattachée à un champ : affichée sous le champ seulement.
         _error = _serverFieldErrors.isEmpty ? e.message : null;
       });
+      _serverFieldErrors.keys.forEach(DriverOnboardingAnalytics.signupFormError);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
