@@ -233,6 +233,8 @@
     "status_upload_body": "Fotografieren Sie jedes Pflichtdokument. Sobald alle gesendet sind, prüft unser Team Ihre Unterlagen, meist innerhalb von {hours} Std.",
     "status_replace_title": "Ein Dokument wurde abgelehnt",
     "status_replace_body": "Lesen Sie den Grund unter dem Dokument und senden Sie es dann erneut.",
+    "status_remaining_title": "Erste Dokumente gesendet",
+    "status_remaining_body": "Danke! Senden Sie jetzt die restlichen Dokumente: Ihr Konto wird aktiviert, sobald Ihre Unterlagen vollständig und geprüft sind.",
     "status_review_title": "Unterlagen werden geprüft",
     "status_review_body": "Vielen Dank! Unser Team prüft Ihre Dokumente, meist innerhalb von {hours} Std. Sie erhalten eine Benachrichtigung, sobald Ihr Konto aktiviert ist.",
     "status_rejected_title": "Unterlagen abgelehnt",

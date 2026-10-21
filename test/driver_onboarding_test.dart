@@ -131,6 +131,33 @@ void main() {
     });
   });
 
+  group('Profil : dossier progressif (réponse backend du 21/10)', () {
+    test('documents_stage, documents_completed_at et étape des documents', () {
+      final p = DriverProfile.fromJson({
+        'id': 'd1',
+        'account_status': 'pending_documents',
+        'next_action': 'UPLOAD_REMAINING_DOCUMENTS',
+        'documents_stage': 'start_complete',
+        'documents_completed_at': '2026-10-21T16:28:02.279Z',
+        'documents': [
+          {'type': 'id_card', 'label': 'Pièce d’identité', 'required': true, 'status': 'uploaded', 'stage': 'start'},
+          {'type': 'vehicle_registration', 'label': 'Carte grise', 'required': true, 'status': 'missing', 'stage': 'later'},
+        ],
+      });
+      expect(p.nextAction, DriverNextAction.uploadRemainingDocuments);
+      expect(p.documentsStage, DriverDocumentsStage.startComplete);
+      expect(p.documentsCompletedAt, DateTime.utc(2026, 10, 21, 16, 28, 2, 279));
+      expect(p.documents.map((d) => d.stage), ['start', 'later']);
+    });
+
+    test('serveur pas à jour : valeurs par défaut', () {
+      final p = DriverProfile.fromJson({'id': 'd1', 'documents': [{'type': 'selfie'}]});
+      expect(p.documentsStage, DriverDocumentsStage.none);
+      expect(p.documentsCompletedAt, isNull);
+      expect(p.documents.single.stage, isNull);
+    });
+  });
+
   group('Tap sur une notification « dossier »', () {
     test('dossier non validé : « Mon dossier » par-dessus l\'app', () {
       for (final status in ['pending_documents', 'pending_review', 'rejected']) {

@@ -236,6 +236,7 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
   static bool _needsDocuments(DriverProfile p) =>
       p.accountStatus != DriverAccountStatus.rejected &&
       (p.nextAction == DriverNextAction.uploadDocuments ||
+          p.nextAction == DriverNextAction.uploadRemainingDocuments ||
           p.nextAction == DriverNextAction.replaceRejectedDocuments);
 
   /// Tous les documents obligatoires envoyés (ni manquants, ni refusés).
@@ -380,6 +381,12 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
         icon = Icons.report_gmailerrorred_rounded;
         title = 'driver_v2.status_replace_title'.tr();
         body = 'driver_v2.status_replace_body'.tr();
+        break;
+      case DriverNextAction.uploadRemainingDocuments:
+        color = DriverUi.orange;
+        icon = Icons.task_alt_rounded;
+        title = 'driver_v2.status_remaining_title'.tr();
+        body = 'driver_v2.status_remaining_body'.tr();
         break;
       case DriverNextAction.contactSupport:
         color = DriverUi.red;

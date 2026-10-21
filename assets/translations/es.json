@@ -233,6 +233,8 @@
     "status_upload_body": "Haz una foto de cada documento obligatorio. Cuando los hayas enviado todos, nuestro equipo revisará tu expediente, normalmente en {hours} h.",
     "status_replace_title": "Se ha rechazado un documento",
     "status_replace_body": "Lee el motivo indicado bajo el documento y vuelve a enviarlo.",
+    "status_remaining_title": "Primeros documentos enviados",
+    "status_remaining_body": "¡Gracias! Envía ahora los documentos restantes: tu cuenta se activará cuando tu expediente esté completo y verificado.",
     "status_review_title": "Expediente en revisión",
     "status_review_body": "¡Gracias! Nuestro equipo está revisando tus documentos, normalmente en {hours} h. Recibirás una notificación en cuanto tu cuenta esté activada.",
     "status_rejected_title": "Expediente rechazado",

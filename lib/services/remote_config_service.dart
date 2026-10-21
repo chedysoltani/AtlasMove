@@ -36,10 +36,9 @@ class RemoteConfigService extends ChangeNotifier {
     // Désactivé tant que le backend n'accepte pas un dossier partiel.
     driverDocsProgressiveEnabled: false,
     driverDocsVariant: 'A',
-    // TODO(documents progressifs) : ajouter le(s) type(s) de la pièce d'identité
-    // (recto/verso ?) une fois confirmés par GET /v2/driver/me — corrigeable
-    // dans Remote Config sans nouvelle version.
-    driverDocsStartTypes: '["driving_license"]',
+    // Types confirmés par le backend (21/10) ; ne sert que si le serveur ne
+    // donne pas l'étape de chaque document (documents[].stage).
+    driverDocsStartTypes: '["id_card","driving_license"]',
   };
 
   FirebaseRemoteConfig? _config;

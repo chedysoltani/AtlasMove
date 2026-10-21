@@ -54,11 +54,17 @@ class DriverDocumentsPlan {
       FirebaseAnalyticsService.instance.setUserProperty(userProperty, current.variant));
 
   /// Documents répartis « pour commencer » / « plus tard », dans l'ordre du
-  /// serveur. Variante A, ou aucun type reconnu dans la liste (type mal saisi
-  /// dans Remote Config) : tout « pour commencer », rien « plus tard ».
+  /// serveur. Étapes données par le serveur (`documents[].stage`, dossier
+  /// progressif configuré) en priorité, sinon [startTypes]. Variante A, ou
+  /// aucun document de départ reconnu (type mal saisi dans Remote Config) :
+  /// tout « pour commencer », rien « plus tard ».
   ({List<DriverDocument> start, List<DriverDocument> later}) split(List<DriverDocument> docs) {
-    final start = docs.where((d) => startTypes.contains(d.type)).toList();
-    if (variant != variantB || start.isEmpty) return (start: docs, later: const []);
-    return (start: start, later: docs.where((d) => !startTypes.contains(d.type)).toList());
+    if (variant != variantB) return (start: docs, later: const []);
+    final serverStages = docs.any((d) => d.stage == DriverDocumentStage.later);
+    bool isStart(DriverDocument d) =>
+        serverStages ? d.stage != DriverDocumentStage.later : startTypes.contains(d.type);
+    final start = docs.where(isStart).toList();
+    if (start.isEmpty) return (start: docs, later: const []);
+    return (start: start, later: docs.where((d) => !isStart(d)).toList());
   }
 }

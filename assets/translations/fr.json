@@ -1308,6 +1308,8 @@
     "status_upload_body": "Prenez en photo chaque document obligatoire. Dès qu'ils sont tous envoyés, notre équipe vérifie votre dossier, généralement sous {hours} h.",
     "status_replace_title": "Un document a été refusé",
     "status_replace_body": "Lisez la raison indiquée sous le document, puis renvoyez-le.",
+    "status_remaining_title": "Premiers documents envoyés",
+    "status_remaining_body": "Merci ! Envoyez maintenant les documents restants : votre compte sera activé une fois le dossier complet et vérifié.",
     "status_review_title": "Dossier en cours de vérification",
     "status_review_body": "Merci ! Notre équipe vérifie vos documents, généralement sous {hours} h. Vous recevrez une notification dès que votre compte sera activé.",
     "status_rejected_title": "Dossier refusé",

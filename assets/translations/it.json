@@ -233,6 +233,8 @@
     "status_upload_body": "Fotografa ogni documento obbligatorio. Quando li avrai inviati tutti, il nostro team verificherà il tuo fascicolo, di solito entro {hours} h.",
     "status_replace_title": "Un documento è stato rifiutato",
     "status_replace_body": "Leggi il motivo indicato sotto il documento, poi invialo di nuovo.",
+    "status_remaining_title": "Primi documenti inviati",
+    "status_remaining_body": "Grazie! Ora invia i documenti rimanenti: il tuo account sarà attivato quando il fascicolo sarà completo e verificato.",
     "status_review_title": "Fascicolo in fase di verifica",
     "status_review_body": "Grazie! Il nostro team sta verificando i tuoi documenti, di solito entro {hours} h. Riceverai una notifica non appena il tuo account sarà attivato.",
     "status_rejected_title": "Fascicolo rifiutato",

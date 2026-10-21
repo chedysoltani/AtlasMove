@@ -253,6 +253,10 @@ class _DossierStatus {
         return _DossierStatus('driver_v2.status_replace_title'.tr(),
             'driver_v2.status_replace_body'.tr(),
             DriverUi.red, Icons.report_gmailerrorred_rounded);
+      case DriverNextAction.uploadRemainingDocuments:
+        return _DossierStatus('driver_v2.status_remaining_title'.tr(),
+            'driver_v2.status_remaining_body'.tr(),
+            DriverUi.orange, Icons.task_alt_rounded);
       case DriverNextAction.contactSupport:
         return _DossierStatus('driver_v2.status_rejected_title'.tr(),
             p?.rejectionReason ?? 'driver_v2.status_rejected_body'.tr(),
