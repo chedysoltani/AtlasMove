@@ -12,6 +12,7 @@ import '../services/driver_documents_plan.dart';
 import '../services/driver_onboarding_analytics.dart';
 import '../services/driver_onboarding_api.dart';
 import '../services/driver_photo_service.dart';
+import '../services/remote_config_service.dart';
 import '../services/support_whatsapp.dart';
 import '../widgets/driver_documents_trust_card.dart';
 import '../widgets/driver_onboarding_ui.dart';
@@ -314,8 +315,9 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
                         onAction: _refresh),
                     const SizedBox(height: 14),
                   ],
-                  // Tant qu'il reste des documents à envoyer : rassurer avant l'envoi.
-                  if (_needsDocuments(profile)) ...[
+                  // Tant qu'il reste des documents à envoyer : rassurer avant
+                  // l'envoi (désactivable dans Remote Config).
+                  if (_needsDocuments(profile) && RemoteConfigService.instance.trustCardEnabled) ...[
                     DriverDocumentsTrustCard(
                       country: profile.country,
                       initiallyExpanded: profile.documents.every((d) => d.isMissing),

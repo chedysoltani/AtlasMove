@@ -20,6 +20,10 @@ class RemoteConfigService extends ChangeNotifier {
 
   // ── Clés (à créer avec les mêmes noms dans la console Firebase) ───────────
 
+  /// Carte « Vos documents sont protégés » dans « Mon dossier » ; false la masque
+  /// (ex. tant que le chiffrement du stockage n'est pas en place côté serveur).
+  static const driverTrustCardEnabled = 'driver_trust_card_enabled';
+
   /// Nombre affiché dans « +600 chauffeurs … » ; 0 masque la phrase.
   static const driverSocialProofCount = 'driver_social_proof_count';
   static const privacyPolicyUrl = 'privacy_policy_url';
@@ -31,6 +35,7 @@ class RemoteConfigService extends ChangeNotifier {
   static const driverDocsStartTypes = 'driver_docs_start_types';
 
   static const Map<String, Object> _defaults = {
+    driverTrustCardEnabled: true,
     driverSocialProofCount: 600,
     privacyPolicyUrl: 'https://api.atla.business/legal/privacy-policy',
     // Désactivé tant que le backend n'accepte pas un dossier partiel.
@@ -101,6 +106,7 @@ class RemoteConfigService extends ChangeNotifier {
     return _defaults[key] as String;
   }
 
+  bool get trustCardEnabled => getBool(driverTrustCardEnabled);
   int get socialProofCount => getInt(driverSocialProofCount);
   String get privacyUrl => getString(privacyPolicyUrl);
 }
