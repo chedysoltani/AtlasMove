@@ -17,8 +17,8 @@ Objectif : passer d'environ 10 % à **25 % et plus** de chauffeurs qui envoient 
   début / réussite / échec de chaque envoi (avec le motif : taille, format, réseau, serveur).
 - **Envoi plus fiable** : photos compressées sous 1 Mo (1600 px, JPEG), photos iPhone (HEIC)
   converties en JPEG, 3 essais automatiques, « Réessayer » sans reprendre la photo, messages clairs.
-- **Métadonnées retirées** : plus aucune donnée EXIF (position GPS, téléphone, date) dans les photos envoyées.
   **Le format de la requête ne change pas** (`POST /v2/driver/documents/{type}`, multipart, champ `file`).
+- **Métadonnées retirées** : plus aucune donnée EXIF (position GPS, téléphone, date) dans les photos envoyées.
 - **Carte « Vos documents sont protégés »** en haut de « Mon dossier » : pourquoi on demande les documents,
   et trois promesses — *visibles uniquement par l'équipe de vérification*, *jamais partagés*,
   *stockés de façon sécurisée*. **Ces promesses doivent être vraies côté serveur** : voir le besoin 3.1.
