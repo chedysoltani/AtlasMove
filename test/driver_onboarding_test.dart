@@ -150,6 +150,29 @@ void main() {
       expect(p.documents.map((d) => d.stage), ['start', 'later']);
     });
 
+    DriverProfile profile({String? completedAt, required String status}) => DriverProfile.fromJson({
+          'id': 'd1',
+          if (completedAt != null) 'documents_completed_at': completedAt,
+          'documents': [
+            {'type': 'id_card', 'required': true, 'status': status},
+          ],
+        });
+
+    test('dossier complété : selon documents_completed_at quand le serveur le donne', () {
+      const date = '2026-10-21T16:28:02Z';
+      final before = profile(status: 'missing');
+      final after = profile(status: 'uploaded', completedAt: date);
+      expect(after.completedSince(before), isTrue);
+      // Déjà complété une fois (ex. remplacement d'un document refusé) : pas de nouvel évènement.
+      expect(after.completedSince(profile(status: 'rejected', completedAt: date)), isFalse);
+    });
+
+    test('dossier complété : selon les statuts si le serveur n\'est pas à jour', () {
+      expect(profile(status: 'uploaded').completedSince(profile(status: 'missing')), isTrue);
+      expect(profile(status: 'uploaded').completedSince(profile(status: 'uploaded')), isFalse);
+      expect(profile(status: 'missing').completedSince(null), isFalse);
+    });
+
     test('serveur pas à jour : valeurs par défaut', () {
       final p = DriverProfile.fromJson({'id': 'd1', 'documents': [{'type': 'selfie'}]});
       expect(p.documentsStage, DriverDocumentsStage.none);

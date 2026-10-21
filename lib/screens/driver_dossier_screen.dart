@@ -154,7 +154,7 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
       return;
     }
 
-    final wasComplete = _requiredDocsSent(_store.profile.value);
+    final before = _store.profile.value;
     setState(() {
       state.running = true;
       state.error = null;
@@ -186,7 +186,7 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
         await _store.refresh();
       }
       final updated = _store.profile.value;
-      if (!wasComplete && updated != null && _requiredDocsSent(updated)) {
+      if (updated != null && updated.completedSince(before)) {
         unawaited(DriverOnboardingAnalytics.documentsCompleted(updated.id));
       }
       if (mounted) {
@@ -238,12 +238,6 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
       (p.nextAction == DriverNextAction.uploadDocuments ||
           p.nextAction == DriverNextAction.uploadRemainingDocuments ||
           p.nextAction == DriverNextAction.replaceRejectedDocuments);
-
-  /// Tous les documents obligatoires envoyés (ni manquants, ni refusés).
-  static bool _requiredDocsSent(DriverProfile? p) {
-    final required = p?.documents.where((d) => d.required).toList() ?? const <DriverDocument>[];
-    return required.isNotEmpty && required.every((d) => !d.isMissing && !d.isRejected);
-  }
 
   /// Motif d'échec pour Analytics : `size`, `format`, `network`, `server` ou `unknown`.
   static String _failureReason(DriverApiException e) {

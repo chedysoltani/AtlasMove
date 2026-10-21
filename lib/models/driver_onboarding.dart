@@ -342,6 +342,21 @@ class DriverProfile {
 
   bool get isActive => accountStatus == DriverAccountStatus.active;
   bool get isSuspended => accountStatus == DriverAccountStatus.suspended;
+
+  /// Tous les documents obligatoires envoyés (ni manquants, ni refusés).
+  bool get requiredDocumentsSent {
+    final required = documents.where((d) => d.required).toList();
+    return required.isNotEmpty && required.every((d) => !d.isMissing && !d.isRejected);
+  }
+
+  /// Le dossier vient d'être complété depuis [before] (évènement
+  /// `driver_documents_completed`). Serveur à jour : `documents_completed_at`
+  /// vient d'apparaître (fixé une seule fois par chauffeur, même après
+  /// réinstallation) ; sinon, d'après les statuts des documents obligatoires.
+  bool completedSince(DriverProfile? before) {
+    if (documentsCompletedAt != null) return before?.documentsCompletedAt == null;
+    return !(before?.requiredDocumentsSent ?? false) && requiredDocumentsSent;
+  }
 }
 
 /// Réponse de `register` et `login` : jetons + profil.
