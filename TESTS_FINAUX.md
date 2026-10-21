@@ -11,8 +11,11 @@ Les cases cochées ont déjà été vérifiées pendant le développement (21/10
 - Images factices dans la galerie de l'émulateur (`Pictures/AtlasMoveTest`) : CIN, permis,
   carte grise, selfie, véhicule, grosse photo (8 Mo), fichier illisible. Aucune vraie pièce.
 - **Un seul** compte de test : prénom « TEST AtlasMove », nom « ne pas valider ».
-  Une adresse e-mail et un numéro de téléphone fournis par vous ; vous transmettez le code reçu.
-  Le compte sera supprimé depuis l'admin à la fin.
+  Une adresse e-mail et un numéro de téléphone fournis par vous. Idéalement, le backend configure
+  un **code fixe** pour cette adresse (`DRIVER_OTP_TEST_EMAILS`) : aucun e-mail réel, pas besoin de
+  transmettre le code. Le compte sera supprimé depuis l'admin à la fin.
+- **Release backend du 21/10 déployée** (journal des consultations, `documents_completed_at`,
+  relances 24 h / 72 h, proxy réglé). Sans elle, les scénarios de la section 5 ne sont pas testables.
 - Meta Events Manager ouvert sur **Tester les évènements**.
 
 ## 1. Analytics (étape 1)
@@ -66,8 +69,7 @@ Les cases cochées ont déjà été vérifiées pendant le développement (21/10
 
 - [x] Au démarrage : propriété utilisateur `onboarding_variant = A` envoyée
 - [ ] Par défaut (flag à `false`) : « Mon dossier » identique à avant, une seule liste
-- [ ] Lire les vrais types dans `GET /v2/driver/me` (pièce d'identité : recto/verso ?)
-      et corriger `driver_docs_start_types` dans Remote Config
+- [x] Types confirmés par le backend : `id_card` (recto), `driving_license`… — valeur par défaut mise à jour
 - [ ] Condition Remote Config limitée à l'appareil de test : flag `true` + variante `B` →
       sections « Pour commencer » / « Plus tard », documents toujours envoyables
 - [ ] Même chose avec un type inconnu dans `driver_docs_start_types` → une seule liste
@@ -75,24 +77,43 @@ Les cases cochées ont déjà été vérifiées pendant le développement (21/10
 - [ ] Variante B en arabe (droite à gauche)
 - [ ] Remettre la condition de test à `false` / `A` à la fin
 
-## 5. Non-régression
+## 5. Après la release backend du 21/10
+
+- [x] Lecture de `documents_stage`, `documents_completed_at`, `documents[].stage` et
+      `UPLOAD_REMAINING_DOCUMENTS` (tests automatiques)
+- [ ] `driver_documents_completed` part quand `documents_completed_at` apparaît, et **pas** après le
+      remplacement d'un document refusé (vérifier `documents_completed_at` dans l'admin)
+- [ ] Relance « dossier incomplet » (24 h après l'inscription, ou envoyée à la main depuis le serveur) :
+      le tap ouvre **« Mon dossier »** par-dessus l'app (app ouverte, en arrière-plan, et fermée)
+- [ ] Notification « dossier » sur un compte actif : écran principal, pas « Mon dossier »
+- [ ] Fichier refusé par le serveur (`FILE_TYPE_NOT_ALLOWED` avec le fichier illisible) : message clair
+- [ ] Admin : le compte de test apparaît dans « Consultations des documents » après ouverture d'un
+      document depuis le panel (journal)
+- [ ] Remote Config `driver_trust_card_enabled = false` → carte de confiance masquée (lancement suivant)
+- [ ] Dossier progressif côté serveur (`DRIVER_START_DOCUMENTS`) : **à tester sur le staging seulement**.
+      En production, ce réglage change `next_action` pour tous les chauffeurs concernés. Attendus :
+      statut « Premiers documents envoyés » après id_card + permis, carte de confiance toujours visible,
+      variante B rangée selon `documents[].stage`
+
+## 6. Non-régression
 
 - [ ] Chauffeur déjà inscrit et actif : pas de bandeau, app normale, mise en ligne possible
 - [ ] Chauffeur en vérification : bandeau bleu, « Mon dossier » lisible, pas de carte de confiance
 - [ ] Client : parcours client inchangé (aucun évènement chauffeur)
 - [ ] « Mon dossier » en arabe : tout l'écran de droite à gauche, textes traduits
 
-## 6. Actions dans les consoles
+## 7. Actions dans les consoles
 
 ### Firebase Remote Config
 
 | Paramètre | Type | Valeur par défaut | Rôle |
 |---|---|---|---|
+| `driver_trust_card_enabled` | Booléen | `true` | Affiche la carte « Vos documents sont protégés ». Mettre à `false` si le chiffrement du stockage n'est pas fait au moment de la mise en production. |
 | `driver_social_proof_count` | Nombre | `600` | « +600 chauffeurs… » ; `0` masque la phrase. À garder vrai. |
 | `privacy_policy_url` | Texte | `https://api.atla.business/legal/privacy-policy` | Lien de la carte de confiance |
 | `driver_docs_progressive_enabled` | Booléen | `false` | Interrupteur des documents progressifs. **Rester à `false`** tant que le backend n'accepte pas un dossier partiel. |
 | `driver_docs_variant` | Texte | `A` | Variante attribuée par A/B Testing (`A` ou `B`) |
-| `driver_docs_start_types` | JSON | `["driving_license"]` | Types « pour commencer » ; ajouter la pièce d'identité une fois le type connu |
+| `driver_docs_start_types` | JSON | `["id_card","driving_license"]` | Types « pour commencer », en secours seulement : si le serveur donne `documents[].stage` (`DRIVER_START_DOCUMENTS`), c'est lui qui fait foi |
 
 Sans ces paramètres, l'app utilise les mêmes valeurs par défaut.
 
