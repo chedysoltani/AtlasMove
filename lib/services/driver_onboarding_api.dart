@@ -106,8 +106,9 @@ class DriverOnboardingApi {
 
   static const Duration uploadTimeout = Duration(seconds: 120);
 
-  /// Taille max d'un document (contrat : 10 Mo).
-  static const int maxFileBytes = 10485760;
+  /// Taille max d'un document : `files.max_size_bytes` de registration-options,
+  /// seule source (confirmé par le backend) ; 10 Mo tant qu'elle n'est pas chargée.
+  static int maxFileBytes = 10485760;
   static const int maxUploadRetries = 2;
 
   /// fr, ar ou en (les autres langues de l'app retombent sur fr, comme le serveur).
@@ -140,9 +141,12 @@ class DriverOnboardingApi {
 
   // ── Inscription ───────────────────────────────────────────────────────────
 
-  static Future<DriverRegistrationOptions> registrationOptions() async =>
-      DriverRegistrationOptions.fromJson(await _call(
-          () => HttpClient.get('/v2/driver/registration-options', headers: _headers)));
+  static Future<DriverRegistrationOptions> registrationOptions() async {
+    final options = DriverRegistrationOptions.fromJson(await _call(
+        () => HttpClient.get('/v2/driver/registration-options', headers: _headers)));
+    if (options.maxFileBytes > 0) maxFileBytes = options.maxFileBytes;
+    return options;
+  }
 
   /// [purpose] : `register` ou `login`. [email] : à l'inscription, l'adresse
   /// où le code est envoyé (ignorée par le serveur à la connexion).
