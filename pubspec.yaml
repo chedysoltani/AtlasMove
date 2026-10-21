@@ -43,6 +43,7 @@ dependencies:
   package_info_plus: ^9.0.1
   # Compression JPEG des documents chauffeur (pur Dart, sans code natif)
   image: ^4.3.0
+  firebase_remote_config: ^5.5.0
 
 
 dev_dependencies:

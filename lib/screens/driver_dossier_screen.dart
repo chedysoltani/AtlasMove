@@ -12,6 +12,7 @@ import '../services/driver_onboarding_analytics.dart';
 import '../services/driver_onboarding_api.dart';
 import '../services/driver_photo_service.dart';
 import '../services/support_whatsapp.dart';
+import '../widgets/driver_documents_trust_card.dart';
 import '../widgets/driver_onboarding_ui.dart';
 
 /// « Mon dossier » : statut du compte chauffeur, documents un par un (envoi,
@@ -230,6 +231,12 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
     }
   }
 
+  /// Documents à envoyer ou à remplacer (dossier ni en vérification, ni refusé).
+  static bool _needsDocuments(DriverProfile p) =>
+      p.accountStatus != DriverAccountStatus.rejected &&
+      (p.nextAction == DriverNextAction.uploadDocuments ||
+          p.nextAction == DriverNextAction.replaceRejectedDocuments);
+
   /// Tous les documents obligatoires envoyés (ni manquants, ni refusés).
   static bool _requiredDocsSent(DriverProfile? p) {
     final required = p?.documents.where((d) => d.required).toList() ?? const <DriverDocument>[];
@@ -309,6 +316,14 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
                         message: _loadError!,
                         actionLabel: 'common.retry'.tr(),
                         onAction: _refresh),
+                    const SizedBox(height: 14),
+                  ],
+                  // Tant qu'il reste des documents à envoyer : rassurer avant l'envoi.
+                  if (_needsDocuments(profile)) ...[
+                    DriverDocumentsTrustCard(
+                      country: profile.country,
+                      initiallyExpanded: profile.documents.every((d) => d.isMissing),
+                    ),
                     const SizedBox(height: 14),
                   ],
                   _statusCard(profile),

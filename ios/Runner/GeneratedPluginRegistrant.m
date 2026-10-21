@@ -60,6 +60,12 @@
 @import firebase_messaging;
 #endif
 
+#if __has_include(<firebase_remote_config/FirebaseRemoteConfigPlugin.h>)
+#import <firebase_remote_config/FirebaseRemoteConfigPlugin.h>
+#else
+@import firebase_remote_config;
+#endif
+
 #if __has_include(<flutter_foreground_task/FlutterForegroundTaskPlugin.h>)
 #import <flutter_foreground_task/FlutterForegroundTaskPlugin.h>
 #else
@@ -150,6 +156,7 @@
   [FirebaseAnalyticsPlugin registerWithRegistrar:[registry registrarForPlugin:@"FirebaseAnalyticsPlugin"]];
   [FLTFirebaseCorePlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTFirebaseCorePlugin"]];
   [FLTFirebaseMessagingPlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTFirebaseMessagingPlugin"]];
+  [FirebaseRemoteConfigPlugin registerWithRegistrar:[registry registrarForPlugin:@"FirebaseRemoteConfigPlugin"]];
   [FlutterForegroundTaskPlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterForegroundTaskPlugin"]];
   [FlutterLocalNotificationsPlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterLocalNotificationsPlugin"]];
   [FlutterSecureStoragePlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterSecureStoragePlugin"]];

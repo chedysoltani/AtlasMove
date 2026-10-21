@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'core/utils/darija_asset_loader.dart';
 import 'providers/locale_provider.dart';
 import 'services/location_tracking_service.dart';
 import 'services/driver_service.dart';
@@ -68,6 +69,7 @@ import 'services/location_foreground_service.dart';
 import 'services/push_notification_service.dart';
 import 'services/meta_events_service.dart';
 import 'services/firebase_analytics_service.dart';
+import 'services/remote_config_service.dart';
 import 'services/deep_link_service.dart';
 import 'core/network/http_client.dart';
 import 'core/auth/auth_session.dart';
@@ -94,6 +96,9 @@ void main() async {
   } catch (e) {
     debugPrint('Firebase init error: $e');
   }
+
+  // Valeurs réglables à distance (textes chauffeur, variantes) ; n'attend pas le réseau.
+  await RemoteConfigService.instance.init();
 
   // Canaux Android + tap sur une notification "nouvelle course" / "appel entrant"
   await PushNotificationService.initialize();
@@ -239,6 +244,8 @@ void main() async {
     EasyLocalization(
       supportedLocales: LocaleProvider.supportedLocales,
       path: 'assets/translations',
+      // ar-DZ / ar-MA (pas encore proposées) : complétées par l'arabe standard.
+      assetLoader: const DarijaAssetLoader(),
       fallbackLocale: const Locale('fr'),
       startLocale: const Locale('fr'),
       child: const AtlasMoveApp(),
