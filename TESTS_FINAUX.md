@@ -42,6 +42,12 @@ Les cases cochées ont déjà été vérifiées pendant le développement (21/10
 - [ ] Fichier illisible → message + bouton « Reprendre la photo »
       (`reason=format` ou `unknown` selon la réponse du serveur)
 - [ ] HEIC : sur iPhone uniquement (TestFlight, après le merge) — photo de l'appareil envoyée en JPEG
+- [x] Métadonnées : photo avec GPS, téléphone, date et rotation → plus aucun EXIF ni GPS en sortie,
+      rotation appliquée (test automatique, aussi pour un HEIC converti en JPEG)
+- [ ] Métadonnées en réel : photo prise **avec la localisation activée** (émulateur : position
+      simulée dans les réglages de l'appareil photo), envoyée, puis téléchargée depuis l'admin →
+      aucune donnée GPS (`exiftool photo.jpg` ou propriétés du fichier)
+- [ ] iPhone : même vérification avec une photo HEIC de l'appareil
 - [ ] Remplacement d'un document refusé (si un document du compte de test est refusé depuis l'admin)
 
 ## 3. Carte « Vos documents sont protégés » (étape 3)

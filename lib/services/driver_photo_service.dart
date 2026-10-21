@@ -21,7 +21,7 @@ class CameraPermissionDenied implements Exception {}
 
 /// Photos des documents chauffeur : appareil photo ou galerie, puis
 /// compression avant envoi (1600 px au plus, JPEG qualité 75 %, moins de 1 Mo
-/// visé pour passer sur un réseau faible).
+/// visé pour passer sur un réseau faible), sans aucune métadonnée EXIF.
 class DriverPhotoService {
   DriverPhotoService._();
 
@@ -89,8 +89,9 @@ class DriverPhotoService {
   }
 
   /// Convertit en JPEG (voir [_toJpeg]). Si l'image ne peut pas être
-  /// décodée ici (ex. HEIC), le fichier part tel quel : le serveur accepte
-  /// le HEIC et le convertit lui-même.
+  /// décodée ici (ex. HEIC que le sélecteur n'a pas converti), le fichier part
+  /// tel quel, métadonnées comprises : le serveur accepte le HEIC, le convertit
+  /// et doit en retirer l'EXIF.
   static Future<DriverPhoto> prepare(String path) async {
     final source = File(path);
     try {
@@ -123,12 +124,16 @@ class DriverPhotoService {
   }
 }
 
-/// Isolate : décodage, rotation EXIF appliquée, réduction, encodage JPEG
-/// sous [DriverPhotoService.targetBytes] autant que possible.
+/// Isolate : décodage, rotation EXIF appliquée, métadonnées retirées,
+/// réduction, encodage JPEG sous [DriverPhotoService.targetBytes] autant que possible.
 Uint8List? _toJpeg(Uint8List bytes) {
   final decoded = img.decodeImage(bytes);
   if (decoded == null) return null;
-  var image = _fit(img.bakeOrientation(decoded), DriverPhotoService.maxSide);
+  final upright = img.bakeOrientation(decoded);
+  // Rotation appliquée : plus besoin de l'EXIF. On retire tout (position GPS,
+  // modèle du téléphone, date…) : rien d'autre que l'image ne part au serveur.
+  upright.exif = img.ExifData();
+  var image = _fit(upright, DriverPhotoService.maxSide);
 
   var quality = DriverPhotoService.jpegQuality;
   var jpeg = img.encodeJpg(image, quality: quality);

@@ -17,6 +17,7 @@ Objectif : passer d'environ 10 % à **25 % et plus** de chauffeurs qui envoient 
   début / réussite / échec de chaque envoi (avec le motif : taille, format, réseau, serveur).
 - **Envoi plus fiable** : photos compressées sous 1 Mo (1600 px, JPEG), photos iPhone (HEIC)
   converties en JPEG, 3 essais automatiques, « Réessayer » sans reprendre la photo, messages clairs.
+- **Métadonnées retirées** : plus aucune donnée EXIF (position GPS, téléphone, date) dans les photos envoyées.
   **Le format de la requête ne change pas** (`POST /v2/driver/documents/{type}`, multipart, champ `file`).
 - **Carte « Vos documents sont protégés »** en haut de « Mon dossier » : pourquoi on demande les documents,
   et trois promesses — *visibles uniquement par l'équipe de vérification*, *jamais partagés*,
@@ -36,10 +37,14 @@ Objectif : passer d'environ 10 % à **25 % et plus** de chauffeurs qui envoient 
 3. **Contrôle d'accès** : un chauffeur ne peut lire que *ses* documents, jamais ceux d'un autre
    (vérifier qu'aucune route ne renvoie un fichier à partir d'un identifiant passé par le client).
 4. **Journal d'audit** : qui a consulté quel document, quand (admin, document, date, IP).
-5. **Suppression des métadonnées à l'enregistrement** (EXIF, dont la **position GPS**) :
-   nous avons vérifié que les photos envoyées par l'app peuvent contenir les coordonnées GPS
-   et le modèle du téléphone. La correction est prévue aussi côté app, mais le serveur doit nettoyer
-   tout fichier reçu (les versions déjà installées continueront d'en envoyer).
+5. **Suppression des métadonnées EXIF côté serveur** (dont la **position GPS**) :
+   nous avons constaté que les photos envoyées par les versions actuelles de l'app peuvent contenir
+   les coordonnées GPS, le modèle du téléphone et la date de prise de vue.
+   **C'est corrigé côté app** dans cette branche : toutes les métadonnées sont retirées avant l'envoi
+   (testé). Le serveur doit quand même les retirer :
+   - **à chaque fichier reçu**, en double sécurité (versions déjà installées, et HEIC que l'app
+     n'arrive pas à convertir et envoie tel quel) ;
+   - **sur les photos déjà stockées**, avec un traitement unique sur l'existant.
 6. **Chiffrement au repos** du stockage et **durée de conservation** : que deviennent les documents
    d'un compte refusé, abandonné ou supprimé (l'app propose la suppression de compte) ?
 
@@ -208,7 +213,8 @@ avec des images factices : merci de ne pas le valider, il sera supprimé ensuite
 4. Un chauffeur « documents de base OK » peut-il recevoir des courses, ou seulement après le dossier complet ?
    Combien de temps a-t-il pour envoyer le reste ?
 5. Taille max réelle acceptée par le proxy ? HEIC accepté et converti ?
-6. Les métadonnées (EXIF / GPS) sont-elles supprimées à l'enregistrement ?
+6. Les métadonnées (EXIF / GPS) sont-elles supprimées à l'enregistrement ? Combien de photos déjà
+   stockées en contiennent, et quand peut-on les nettoyer ?
 7. Durée de conservation des documents d'un compte refusé, abandonné ou supprimé ?
 8. Coût et fournisseur envisageables pour le SMS / WhatsApp (DZ, MA) ?
 9. Un staging est-il envisageable rapidement, même minimal ?
