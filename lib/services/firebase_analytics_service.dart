@@ -50,6 +50,16 @@ class FirebaseAnalyticsService {
   Future<void> logEvent(String name, Map<String, Object> parameters) =>
       _log(name, parameters);
 
+  /// Propriété utilisateur (ex. `onboarding_variant`), jointe à tous les évènements suivants.
+  Future<void> setUserProperty(String name, String value) async {
+    if (Firebase.apps.isEmpty) return;
+    try {
+      await analytics.setUserProperty(name: name, value: value);
+    } catch (e) {
+      debugPrint('Analytics user property $name: $e');
+    }
+  }
+
   /// Un évènement Analytics ne doit jamais bloquer ni faire planter l'app.
   Future<void> _log(String name, Map<String, Object> parameters) async {
     if (Firebase.apps.isEmpty) return;

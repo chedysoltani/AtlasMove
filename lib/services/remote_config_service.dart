@@ -12,7 +12,9 @@ import 'package:flutter/foundation.dart';
 /// sous les yeux du chauffeur), sauf au tout premier lancement : rien n'est
 /// encore en cache, elles sont donc activées dès leur arrivée, bien avant que
 /// le nouveau chauffeur atteigne « Mon dossier ».
-class RemoteConfigService {
+///
+/// Prévient ses écouteurs à chaque activation de nouvelles valeurs.
+class RemoteConfigService extends ChangeNotifier {
   RemoteConfigService._();
   static final RemoteConfigService instance = RemoteConfigService._();
 
@@ -22,9 +24,22 @@ class RemoteConfigService {
   static const driverSocialProofCount = 'driver_social_proof_count';
   static const privacyPolicyUrl = 'privacy_policy_url';
 
+  /// Documents progressifs (voir DriverDocumentsPlan) : interrupteur général,
+  /// variante A/B (attribuée par Firebase A/B Testing) et types « pour commencer ».
+  static const driverDocsProgressiveEnabled = 'driver_docs_progressive_enabled';
+  static const driverDocsVariant = 'driver_docs_variant';
+  static const driverDocsStartTypes = 'driver_docs_start_types';
+
   static const Map<String, Object> _defaults = {
     driverSocialProofCount: 600,
     privacyPolicyUrl: 'https://api.atla.business/legal/privacy-policy',
+    // Désactivé tant que le backend n'accepte pas un dossier partiel.
+    driverDocsProgressiveEnabled: false,
+    driverDocsVariant: 'A',
+    // TODO(documents progressifs) : ajouter le(s) type(s) de la pièce d'identité
+    // (recto/verso ?) une fois confirmés par GET /v2/driver/me — corrigeable
+    // dans Remote Config sans nouvelle version.
+    driverDocsStartTypes: '["driving_license"]',
   };
 
   FirebaseRemoteConfig? _config;
@@ -44,22 +59,31 @@ class RemoteConfigService {
       final firstFetch = config.lastFetchStatus == RemoteConfigFetchStatus.noFetchYet;
       await config.activate();
       _config = config;
+      notifyListeners();
       unawaited(_fetch(config, activate: firstFetch));
     } catch (e) {
       debugPrint('Remote Config init: $e');
     }
   }
 
-  static Future<void> _fetch(FirebaseRemoteConfig config, {required bool activate}) async {
+  Future<void> _fetch(FirebaseRemoteConfig config, {required bool activate}) async {
     try {
       if (activate) {
-        await config.fetchAndActivate();
+        if (await config.fetchAndActivate()) notifyListeners();
       } else {
         await config.fetch();
       }
     } catch (e) {
       debugPrint('Remote Config fetch: $e');
     }
+  }
+
+  bool getBool(String key) {
+    try {
+      final config = _config;
+      if (config != null) return config.getBool(key);
+    } catch (_) {}
+    return _defaults[key] as bool;
   }
 
   int getInt(String key) {

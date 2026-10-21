@@ -69,6 +69,7 @@ import 'services/location_foreground_service.dart';
 import 'services/push_notification_service.dart';
 import 'services/meta_events_service.dart';
 import 'services/firebase_analytics_service.dart';
+import 'services/driver_documents_plan.dart';
 import 'services/remote_config_service.dart';
 import 'services/deep_link_service.dart';
 import 'core/network/http_client.dart';
@@ -98,6 +99,8 @@ void main() async {
   }
 
   // Valeurs réglables à distance (textes chauffeur, variantes) ; n'attend pas le réseau.
+  // Variante des documents chauffeur publiée en propriété Analytics à chaque activation.
+  RemoteConfigService.instance.addListener(DriverDocumentsPlan.publishVariant);
   await RemoteConfigService.instance.init();
 
   // Canaux Android + tap sur une notification "nouvelle course" / "appel entrant"

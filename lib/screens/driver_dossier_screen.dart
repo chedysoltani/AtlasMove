@@ -8,6 +8,7 @@ import '../core/constants/support_constants.dart';
 import '../models/driver_onboarding.dart';
 import '../services/auth_service.dart';
 import '../services/driver_account_store.dart';
+import '../services/driver_documents_plan.dart';
 import '../services/driver_onboarding_analytics.dart';
 import '../services/driver_onboarding_api.dart';
 import '../services/driver_photo_service.dart';
@@ -328,16 +329,7 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
                   ],
                   _statusCard(profile),
                   const SizedBox(height: 22),
-                  Text('driver_v2.documents_title'.tr(),
-                      style: DriverUi.text(16, weight: FontWeight.w800)),
-                  const SizedBox(height: 12),
-                  for (final doc in profile.documents) ...[
-                    // Dossier refusé : lecture seule, la suite passe par le support.
-                    _documentCard(doc,
-                        canSend: !doc.isApproved &&
-                            profile.accountStatus != DriverAccountStatus.rejected),
-                    const SizedBox(height: 10),
-                  ],
+                  ..._documentSections(profile),
                   const SizedBox(height: 14),
                   _helpButton(),
                 ],
@@ -445,6 +437,49 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
         ],
       ),
     );
+  }
+
+  /// Liste des documents. Variante B des documents progressifs (désactivée par
+  /// défaut, voir DriverDocumentsPlan) : « Pour commencer » puis « Plus tard »,
+  /// seulement tant qu'il reste des documents à envoyer.
+  List<Widget> _documentSections(DriverProfile profile) {
+    // Dossier refusé : lecture seule, la suite passe par le support.
+    List<Widget> cards(List<DriverDocument> docs) => [
+          for (final doc in docs) ...[
+            _documentCard(doc,
+                canSend: !doc.isApproved &&
+                    profile.accountStatus != DriverAccountStatus.rejected),
+            const SizedBox(height: 10),
+          ],
+        ];
+    Widget title(String text) =>
+        Text(text, style: DriverUi.text(16, weight: FontWeight.w800));
+    Widget hint(String text) => Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Text(text, style: DriverUi.text(12.5, color: DriverUi.textSecondary, height: 1.4)),
+        );
+
+    final split = _needsDocuments(profile)
+        ? DriverDocumentsPlan.current.split(profile.documents)
+        : (start: profile.documents, later: const <DriverDocument>[]);
+    if (split.later.isEmpty) {
+      return [
+        title('driver_v2.documents_title'.tr()),
+        const SizedBox(height: 12),
+        ...cards(split.start),
+      ];
+    }
+    return [
+      title('driver_v2.docs_start_title'.tr()),
+      hint('driver_v2.docs_start_body'.tr()),
+      const SizedBox(height: 12),
+      ...cards(split.start),
+      const SizedBox(height: 12),
+      title('driver_v2.docs_later_title'.tr()),
+      hint('driver_v2.docs_later_body'.tr()),
+      const SizedBox(height: 12),
+      ...cards(split.later),
+    ];
   }
 
   Widget _documentCard(DriverDocument doc, {required bool canSend}) {
