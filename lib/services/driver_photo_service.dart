@@ -20,12 +20,19 @@ class DriverPhoto {
 class CameraPermissionDenied implements Exception {}
 
 /// Photos des documents chauffeur : appareil photo ou galerie, puis
-/// compression avant envoi (1600 px au plus, JPEG qualité 80 %).
+/// compression avant envoi (1600 px au plus, JPEG qualité 75 %, moins de 1 Mo
+/// visé pour passer sur un réseau faible).
 class DriverPhotoService {
   DriverPhotoService._();
 
   static const int maxSide = 1600;
-  static const int jpegQuality = 80;
+  static const int jpegQuality = 75;
+
+  /// Taille visée ; au-delà, qualité réduite jusqu'à [minJpegQuality], puis
+  /// côté réduit pas à pas ([fallbackSides]) : le texte d'un document reste lisible.
+  static const int targetBytes = 1024 * 1024;
+  static const int minJpegQuality = 55;
+  static const List<int> fallbackSides = [1280, 1024];
 
   static final _picker = ImagePicker();
 
@@ -72,13 +79,16 @@ class DriverPhotoService {
       source: source,
       maxWidth: maxSide.toDouble(),
       maxHeight: maxSide.toDouble(),
+      // Avec une qualité demandée, le sélecteur natif réencode en JPEG : une
+      // photo HEIC (iPhone), que [prepare] ne sait pas décoder, n'arrive plus brute.
+      imageQuality: 90,
       requestFullMetadata: false,
     );
     if (picked == null) return null;
     return prepare(picked.path);
   }
 
-  /// Convertit en JPEG (1600 px, qualité 80 %). Si l'image ne peut pas être
+  /// Convertit en JPEG (voir [_toJpeg]). Si l'image ne peut pas être
   /// décodée ici (ex. HEIC), le fichier part tel quel : le serveur accepte
   /// le HEIC et le convertit lui-même.
   static Future<DriverPhoto> prepare(String path) async {
@@ -113,16 +123,33 @@ class DriverPhotoService {
   }
 }
 
-/// Isolate : décodage, rotation EXIF appliquée, réduction, encodage JPEG.
+/// Isolate : décodage, rotation EXIF appliquée, réduction, encodage JPEG
+/// sous [DriverPhotoService.targetBytes] autant que possible.
 Uint8List? _toJpeg(Uint8List bytes) {
   final decoded = img.decodeImage(bytes);
   if (decoded == null) return null;
-  var image = img.bakeOrientation(decoded);
-  final longest = image.width > image.height ? image.width : image.height;
-  if (longest > DriverPhotoService.maxSide) {
-    image = image.width >= image.height
-        ? img.copyResize(image, width: DriverPhotoService.maxSide)
-        : img.copyResize(image, height: DriverPhotoService.maxSide);
+  var image = _fit(img.bakeOrientation(decoded), DriverPhotoService.maxSide);
+
+  var quality = DriverPhotoService.jpegQuality;
+  var jpeg = img.encodeJpg(image, quality: quality);
+  while (jpeg.length > DriverPhotoService.targetBytes &&
+      quality > DriverPhotoService.minJpegQuality) {
+    quality -= 10;
+    jpeg = img.encodeJpg(image, quality: quality);
   }
-  return img.encodeJpg(image, quality: DriverPhotoService.jpegQuality);
+  for (final side in DriverPhotoService.fallbackSides) {
+    if (jpeg.length <= DriverPhotoService.targetBytes) break;
+    image = _fit(image, side);
+    jpeg = img.encodeJpg(image, quality: quality);
+  }
+  return jpeg;
+}
+
+/// Réduit l'image pour que son plus grand côté fasse au plus [side] px.
+img.Image _fit(img.Image image, int side) {
+  final longest = image.width > image.height ? image.width : image.height;
+  if (longest <= side) return image;
+  return image.width >= image.height
+      ? img.copyResize(image, width: side)
+      : img.copyResize(image, height: side);
 }

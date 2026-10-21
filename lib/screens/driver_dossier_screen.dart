@@ -34,6 +34,19 @@ class _UploadState {
   double progress = 0;
   String? error;
   bool running = false;
+
+  /// Photo prise, en cours de compression.
+  bool preparing = false;
+
+  /// Nouvel essai automatique en cours (`attempt` sur `total`), sinon null.
+  int? retryAttempt;
+  int retryTotal = 0;
+
+  /// Photo déjà préparée et pas encore reçue : « Réessayer » la renvoie sans
+  /// la reprendre. Null après un succès, ou si la photo elle-même est refusée.
+  DriverPhoto? photo;
+
+  bool get busy => running || preparing;
 }
 
 class _DriverDossierScreenState extends State<DriverDossierScreen> {
@@ -95,35 +108,57 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
 
   // ── Envoi d'un document ───────────────────────────────────────────────────
 
+  /// Nouvelle photo (appareil photo ou galerie), préparée puis envoyée.
   Future<void> _upload(DriverDocument doc) async {
     final state = _uploads.putIfAbsent(doc.type, _UploadState.new);
-    if (state.running) return;
+    if (state.busy) return;
 
     final source = await DriverPhotoService.askSource(context);
     if (source == null || !mounted) return;
 
+    setState(() { state.preparing = true; state.error = null; });
     DriverPhoto? photo;
     try {
       photo = await DriverPhotoService.pick(source);
     } on CameraPermissionDenied {
-      setState(() => state.error = 'driver_v2.camera_permission'.tr());
+      if (mounted) setState(() => state.error = 'driver_v2.camera_permission'.tr());
       return;
     } catch (_) {
-      setState(() => state.error = 'driver_v2.photo_error'.tr());
+      if (mounted) setState(() => state.error = 'driver_v2.photo_error'.tr());
       return;
+    } finally {
+      if (mounted) setState(() => state.preparing = false);
     }
     if (photo == null || !mounted) return;
+    state.photo = photo;
+    await _send(doc, photo);
+  }
+
+  /// Envoi d'une photo préparée (première fois ou « Réessayer »).
+  Future<void> _send(DriverDocument doc, DriverPhoto photo) async {
+    final state = _uploads.putIfAbsent(doc.type, _UploadState.new);
+    if (state.busy) return;
     DriverOnboardingAnalytics.documentUploadStarted(doc.type);
 
     if (await photo.file.length() > DriverOnboardingApi.maxFileBytes) {
       DriverOnboardingAnalytics.registrationError(step: 'upload', errorCode: 'FILE_TOO_LARGE');
       DriverOnboardingAnalytics.documentUploadFailed(doc.type, reason: 'size');
-      setState(() => state.error = 'driver_v2.errors.FILE_TOO_LARGE'.tr());
+      if (mounted) {
+        setState(() {
+          state.photo = null;
+          state.error = 'driver_v2.errors.FILE_TOO_LARGE'.tr();
+        });
+      }
       return;
     }
 
     final wasComplete = _requiredDocsSent(_store.profile.value);
-    setState(() { state.running = true; state.error = null; state.progress = 0; });
+    setState(() {
+      state.running = true;
+      state.error = null;
+      state.progress = 0;
+      state.retryAttempt = null;
+    });
     try {
       final profile = await DriverOnboardingApi.uploadDocument(
         doc.type,
@@ -132,7 +167,16 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
         onProgress: (p) {
           if (mounted) setState(() => state.progress = p);
         },
+        onRetry: (attempt, total) {
+          if (!mounted) return;
+          setState(() {
+            state.retryAttempt = attempt;
+            state.retryTotal = total;
+            state.progress = 0;
+          });
+        },
       );
+      state.photo = null;
       DriverOnboardingAnalytics.documentUploaded(doc.type);
       if (profile.id.isNotEmpty) {
         await _store.update(profile);
@@ -151,19 +195,38 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
         ));
       }
     } on DriverApiException catch (e) {
+      final reason = _failureReason(e);
       DriverOnboardingAnalytics.registrationError(step: 'upload', errorCode: e.code);
       DriverOnboardingAnalytics.documentUploadFailed(doc.type,
-          reason: _failureReason(e), httpStatus: e.statusCode);
+          reason: reason, httpStatus: e.statusCode);
       if (mounted) {
-        setState(() => state.error = e.isNetwork ? 'driver_v2.upload_network_error'.tr() : e.message);
+        setState(() {
+          // Photo refusée (taille, format) : il faut en reprendre une.
+          if (reason == 'size' || reason == 'format') state.photo = null;
+          state.error = switch (reason) {
+            'network' => 'driver_v2.upload_network_error'.tr(),
+            'server' => 'driver_v2.upload_server_error'.tr(),
+            _ => e.message,
+          };
+        });
       }
     } catch (e) {
       // Fichier illisible sur l'appareil, réponse inattendue… : jamais muet.
       debugPrint('Driver document upload: ${e.runtimeType}');
       DriverOnboardingAnalytics.documentUploadFailed(doc.type, reason: 'unknown');
-      if (mounted) setState(() => state.error = 'driver_v2.errors.generic'.tr());
+      if (mounted) {
+        setState(() {
+          state.photo = null;
+          state.error = 'driver_v2.photo_error'.tr();
+        });
+      }
     } finally {
-      if (mounted) setState(() => state.running = false);
+      if (mounted) {
+        setState(() {
+          state.running = false;
+          state.retryAttempt = null;
+        });
+      }
     }
   }
 
@@ -372,6 +435,7 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
   Widget _documentCard(DriverDocument doc, {required bool canSend}) {
     final upload = _uploads[doc.type];
     final running = upload?.running == true;
+    final busy = upload?.busy == true;
 
     final (Color color, String statusLabel) = switch (doc.status) {
       DriverDocumentStatus.approved => (DriverUi.green, 'driver_v2.doc_approved'.tr()),
@@ -419,7 +483,7 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
                   ],
                 ),
               ),
-              if (canSend && !running)
+              if (canSend && !busy)
                 TextButton(
                   onPressed: () => _upload(doc),
                   style: TextButton.styleFrom(
@@ -450,12 +514,12 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
               ),
             ),
           ],
-          if (running) ...[
+          if (busy) ...[
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
-                value: upload!.progress > 0 ? upload.progress : null,
+                value: running && upload!.progress > 0 ? upload.progress : null,
                 minHeight: 6,
                 color: DriverUi.orange,
                 backgroundColor: DriverUi.orange.withOpacity(0.15),
@@ -463,16 +527,30 @@ class _DriverDossierScreenState extends State<DriverDossierScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'driver_v2.uploading'.tr(namedArgs: {'percent': '${(upload.progress * 100).round()}'}),
+              !running
+                  ? 'driver_v2.preparing_photo'.tr()
+                  : upload!.retryAttempt != null
+                      ? 'driver_v2.upload_retrying'.tr(namedArgs: {
+                          'attempt': '${upload.retryAttempt}',
+                          'total': '${upload.retryTotal}',
+                        })
+                      : 'driver_v2.uploading'.tr(
+                          namedArgs: {'percent': '${(upload.progress * 100).round()}'}),
               style: DriverUi.text(11.5, color: DriverUi.textSecondary),
             ),
           ],
-          if (upload?.error != null && !running) ...[
+          if (upload?.error != null && !busy) ...[
             const SizedBox(height: 10),
+            // Photo gardée : « Réessayer » la renvoie ; sinon, nouvelle photo.
             DriverMessageBanner(
               message: upload!.error!,
-              actionLabel: 'common.retry'.tr(),
-              onAction: () => _upload(doc),
+              actionLabel: upload.photo != null
+                  ? 'common.retry'.tr()
+                  : 'driver_v2.retake_photo'.tr(),
+              onAction: () {
+                final photo = upload.photo;
+                photo != null ? _send(doc, photo) : _upload(doc);
+              },
             ),
           ],
         ],

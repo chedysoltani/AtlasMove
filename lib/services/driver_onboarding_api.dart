@@ -251,12 +251,14 @@ class DriverOnboardingApi {
 
   /// Envoie un document (champ multipart `file`). Jusqu'à [maxUploadRetries]
   /// nouveaux essais automatiques sur une erreur réseau ; [onProgress] reçoit
-  /// la part envoyée (0 → 1), remise à zéro à chaque essai.
+  /// la part envoyée (0 → 1), remise à zéro à chaque essai ; [onRetry] est
+  /// appelé avant chaque nouvel essai (numéro de l'essai, nombre total).
   static Future<DriverProfile> uploadDocument(
     String type,
     File file, {
     required String contentType,
     void Function(double progress)? onProgress,
+    void Function(int attempt, int total)? onRetry,
   }) async {
     for (var attempt = 0;; attempt++) {
       try {
@@ -269,6 +271,7 @@ class DriverOnboardingApi {
       } on DriverApiException catch (e) {
         if (!e.isRetryable || attempt >= maxUploadRetries) rethrow;
       }
+      onRetry?.call(attempt + 2, maxUploadRetries + 1);
       await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
     }
   }
