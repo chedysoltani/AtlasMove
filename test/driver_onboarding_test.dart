@@ -131,6 +131,24 @@ void main() {
     });
   });
 
+  group('Tap sur une notification « dossier »', () {
+    test('dossier non validé : « Mon dossier » par-dessus l\'app', () {
+      for (final status in ['pending_documents', 'pending_review', 'rejected']) {
+        expect(DriverAccountStore.opensDossierOnTop('/driver_main', _profile(status, 'UPLOAD_DOCUMENTS')), isTrue,
+            reason: status);
+      }
+    });
+
+    test('compte actif, suspendu ou profil inconnu : pas de « Mon dossier »', () {
+      expect(DriverAccountStore.opensDossierOnTop('/driver_main', _profile('active', 'NONE')), isFalse);
+      expect(DriverAccountStore.opensDossierOnTop('/driver_suspended', _profile('suspended', 'CONTACT_SUPPORT')),
+          isFalse);
+      expect(DriverAccountStore.opensDossierOnTop('/login', _profile('pending_documents', 'UPLOAD_DOCUMENTS')),
+          isFalse);
+      expect(DriverAccountStore.opensDossierOnTop('/driver_main', null), isFalse);
+    });
+  });
+
   group('Aiguillage selon le statut', () {
     // Dossier incomplet, en vérification ou refusé : accès à l'app (le travail
     // reste bloqué par DriverDossierGate) ; seul un compte suspendu est bloqué.
