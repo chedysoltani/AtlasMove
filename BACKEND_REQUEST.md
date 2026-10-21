@@ -2,14 +2,22 @@
 
 *Équipe app mobile — 21 octobre 2026 — branche `feat/driver-documents-funnel`*
 
+> **Réponse souhaitée sous 7 jours** pour 3.1 (confirmation écrite) et 3.3 (types de documents).
+
 ## 1. Contexte
 
-Notre parcours d'inscription chauffeur perd presque tout le monde à l'étape des documents :
-**1 920** installations → **1 100** choix du type de compte (clients et chauffeurs confondus) →
-seulement **203 chauffeurs** ont envoyé au moins un document (1 218 envois au total).
-La cause principale : les chauffeurs **ont peur** d'envoyer leur CIN, leur permis et leur carte grise à une
-app qu'ils ne connaissent pas. Il y a aussi des échecs techniques (photos lourdes, réseau faible).
-Objectif : passer d'environ 10 % à **25 % et plus** de chauffeurs qui envoient leurs documents.
+L'étape des documents est un point faible de notre parcours d'inscription chauffeur. Les chiffres actuels :
+
+- **1 920** installations ;
+- **1 100** choix du type de compte (clients et chauffeurs confondus) ;
+- **203 chauffeurs uniques** ont envoyé au moins un document (1 218 envois) ;
+- l'admin compte **677 comptes chauffeurs**, dont **187 actifs**.
+
+Le taux réel à chaque étape sera mesuré avec les nouveaux évènements ajoutés dans cette version.
+Le retour du terrain (notre hypothèse principale) : les chauffeurs **hésitent à envoyer** leur CIN, leur permis
+et leur carte grise à une app qu'ils ne connaissent pas. S'y ajoutent des échecs techniques possibles
+(photos lourdes, réseau faible).
+Objectif : **doubler la part des chauffeurs inscrits qui envoient leurs documents**.
 
 ## 2. Ce qui a été fait côté app (Flutter)
 
@@ -78,12 +86,15 @@ puis le reste plus tard.
 4. **Admin** : filtrer les dossiers « base OK / complet », voir les documents manquants,
    relancer le chauffeur.
 
-**Pourquoi.** Demander 2 documents au lieu de 5 à un chauffeur qui ne nous connaît pas encore
-fait baisser la peur et l'effort. L'app est prête à le tester (A/B 50/50) dès que le backend suit.
+**Pourquoi.** Demander deux documents au lieu de la liste complète à un chauffeur qui ne nous connaît
+pas encore devrait réduire l'hésitation et l'effort. L'app est prête à le vérifier par un test A/B 50/50
+dès que le backend suit.
 
 **Proposition de contrat.**
 
-`GET /v2/driver/registration-options` — ajouter l'étape de chaque document :
+`GET /v2/driver/registration-options` — ajouter l'étape de chaque document.
+*Exemple seulement : `id_card_front` et les autres types ci-dessous sont indicatifs ; les vrais
+types dépendent de la réponse à la question 3.*
 
 ```json
 "countries": [{
@@ -112,7 +123,10 @@ fait baisser la peur et l'effort. L'app est prête à le tester (A/B 50/50) dès
 Nouveau `next_action` : `UPLOAD_REMAINING_DOCUMENTS` (base validée, reste à envoyer).
 Les chauffeurs déjà inscrits ne doivent pas changer de statut.
 
-**Question métier à trancher** (voir section 4) : un chauffeur « base OK » peut-il déjà travailler ?
+**Décision métier.** Un chauffeur « documents de base OK » peut accéder à l'app et voir l'activité,
+mais ne peut **pas** accepter de course tant que le dossier n'est pas complet et vérifié
+(la règle d'éligibilité actuelle, 403 `DOCUMENTS_REQUIRED`, reste la référence).
+Reste à fixer : le délai maximal pour compléter le dossier (question 4).
 
 ### 3.3 Types exacts des documents par pays — priorité **haute** (rapide)
 
@@ -155,8 +169,9 @@ des refus d'éligibilité (403) arrivent en minuscules : merci d'uniformiser
 
 **Besoin.** Proposer l'envoi du code par **SMS** ou **WhatsApp** en plus de l'e-mail.
 
-**Pourquoi.** Beaucoup de chauffeurs ne consultent pas leurs e-mails. Les nouveaux évènements
-`driver_otp_sent` / `driver_otp_verified` / `driver_otp_failed` vont mesurer la perte à cette étape.
+**Pourquoi.** Nous soupçonnons une perte importante à cette étape : beaucoup de chauffeurs
+consulteraient peu leurs e-mails. Les nouveaux évènements `driver_otp_sent` / `driver_otp_verified` /
+`driver_otp_failed` vont le mesurer avant toute décision.
 
 **Proposition de contrat.**
 
@@ -210,8 +225,9 @@ avec des images factices : merci de ne pas le valider, il sera supprimé ensuite
 1. Les fichiers sont-ils aujourd'hui accessibles **sans authentification** par une URL ? Où sont-ils stockés ?
 2. Qui, chez nous, peut voir les documents (rôles admin) ? Existe-t-il déjà un journal des consultations ?
 3. **Quels sont les types exacts des documents d'identité (recto/verso ?) et la liste complète des types par pays ?**
-4. Un chauffeur « documents de base OK » peut-il recevoir des courses, ou seulement après le dossier complet ?
-   Combien de temps a-t-il pour envoyer le reste ?
+4. Quel délai maximal pour compléter le dossier après « documents de base OK », et que se passe-t-il
+   ensuite (relance, blocage, suppression) ? *Rappel de la décision : pas de course acceptée tant que
+   le dossier n'est pas complet et vérifié.*
 5. Taille max réelle acceptée par le proxy ? HEIC accepté et converti ?
 6. Les métadonnées (EXIF / GPS) sont-elles supprimées à l'enregistrement ? Combien de photos déjà
    stockées en contiennent, et quand peut-on les nettoyer ?
