@@ -132,11 +132,13 @@ void main() {
   });
 
   group('Aiguillage selon le statut', () {
-    test('dossier, principal, suspendu', () {
-      expect(DriverAccountStore.routeFor(_profile('pending_documents', 'UPLOAD_DOCUMENTS')), '/driver_dossier');
-      expect(DriverAccountStore.routeFor(_profile('pending_documents', 'REPLACE_REJECTED_DOCUMENTS')), '/driver_dossier');
-      expect(DriverAccountStore.routeFor(_profile('pending_review', 'WAIT_FOR_REVIEW')), '/driver_dossier');
-      expect(DriverAccountStore.routeFor(_profile('rejected', 'CONTACT_SUPPORT')), '/driver_dossier');
+    // Dossier incomplet, en vérification ou refusé : accès à l'app (le travail
+    // reste bloqué par DriverDossierGate) ; seul un compte suspendu est bloqué.
+    test('principal, suspendu', () {
+      expect(DriverAccountStore.routeFor(_profile('pending_documents', 'UPLOAD_DOCUMENTS')), '/driver_main');
+      expect(DriverAccountStore.routeFor(_profile('pending_documents', 'REPLACE_REJECTED_DOCUMENTS')), '/driver_main');
+      expect(DriverAccountStore.routeFor(_profile('pending_review', 'WAIT_FOR_REVIEW')), '/driver_main');
+      expect(DriverAccountStore.routeFor(_profile('rejected', 'CONTACT_SUPPORT')), '/driver_main');
       expect(DriverAccountStore.routeFor(_profile('active', 'NONE')), '/driver_main');
       expect(DriverAccountStore.routeFor(_profile('suspended', 'CONTACT_SUPPORT')), '/driver_suspended');
     });
