@@ -131,12 +131,82 @@ void main() {
     });
   });
 
+  group('Profil : dossier progressif (réponse backend du 21/10)', () {
+    test('documents_stage, documents_completed_at et étape des documents', () {
+      final p = DriverProfile.fromJson({
+        'id': 'd1',
+        'account_status': 'pending_documents',
+        'next_action': 'UPLOAD_REMAINING_DOCUMENTS',
+        'documents_stage': 'start_complete',
+        'documents_completed_at': '2026-10-21T16:28:02.279Z',
+        'documents': [
+          {'type': 'id_card', 'label': 'Pièce d’identité', 'required': true, 'status': 'uploaded', 'stage': 'start'},
+          {'type': 'vehicle_registration', 'label': 'Carte grise', 'required': true, 'status': 'missing', 'stage': 'later'},
+        ],
+      });
+      expect(p.nextAction, DriverNextAction.uploadRemainingDocuments);
+      expect(p.documentsStage, DriverDocumentsStage.startComplete);
+      expect(p.documentsCompletedAt, DateTime.utc(2026, 10, 21, 16, 28, 2, 279));
+      expect(p.documents.map((d) => d.stage), ['start', 'later']);
+    });
+
+    DriverProfile profile({String? completedAt, required String status}) => DriverProfile.fromJson({
+          'id': 'd1',
+          if (completedAt != null) 'documents_completed_at': completedAt,
+          'documents': [
+            {'type': 'id_card', 'required': true, 'status': status},
+          ],
+        });
+
+    test('dossier complété : selon documents_completed_at quand le serveur le donne', () {
+      const date = '2026-10-21T16:28:02Z';
+      final before = profile(status: 'missing');
+      final after = profile(status: 'uploaded', completedAt: date);
+      expect(after.completedSince(before), isTrue);
+      // Déjà complété une fois (ex. remplacement d'un document refusé) : pas de nouvel évènement.
+      expect(after.completedSince(profile(status: 'rejected', completedAt: date)), isFalse);
+    });
+
+    test('dossier complété : selon les statuts si le serveur n\'est pas à jour', () {
+      expect(profile(status: 'uploaded').completedSince(profile(status: 'missing')), isTrue);
+      expect(profile(status: 'uploaded').completedSince(profile(status: 'uploaded')), isFalse);
+      expect(profile(status: 'missing').completedSince(null), isFalse);
+    });
+
+    test('serveur pas à jour : valeurs par défaut', () {
+      final p = DriverProfile.fromJson({'id': 'd1', 'documents': [{'type': 'selfie'}]});
+      expect(p.documentsStage, DriverDocumentsStage.none);
+      expect(p.documentsCompletedAt, isNull);
+      expect(p.documents.single.stage, isNull);
+    });
+  });
+
+  group('Tap sur une notification « dossier »', () {
+    test('dossier non validé : « Mon dossier » par-dessus l\'app', () {
+      for (final status in ['pending_documents', 'pending_review', 'rejected']) {
+        expect(DriverAccountStore.opensDossierOnTop('/driver_main', _profile(status, 'UPLOAD_DOCUMENTS')), isTrue,
+            reason: status);
+      }
+    });
+
+    test('compte actif, suspendu ou profil inconnu : pas de « Mon dossier »', () {
+      expect(DriverAccountStore.opensDossierOnTop('/driver_main', _profile('active', 'NONE')), isFalse);
+      expect(DriverAccountStore.opensDossierOnTop('/driver_suspended', _profile('suspended', 'CONTACT_SUPPORT')),
+          isFalse);
+      expect(DriverAccountStore.opensDossierOnTop('/login', _profile('pending_documents', 'UPLOAD_DOCUMENTS')),
+          isFalse);
+      expect(DriverAccountStore.opensDossierOnTop('/driver_main', null), isFalse);
+    });
+  });
+
   group('Aiguillage selon le statut', () {
-    test('dossier, principal, suspendu', () {
-      expect(DriverAccountStore.routeFor(_profile('pending_documents', 'UPLOAD_DOCUMENTS')), '/driver_dossier');
-      expect(DriverAccountStore.routeFor(_profile('pending_documents', 'REPLACE_REJECTED_DOCUMENTS')), '/driver_dossier');
-      expect(DriverAccountStore.routeFor(_profile('pending_review', 'WAIT_FOR_REVIEW')), '/driver_dossier');
-      expect(DriverAccountStore.routeFor(_profile('rejected', 'CONTACT_SUPPORT')), '/driver_dossier');
+    // Dossier incomplet, en vérification ou refusé : accès à l'app (le travail
+    // reste bloqué par DriverDossierGate) ; seul un compte suspendu est bloqué.
+    test('principal, suspendu', () {
+      expect(DriverAccountStore.routeFor(_profile('pending_documents', 'UPLOAD_DOCUMENTS')), '/driver_main');
+      expect(DriverAccountStore.routeFor(_profile('pending_documents', 'REPLACE_REJECTED_DOCUMENTS')), '/driver_main');
+      expect(DriverAccountStore.routeFor(_profile('pending_review', 'WAIT_FOR_REVIEW')), '/driver_main');
+      expect(DriverAccountStore.routeFor(_profile('rejected', 'CONTACT_SUPPORT')), '/driver_main');
       expect(DriverAccountStore.routeFor(_profile('active', 'NONE')), '/driver_main');
       expect(DriverAccountStore.routeFor(_profile('suspended', 'CONTACT_SUPPORT')), '/driver_suspended');
     });

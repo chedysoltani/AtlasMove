@@ -84,6 +84,7 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
 
   DriverOtpArgs get _args => widget.args;
   bool get _isRegister => _args.purpose == DriverOtpPurpose.register;
+  String get _purpose => _isRegister ? 'register' : 'login';
 
   @override
   void initState() {
@@ -120,6 +121,7 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
         purpose: _isRegister ? 'register' : 'login',
         email: _args.registration?.email,
       );
+      DriverOnboardingAnalytics.otpResent(purpose: _purpose, channel: otp.channel);
       if (!mounted) return;
       _otp = otp;
       _verificationToken = null;
@@ -128,6 +130,7 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
       _codeFocus.requestFocus();
     } on DriverApiException catch (e) {
       DriverOnboardingAnalytics.registrationError(step: 'otp_send', errorCode: e.code);
+      DriverOnboardingAnalytics.otpFailed(purpose: _purpose, stage: 'send', reason: e.code);
       if (!mounted) return;
       setState(() { _error = e.message; _errorCode = e.code; });
       final wait = e.retryAfter;
@@ -147,13 +150,16 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
       if (_isRegister) {
         // Le jeton reste valable si `register` échoue sur une erreur de saisie.
         final r = _args.registration!;
-        _verificationToken ??= await DriverOnboardingApi.verifyOtp(
-          phone: _args.phone,
-          country: _args.country,
-          email: r.email,
-          requestId: _otp.requestId,
-          code: code,
-        );
+        if (_verificationToken == null) {
+          _verificationToken = await DriverOnboardingApi.verifyOtp(
+            phone: _args.phone,
+            country: _args.country,
+            email: r.email,
+            requestId: _otp.requestId,
+            code: code,
+          );
+          DriverOnboardingAnalytics.otpVerified(purpose: _purpose);
+        }
         step = 'register';
         session = await DriverOnboardingApi.register(
           verificationToken: _verificationToken!,
@@ -176,6 +182,7 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
           requestId: _otp.requestId,
           code: code,
         );
+        DriverOnboardingAnalytics.otpVerified(purpose: _purpose);
       }
       await DriverAccountStore.instance.startSession(session);
       if (!mounted) return;
@@ -190,6 +197,10 @@ class _DriverOtpScreenState extends State<DriverOtpScreen> {
       }
     } on DriverApiException catch (e) {
       DriverOnboardingAnalytics.registrationError(step: step, errorCode: e.code);
+      // Échec de `register` après un code accepté : pas un échec du code.
+      if (step != 'register') {
+        DriverOnboardingAnalytics.otpFailed(purpose: _purpose, stage: 'verify', reason: e.code);
+      }
       if (!mounted) return;
       HapticFeedback.heavyImpact();
       _handleError(e);

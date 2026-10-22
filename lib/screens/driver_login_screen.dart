@@ -142,6 +142,7 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
             DriverAccountStore.routeFor(session.driver), (_) => false);
       } else {
         final otp = await DriverOnboardingApi.sendOtp(phone: phone, country: _country, purpose: 'login');
+        DriverOnboardingAnalytics.otpSent(purpose: 'login', channel: otp.channel);
         if (!mounted) return;
         Navigator.of(context).pushNamed(
           DriverOtpScreen.route,
@@ -156,6 +157,9 @@ class _DriverLoginScreenState extends State<DriverLoginScreen> {
     } on DriverApiException catch (e) {
       DriverOnboardingAnalytics.registrationError(
           step: _usePassword ? 'login' : 'otp_send', errorCode: e.code);
+      if (!_usePassword) {
+        DriverOnboardingAnalytics.otpFailed(purpose: 'login', stage: 'send', reason: e.code);
+      }
       if (!mounted) return;
       if (e.code == 'ACCOUNT_SUSPENDED') {
         Navigator.of(context).pushNamedAndRemoveUntil(DriverAccountStore.routeSuspended, (_) => false);

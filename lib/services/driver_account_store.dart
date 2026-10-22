@@ -42,6 +42,12 @@ class DriverAccountStore {
     return routeMain;
   }
 
+  /// Après l'arrivée sur [route] (tap sur une notification « dossier ») :
+  /// ouvrir « Mon dossier » par-dessus l'app tant que le compte n'est pas
+  /// actif. Profil inconnu (hors-ligne) : on reste sur l'écran principal.
+  static bool opensDossierOnTop(String route, DriverProfile? p) =>
+      route == routeMain && p != null && !p.isActive;
+
   /// Recharge le profil et le publie.
   Future<DriverProfile> refresh() async {
     final p = await DriverOnboardingApi.me();

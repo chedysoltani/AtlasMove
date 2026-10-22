@@ -475,12 +475,18 @@ class PushNotificationService {
     final actionId = action['actionId'] as String?;
     final type = data['type']?.toString();
 
-    // Dossier chauffeur (document refusé, compte activé…) : l'écran qui
-    // correspond au statut à jour — « Mon dossier » ou l'écran principal.
+    // Dossier chauffeur (relance « documents manquants », document refusé,
+    // compte activé…) : l'écran qui correspond au statut à jour. Dossier pas
+    // encore validé : « Mon dossier » par-dessus l'app, là où agir.
     if (type == 'driver_onboarding') {
       if (await TokenStorage.getUserRole() != 'delivery') return;
-      final route = await DriverAccountStore.instance.resolveHomeRoute();
-      navigatorKey.currentState?.pushNamedAndRemoveUntil(route, (_) => false);
+      final store = DriverAccountStore.instance;
+      final route = await store.resolveHomeRoute();
+      final nav = navigatorKey.currentState;
+      nav?.pushNamedAndRemoveUntil(route, (_) => false);
+      if (DriverAccountStore.opensDossierOnTop(route, store.profile.value)) {
+        nav?.pushNamed(DriverAccountStore.routeDossier);
+      }
       return;
     }
 

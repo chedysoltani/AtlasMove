@@ -106,8 +106,9 @@ class DriverOnboardingApi {
 
   static const Duration uploadTimeout = Duration(seconds: 120);
 
-  /// Taille max d'un document (contrat : 10 Mo).
-  static const int maxFileBytes = 10485760;
+  /// Taille max d'un document : `files.max_size_bytes` de registration-options,
+  /// seule source (confirmé par le backend) ; 10 Mo tant qu'elle n'est pas chargée.
+  static int maxFileBytes = 10485760;
   static const int maxUploadRetries = 2;
 
   /// fr, ar ou en (les autres langues de l'app retombent sur fr, comme le serveur).
@@ -140,9 +141,12 @@ class DriverOnboardingApi {
 
   // ── Inscription ───────────────────────────────────────────────────────────
 
-  static Future<DriverRegistrationOptions> registrationOptions() async =>
-      DriverRegistrationOptions.fromJson(await _call(
-          () => HttpClient.get('/v2/driver/registration-options', headers: _headers)));
+  static Future<DriverRegistrationOptions> registrationOptions() async {
+    final options = DriverRegistrationOptions.fromJson(await _call(
+        () => HttpClient.get('/v2/driver/registration-options', headers: _headers)));
+    if (options.maxFileBytes > 0) maxFileBytes = options.maxFileBytes;
+    return options;
+  }
 
   /// [purpose] : `register` ou `login`. [email] : à l'inscription, l'adresse
   /// où le code est envoyé (ignorée par le serveur à la connexion).
@@ -251,12 +255,14 @@ class DriverOnboardingApi {
 
   /// Envoie un document (champ multipart `file`). Jusqu'à [maxUploadRetries]
   /// nouveaux essais automatiques sur une erreur réseau ; [onProgress] reçoit
-  /// la part envoyée (0 → 1), remise à zéro à chaque essai.
+  /// la part envoyée (0 → 1), remise à zéro à chaque essai ; [onRetry] est
+  /// appelé avant chaque nouvel essai (numéro de l'essai, nombre total).
   static Future<DriverProfile> uploadDocument(
     String type,
     File file, {
     required String contentType,
     void Function(double progress)? onProgress,
+    void Function(int attempt, int total)? onRetry,
   }) async {
     for (var attempt = 0;; attempt++) {
       try {
@@ -269,6 +275,7 @@ class DriverOnboardingApi {
       } on DriverApiException catch (e) {
         if (!e.isRetryable || attempt >= maxUploadRetries) rethrow;
       }
+      onRetry?.call(attempt + 2, maxUploadRetries + 1);
       await Future.delayed(Duration(seconds: 2 * (attempt + 1)));
     }
   }

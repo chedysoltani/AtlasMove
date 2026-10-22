@@ -29,6 +29,9 @@ class DriverAccountStatus {
 class DriverNextAction {
   DriverNextAction._();
   static const uploadDocuments = 'UPLOAD_DOCUMENTS';
+
+  /// Dossier progressif : premiers documents envoyés, le reste à envoyer.
+  static const uploadRemainingDocuments = 'UPLOAD_REMAINING_DOCUMENTS';
   static const replaceRejectedDocuments = 'REPLACE_REJECTED_DOCUMENTS';
   static const waitForReview = 'WAIT_FOR_REVIEW';
   static const none = 'NONE';
@@ -42,6 +45,21 @@ class DriverDocumentStatus {
   static const uploaded = 'uploaded';
   static const approved = 'approved';
   static const rejected = 'rejected';
+}
+
+/// Étape d'un document dans un dossier progressif (`documents[].stage`).
+class DriverDocumentStage {
+  DriverDocumentStage._();
+  static const start = 'start';
+  static const later = 'later';
+}
+
+/// Avancement du dossier (`documents_stage`).
+class DriverDocumentsStage {
+  DriverDocumentsStage._();
+  static const none = 'none';
+  static const startComplete = 'start_complete';
+  static const complete = 'complete';
 }
 
 // ── registration-options ─────────────────────────────────────────────────────
@@ -221,6 +239,9 @@ class DriverDocument {
   final DateTime? uploadedAt;
   final int uploadCount;
 
+  /// `start` ou `later` (dossier progressif configuré sur le serveur), sinon null.
+  final String? stage;
+
   const DriverDocument({
     required this.type,
     required this.label,
@@ -229,6 +250,7 @@ class DriverDocument {
     this.rejectionReason,
     this.uploadedAt,
     this.uploadCount = 0,
+    this.stage,
   });
 
   factory DriverDocument.fromJson(Map<String, dynamic> json) => DriverDocument(
@@ -239,6 +261,7 @@ class DriverDocument {
         rejectionReason: _str(json['rejection_reason']),
         uploadedAt: DateTime.tryParse(json['uploaded_at']?.toString() ?? ''),
         uploadCount: _int(json['upload_count']) ?? 0,
+        stage: _str(json['stage']),
       );
 
   bool get isMissing => status == DriverDocumentStatus.missing;
@@ -264,6 +287,13 @@ class DriverProfile {
   final List<DriverDocument> documents;
   final bool hasPassword;
 
+  /// `none`, `start_complete` ou `complete` (voir [DriverDocumentsStage]).
+  final String documentsStage;
+
+  /// Première fois que tous les documents obligatoires ont été envoyés ; fixée
+  /// une seule fois par le serveur (null : jamais, ou serveur pas à jour).
+  final DateTime? documentsCompletedAt;
+
   const DriverProfile({
     required this.id,
     required this.firstName,
@@ -281,6 +311,8 @@ class DriverProfile {
     this.rejectedDocuments = const [],
     this.documents = const [],
     this.hasPassword = false,
+    this.documentsStage = DriverDocumentsStage.none,
+    this.documentsCompletedAt,
   });
 
   factory DriverProfile.fromJson(Map<String, dynamic> json) => DriverProfile(
@@ -304,10 +336,27 @@ class DriverProfile {
             .where((d) => d.type.isNotEmpty)
             .toList(),
         hasPassword: json['has_password'] == true,
+        documentsStage: json['documents_stage']?.toString() ?? DriverDocumentsStage.none,
+        documentsCompletedAt: DateTime.tryParse(json['documents_completed_at']?.toString() ?? ''),
       );
 
   bool get isActive => accountStatus == DriverAccountStatus.active;
   bool get isSuspended => accountStatus == DriverAccountStatus.suspended;
+
+  /// Tous les documents obligatoires envoyés (ni manquants, ni refusés).
+  bool get requiredDocumentsSent {
+    final required = documents.where((d) => d.required).toList();
+    return required.isNotEmpty && required.every((d) => !d.isMissing && !d.isRejected);
+  }
+
+  /// Le dossier vient d'être complété depuis [before] (évènement
+  /// `driver_documents_completed`). Serveur à jour : `documents_completed_at`
+  /// vient d'apparaître (fixé une seule fois par chauffeur, même après
+  /// réinstallation) ; sinon, d'après les statuts des documents obligatoires.
+  bool completedSince(DriverProfile? before) {
+    if (documentsCompletedAt != null) return before?.documentsCompletedAt == null;
+    return !(before?.requiredDocumentsSent ?? false) && requiredDocumentsSent;
+  }
 }
 
 /// Réponse de `register` et `login` : jetons + profil.
