@@ -16,6 +16,13 @@ flutter pub get
 # Installer CocoaPods et les dépendances iOS
 HOMEBREW_NO_AUTO_UPDATE=1 brew install cocoapods
 # --repo-update : index des pods à jour, pour résoudre la dernière version du SDK Facebook (FBSDKCoreKit)
-cd ios && pod install --repo-update
+# Podfile.lock ne peut être régénéré que sur un Mac : s'il est périmé (ex. Firebase
+# figé en 11.x alors que les plugins exigent 12.x), on le recalcule ici.
+cd ios
+if ! pod install --repo-update; then
+  echo "Podfile.lock incompatible avec les plugins : nouvelle résolution des pods"
+  rm -f Podfile.lock
+  pod install --repo-update
+fi
 
 exit 0
