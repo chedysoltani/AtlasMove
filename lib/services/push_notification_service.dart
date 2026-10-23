@@ -191,9 +191,13 @@ class PushNotificationService {
       _queueFromResponse(launchResponse);
     }
 
-    // Idem pour un push affiché par le système (dossier chauffeur).
+    // Idem pour un push affiché par le système (dossier chauffeur). Délai
+    // borné : sur iOS, ce plugin peut ne jamais répondre (cycle de vie par
+    // scènes), et l'app resterait figée sur l'écran de démarrage.
     try {
-      final initial = await FirebaseMessaging.instance.getInitialMessage();
+      final initial = await FirebaseMessaging.instance
+          .getInitialMessage()
+          .timeout(const Duration(seconds: 3));
       if (initial != null) handleOpenedMessage(initial);
     } catch (_) {}
   }

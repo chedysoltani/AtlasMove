@@ -103,8 +103,13 @@ void main() async {
   RemoteConfigService.instance.addListener(DriverDocumentsPlan.publishVariant);
   await RemoteConfigService.instance.init();
 
-  // Canaux Android + tap sur une notification "nouvelle course" / "appel entrant"
-  await PushNotificationService.initialize();
+  // Canaux Android + tap sur une notification "nouvelle course" / "appel entrant".
+  // Jamais bloquant au-delà de quelques secondes : l'app doit toujours s'afficher.
+  try {
+    await PushNotificationService.initialize().timeout(const Duration(seconds: 8));
+  } catch (e) {
+    debugPrint('Notifications init: $e');
+  }
   FirebaseMessaging.onMessage.listen(PushNotificationService.handleForegroundMessage);
   // Push affiché par le système puis tapé, app en arrière-plan (dossier chauffeur)
   FirebaseMessaging.onMessageOpenedApp.listen(PushNotificationService.handleOpenedMessage);
