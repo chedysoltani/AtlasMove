@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Capacités de la configuration Release (TestFlight / App Store), signée
+	  avec le profil « AtlasMove AppStore Profile » : aps-environment doit valoir
+	  production pour correspondre à ce profil. Voir Runner.entitlements.
+	-->
+	<key>aps-environment</key>
+	<string>production</string>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:atlasbusiness.online</string>
+		<string>applinks:www.atlasbusiness.online</string>
+	</array>
+</dict>
+</plist>

@@ -3,25 +3,16 @@
 <plist version="1.0">
 <dict>
 	<!--
-	  Point de départ pour les push notifications (chemin B — alerte, sans VoIP).
-	  Ce fichier seul ne suffit PAS : il faut, dans Xcode (Mac requis) :
-	    1. Signing & Capabilities → + Capability → "Push Notifications"
-	       (relie ce fichier au projet et ajoute la clé aps-environment ci-dessous
-	       automatiquement — vérifier qu'elle correspond).
-	    2. + Capability → "Background Modes" → cocher "Remote notifications"
-	       (le tableau UIBackgroundModes dans Info.plist a déjà été complété).
-	    3. + Capability → "Time Sensitive Notifications" — nécessaire pour que
-	       `interruption-level: time-sensitive` (nouvelle course / appel) perce
-	       le mode Ne pas déranger / Concentration.
-	  -->
+	  Capacités des configurations Debug et Profile (CODE_SIGN_ENTITLEMENTS dans
+	  project.pbxproj). La configuration Release (TestFlight / App Store) utilise
+	  RunnerRelease.entitlements, identique sauf aps-environment = production.
+	  Push Notifications et Associated Domains doivent aussi être cochés sur
+	  l'identifiant com.atlasmove.atlasmove (developer.apple.com).
+	-->
 	<key>aps-environment</key>
 	<string>development</string>
-	<!--
-	  Universal Links (liens d'inscription des campagnes). À activer dans Xcode :
-	  Signing & Capabilities → + Capability → "Associated Domains" ; vérifier que
-	  les deux domaines ci-dessous apparaissent. Le fichier
-	  apple-app-site-association doit être servi par les deux hôtes.
-	-->
+	<!-- Universal Links (liens d'inscription des campagnes). Le fichier
+	     apple-app-site-association doit être servi par les deux hôtes. -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:atlasbusiness.online</string>
