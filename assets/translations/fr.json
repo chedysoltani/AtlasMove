@@ -1389,5 +1389,15 @@
       "EMAIL_ALREADY_REGISTERED": "Un compte existe déjà avec cette adresse e-mail.",
       "EMAIL_NOT_SET": "Aucune adresse e-mail n'est liée à ce compte : le code ne peut pas être envoyé. Connectez-vous avec votre mot de passe ou contactez le support."
     }
+  },
+  "app_gate": {
+    "update_title": "Mise à jour nécessaire",
+    "update_body": "Une nouvelle version d'AtlasMove est disponible. Mettez l'application à jour pour continuer à l'utiliser.",
+    "update_button": "Mettre à jour",
+    "maintenance_title": "Maintenance en cours",
+    "maintenance_body": "AtlasMove est en maintenance. Nous revenons très vite.",
+    "maintenance_eta": "Retour prévu : {time}",
+    "maintenance_auto": "L'application reprendra automatiquement dès la fin de la maintenance.",
+    "maintenance_banner": "Maintenance en cours : votre course continue normalement."
   }
 }

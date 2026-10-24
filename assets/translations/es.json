@@ -1389,5 +1389,15 @@
     "driver_body": "Recibe viajes y entregas cerca de ti y gana dinero con tu vehículo.",
     "have_account": "Ya tengo una cuenta.",
     "login": "Iniciar sesión"
+  },
+  "app_gate": {
+    "update_title": "Actualización necesaria",
+    "update_body": "Hay una nueva versión de AtlasMove disponible. Actualiza la app para seguir usándola.",
+    "update_button": "Actualizar",
+    "maintenance_title": "Mantenimiento en curso",
+    "maintenance_body": "AtlasMove está en mantenimiento. Volvemos muy pronto.",
+    "maintenance_eta": "Regreso previsto: {time}",
+    "maintenance_auto": "La app se reanudará automáticamente al terminar el mantenimiento.",
+    "maintenance_banner": "Mantenimiento en curso: tu viaje continúa con normalidad."
   }
 }

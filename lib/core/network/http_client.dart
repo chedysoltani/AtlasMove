@@ -98,7 +98,12 @@ class HttpClient {
   /// Appelé quand le backend renvoie 403 pour accords légaux non acceptés.
   /// Branché dans main.dart pour naviguer vers /legal_consent.
   static void Function()? onLegalConsentRequired;
-  
+
+  /// Mode maintenance (AppGateService) : vrai = aucun appel au serveur, les
+  /// requêtes échouent tout de suite avec [MaintenanceException].
+  static bool Function()? isNetworkBlocked;
+  static bool get networkBlocked => isNetworkBlocked?.call() ?? false;
+
   /// Headers par défaut pour toutes les requêtes
   static Future<Map<String, String>> _defaultHeaders({bool authEndpoint = false}) async {
     final deviceId = await TokenStorage.getOrCreateDeviceId();
@@ -318,6 +323,7 @@ class HttpClient {
     bool isRetry = false,
     bool skipAutoRefresh = false,
   }) async {
+    if (networkBlocked) throw MaintenanceException();
     try {
       final authEndpoint = _isAuthEndpoint(endpoint);
 
@@ -677,6 +683,11 @@ class TooManyRequestsException extends ApiException {
 
 class ServerException extends ApiException {
   ServerException(String message, HttpResponse response) : super(message, response);
+}
+
+/// Mode maintenance actif : la requête n'est pas envoyée (voir AppGateService).
+class MaintenanceException extends ApiException {
+  MaintenanceException() : super('app_gate.maintenance_title'.tr());
 }
 
 /// Lancée quand le refresh token est aussi invalide → forcer la reconnexion

@@ -8,10 +8,9 @@ import 'package:flutter/foundation.dart';
 ///
 /// Chaque valeur a un défaut dans l'app ([_defaults]) : sans réseau, sans
 /// Firebase ou avant le premier chargement, l'app fonctionne à l'identique.
-/// Les valeurs chargées s'appliquent au lancement suivant (pas de changement
-/// sous les yeux du chauffeur), sauf au tout premier lancement : rien n'est
-/// encore en cache, elles sont donc activées dès leur arrivée, bien avant que
-/// le nouveau chauffeur atteigne « Mon dossier ».
+/// Au démarrage, les valeurs en cache sont activées tout de suite, puis les
+/// nouvelles dès leur arrivée. Pendant que l'app tourne, un changement publié
+/// dans la console arrive en temps réel (maintenance, mise à jour obligatoire).
 ///
 /// Prévient ses écouteurs à chaque activation de nouvelles valeurs.
 class RemoteConfigService extends ChangeNotifier {
@@ -34,6 +33,18 @@ class RemoteConfigService extends ChangeNotifier {
   static const driverDocsVariant = 'driver_docs_variant';
   static const driverDocsStartTypes = 'driver_docs_start_types';
 
+  /// Mise à jour obligatoire : version minimale par plateforme (« 1.0.9 ») ;
+  /// « 0.0.0 » n'impose rien. Voir AppGateService.
+  static const minAppVersionIos = 'min_app_version_ios';
+  static const minAppVersionAndroid = 'min_app_version_android';
+
+  /// Mode maintenance : interrupteur, message (texte simple, ou JSON par
+  /// langue : {"fr": "…", "ar": "…"} ; vide = texte de l'app) et heure de
+  /// retour affichée telle quelle (« 14h30 » ; vide = rien).
+  static const maintenanceEnabled = 'maintenance_enabled';
+  static const maintenanceMessage = 'maintenance_message';
+  static const maintenanceEta = 'maintenance_eta';
+
   static const Map<String, Object> _defaults = {
     driverTrustCardEnabled: true,
     driverSocialProofCount: 600,
@@ -44,42 +55,61 @@ class RemoteConfigService extends ChangeNotifier {
     // Types confirmés par le backend (21/10) ; ne sert que si le serveur ne
     // donne pas l'étape de chaque document (documents[].stage).
     driverDocsStartTypes: '["id_card","driving_license"]',
+    minAppVersionIos: '0.0.0',
+    minAppVersionAndroid: '0.0.0',
+    maintenanceEnabled: false,
+    maintenanceMessage: '',
+    maintenanceEta: '',
   };
 
   FirebaseRemoteConfig? _config;
+  StreamSubscription<RemoteConfigUpdate>? _updates;
 
   /// À appeler une fois au démarrage, après Firebase.initializeApp. N'attend
   /// pas le réseau : les valeurs déjà en cache sont activées tout de suite, les
-  /// nouvelles sont chargées en arrière-plan pour le prochain lancement.
+  /// nouvelles dès leur arrivée, puis chaque changement en temps réel.
   Future<void> init() async {
     if (Firebase.apps.isEmpty) return;
     try {
       final config = FirebaseRemoteConfig.instance;
       await config.setConfigSettings(RemoteConfigSettings(
         fetchTimeout: const Duration(seconds: 10),
-        minimumFetchInterval: kDebugMode ? Duration.zero : const Duration(hours: 1),
+        // Court : la fin d'une maintenance doit être vue vite au lancement.
+        minimumFetchInterval: kDebugMode ? Duration.zero : const Duration(minutes: 15),
       ));
       await config.setDefaults(_defaults);
-      final firstFetch = config.lastFetchStatus == RemoteConfigFetchStatus.noFetchYet;
       await config.activate();
       _config = config;
       notifyListeners();
-      unawaited(_fetch(config, activate: firstFetch));
+      unawaited(_fetchAndActivate(config));
+      _listenForUpdates(config);
     } catch (e) {
       debugPrint('Remote Config init: $e');
     }
   }
 
-  Future<void> _fetch(FirebaseRemoteConfig config, {required bool activate}) async {
+  Future<void> _fetchAndActivate(FirebaseRemoteConfig config) async {
     try {
-      if (activate) {
-        if (await config.fetchAndActivate()) notifyListeners();
-      } else {
-        await config.fetch();
-      }
+      if (await config.fetchAndActivate()) notifyListeners();
     } catch (e) {
       debugPrint('Remote Config fetch: $e');
     }
+  }
+
+  /// Changements publiés dans la console pendant que l'app tourne.
+  void _listenForUpdates(FirebaseRemoteConfig config) {
+    _updates?.cancel();
+    _updates = config.onConfigUpdated.listen(
+      (_) async {
+        try {
+          await config.activate();
+          notifyListeners();
+        } catch (e) {
+          debugPrint('Remote Config update: $e');
+        }
+      },
+      onError: (Object e) => debugPrint('Remote Config temps réel: $e'),
+    );
   }
 
   bool getBool(String key) {
@@ -104,6 +134,13 @@ class RemoteConfigService extends ChangeNotifier {
       if (value != null && value.isNotEmpty) return value;
     } catch (_) {}
     return _defaults[key] as String;
+  }
+
+  /// Relit les valeurs du serveur (ex. au retour au premier plan), si
+  /// l'intervalle minimal depuis le dernier chargement est écoulé.
+  Future<void> refresh() async {
+    final config = _config;
+    if (config != null) await _fetchAndActivate(config);
   }
 
   bool get trustCardEnabled => getBool(driverTrustCardEnabled);

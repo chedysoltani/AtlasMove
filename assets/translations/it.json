@@ -1389,5 +1389,15 @@
     "driver_body": "Ricevi corse e consegne vicino a te e guadagna con il tuo veicolo.",
     "have_account": "Ho già un account.",
     "login": "Accedi"
+  },
+  "app_gate": {
+    "update_title": "Aggiornamento necessario",
+    "update_body": "È disponibile una nuova versione di AtlasMove. Aggiorna l'app per continuare a usarla.",
+    "update_button": "Aggiorna",
+    "maintenance_title": "Manutenzione in corso",
+    "maintenance_body": "AtlasMove è in manutenzione. Torniamo prestissimo.",
+    "maintenance_eta": "Ritorno previsto: {time}",
+    "maintenance_auto": "L'app riprenderà automaticamente al termine della manutenzione.",
+    "maintenance_banner": "Manutenzione in corso: la tua corsa continua normalmente."
   }
 }

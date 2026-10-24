@@ -69,7 +69,9 @@ import 'services/location_foreground_service.dart';
 import 'services/push_notification_service.dart';
 import 'services/meta_events_service.dart';
 import 'services/firebase_analytics_service.dart';
+import 'services/app_gate_service.dart';
 import 'services/driver_documents_plan.dart';
+import 'widgets/app_gate_overlay.dart';
 import 'services/remote_config_service.dart';
 import 'services/deep_link_service.dart';
 import 'core/network/http_client.dart';
@@ -102,6 +104,8 @@ void main() async {
   // Variante des documents chauffeur publiée en propriété Analytics à chaque activation.
   RemoteConfigService.instance.addListener(DriverDocumentsPlan.publishVariant);
   await RemoteConfigService.instance.init();
+  // Mise à jour obligatoire et mode maintenance (Remote Config, sans backend).
+  await AppGateService.instance.init();
 
   // Canaux Android + tap sur une notification "nouvelle course" / "appel entrant".
   // Jamais bloquant au-delà de quelques secondes : l'app doit toujours s'afficher.
@@ -377,6 +381,8 @@ class AtlasMoveApp extends StatelessWidget {
             children: [
               if (child != null) child,
               const RideOffersPanel(),
+              // Mise à jour obligatoire / maintenance : au-dessus de tout.
+              const Positioned.fill(child: AppGateOverlay()),
             ],
           ),
           initialRoute: '/',
