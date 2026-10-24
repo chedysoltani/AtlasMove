@@ -1389,5 +1389,15 @@
     "driver_body": "Erhalten Sie Fahrten und Lieferungen in Ihrer Nähe und verdienen Sie Geld mit Ihrem Fahrzeug.",
     "have_account": "Ich habe bereits ein Konto.",
     "login": "Anmelden"
+  },
+  "app_gate": {
+    "update_title": "Aktualisierung erforderlich",
+    "update_body": "Eine neue Version von AtlasMove ist verfügbar. Aktualisieren Sie die App, um sie weiter zu nutzen.",
+    "update_button": "Aktualisieren",
+    "maintenance_title": "Wartung läuft",
+    "maintenance_body": "AtlasMove wird gerade gewartet. Wir sind gleich wieder da.",
+    "maintenance_eta": "Voraussichtlich zurück: {time}",
+    "maintenance_auto": "Die App läuft nach Ende der Wartung automatisch weiter.",
+    "maintenance_banner": "Wartung läuft: Ihre Fahrt geht normal weiter."
   }
 }

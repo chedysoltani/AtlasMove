@@ -1389,5 +1389,15 @@
       "EMAIL_ALREADY_REGISTERED": "An account already exists with this email address.",
       "EMAIL_NOT_SET": "No email address is linked to this account, so the code can't be sent. Log in with your password or contact support."
     }
+  },
+  "app_gate": {
+    "update_title": "Update required",
+    "update_body": "A new version of AtlasMove is available. Update the app to keep using it.",
+    "update_button": "Update",
+    "maintenance_title": "Maintenance in progress",
+    "maintenance_body": "AtlasMove is under maintenance. We'll be back very soon.",
+    "maintenance_eta": "Expected back: {time}",
+    "maintenance_auto": "The app will resume automatically as soon as maintenance ends.",
+    "maintenance_banner": "Maintenance in progress: your ride continues normally."
   }
 }

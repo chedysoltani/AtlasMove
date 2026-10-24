@@ -56,6 +56,8 @@ class CallService {
   /// l'app n'est pas relancée — symptôme observé : les appels fonctionnent au
   /// tout début puis plus du tout, surtout entre deux téléphones physiques.
   Future<void> connectSocket({bool force = false}) async {
+    // Maintenance : aucune connexion (reprise par AppGateService à la fin).
+    if (HttpClient.networkBlocked) return;
     if (!force && _socket != null && _socket!.connected) return;
 
     // Socket morte, zombie ou en reconnexion avec un vieux token : on la remplace.

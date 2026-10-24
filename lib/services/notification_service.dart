@@ -61,6 +61,8 @@ class NotificationService extends ChangeNotifier {
   /// retour au premier plan, où une socket peut rester bloquée "connectée" en
   /// façade après une coupure réseau réelle (voir CallService.connectSocket).
   Future<void> connectWebSocket({bool force = false}) async {
+    // Maintenance : aucune connexion (reprise par AppGateService à la fin).
+    if (HttpClient.networkBlocked) return;
     // Si déjà connecté, ignorer (sauf reconnexion forcée)
     if (!force && _socket != null && _socket!.connected) return;
 
