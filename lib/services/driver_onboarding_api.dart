@@ -74,7 +74,9 @@ class DriverApiException implements Exception {
         final message = map['message'];
         return DriverApiException(
           statusCode: statusCode,
-          code: (map['code'] ?? error['code'] ?? _codeForStatus(statusCode)).toString(),
+          // Majuscules : certains codes arrivent en minuscules (ex.
+          // legal_acceptance_required), l'app compare toujours en majuscules.
+          code: (map['code'] ?? error['code'] ?? _codeForStatus(statusCode)).toString().toUpperCase(),
           serverMessage: message is String ? message : (error['message']?.toString() ?? ''),
           fieldErrors: fields,
           details: map['details'] is Map ? Map<String, dynamic>.from(map['details']) : const {},
