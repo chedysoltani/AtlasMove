@@ -17,7 +17,7 @@ class _LocationTaskHandler extends TaskHandler {
   void onRepeatEvent(DateTime timestamp) {}
 
   @override
-  Future<void> onDestroy(DateTime timestamp) async {}
+  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {}
 }
 
 /// Gère le foreground service Android + background mode iOS pour le tracking GPS livreur.

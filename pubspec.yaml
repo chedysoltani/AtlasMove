@@ -1,6 +1,6 @@
 name: atlasmove
 description: Plateforme de transport et livraison - Alternative à Uber
-version: 1.0.9+21
+version: 1.0.10+22
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -30,7 +30,7 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   firebase_core: ^4.14.0
   firebase_messaging: ^16.7.0
-  flutter_foreground_task: ^8.0.0
+  flutter_foreground_task: ^10.0.0
   webview_flutter: ^4.7.0
   flutter_local_notifications: ^22.3.1
   audioplayers: ^6.7.1
