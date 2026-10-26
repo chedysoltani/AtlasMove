@@ -550,6 +550,7 @@
     "route_calculated": "Route berechnet",
     "starting_proposal": "Ihr Anfangsvorschlag:",
     "standard_estimated_fare": "Geschätzter Standardtarif: {amount} {currency}",
+    "fare_estimate_error": "Der Preis kann gerade nicht berechnet werden.",
     "available_services": "Verfügbare Dienste",
     "card": "Karte",
     "add_card": "Karte hinzufügen",

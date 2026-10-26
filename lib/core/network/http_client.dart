@@ -312,6 +312,31 @@ class HttpClient {
     );
   }
 
+  /// Corps d'une réponse 403 : refus « politique de confidentialité / CGU non
+  /// acceptées » ? Le backend renvoie `legal_acceptance_required` (en
+  /// minuscules) au premier niveau et dans `error.code` : la casse est ignorée.
+  /// Un autre code (ex. ACCOUNT_SUSPENDED) n'est jamais pris pour un refus
+  /// légal, même si son message parle de « conditions » ; sans aucun code
+  /// (anciens serveurs), on se fie aux mots du message.
+  @visibleForTesting
+  static bool isLegalConsentRefusal(dynamic errorBody) {
+    if (errorBody is! Map) return false;
+    final nested = errorBody['error'];
+    final codes = [errorBody['code'], if (nested is Map) nested['code']]
+        .where((c) => c != null && c.toString().isNotEmpty)
+        .map((c) => c.toString().toUpperCase())
+        .toList();
+    if (codes.isNotEmpty) return codes.contains('LEGAL_ACCEPTANCE_REQUIRED');
+
+    final message = errorBody['message'] ?? (nested is Map ? nested['message'] : nested) ?? '';
+    final msg = message.toString().toLowerCase();
+    const keywords = [
+      'legal', 'agreement', 'privacy', 'terms', 'accepted',
+      'politique', 'confidentialit', 'conditions', 'utilisation', 'accepter', 'accords',
+    ];
+    return keywords.any(msg.contains);
+  }
+
   /// Méthode principale pour faire les requêtes HTTP
   static Future<HttpResponse> _makeRequest(
     String method,
@@ -434,25 +459,10 @@ class HttpClient {
         );
       }
 
-      // 403 → accords légaux non acceptés
+      // 403 → accords légaux non acceptés : écran de consentement.
       if (response.statusCode == 403) {
         try {
-          final errorBody = jsonDecode(response.body);
-          final msg = (errorBody['message'] ?? errorBody['error'] ?? '').toString().toLowerCase();
-          // Routes qui renvoient un code d'erreur stable (chauffeurs v2) : on se
-          // fie au code, pas aux mots du message (ex. ACCOUNT_SUSPENDED).
-          final code = errorBody is Map ? errorBody['code']?.toString() : null;
-          if (code != null) {
-            if (code == 'LEGAL_ACCEPTANCE_REQUIRED') onLegalConsentRequired?.call();
-          } else if (msg.contains('legal') || msg.contains('agreement') ||
-              msg.contains('privacy') || msg.contains('terms') ||
-              msg.contains('accepted') ||
-              // French keywords
-              msg.contains('politique') || msg.contains('confidentialit') ||
-              msg.contains('conditions') || msg.contains('utilisation') ||
-              msg.contains('accepter') || msg.contains('accords')) {
-            onLegalConsentRequired?.call();
-          }
+          if (isLegalConsentRefusal(jsonDecode(response.body))) onLegalConsentRequired?.call();
         } catch (_) {}
       }
 

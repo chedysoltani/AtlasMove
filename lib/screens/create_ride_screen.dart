@@ -185,6 +185,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
   FareEstimate? _fareEstimate;
   bool _isFetchingEstimate = false;
 
+  /// Dernière estimation refusée (réseau, serveur, consentement…) : on
+  /// l'affiche et on bloque la réservation, jamais de prix de catalogue à la place.
+  bool _fareEstimateFailed = false;
+
   // Multi-destination (stops[]) — max 2 extra stops, 3 destinations au total
   List<_ExtraStop> _extraStops = [];
   double? _leg1DistanceKm;
@@ -414,7 +418,10 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
   Future<void> _fetchFareEstimate() async {
     if (_selectedService == null || _estimatedDistance == null || _estimatedDuration == null) return;
     if (_isFetchingEstimate) return;
-    setState(() => _isFetchingEstimate = true);
+    setState(() {
+      _isFetchingEstimate = true;
+      _fareEstimateFailed = false;
+    });
     try {
       final durationMin = _parseDurationToMinutes(_estimatedDuration!).toDouble();
       final pickupCoords = _estimatedPickupCoords;
@@ -442,15 +449,20 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
       if (mounted) {
         setState(() {
           _fareEstimate = estimate;
-          // Initialiser l'offre dans les bornes si déjà saisie hors limite
           if (_isNegotiable) {
+            // Offre déjà saisie : ramenée dans les bornes ; sinon, le prix estimé.
             final current = _customOfferedFare ?? estimate.estimatedFare;
             _customOfferedFare = current.clamp(estimate.minBid, estimate.maxBid);
+          } else {
+            // Prix fixe : celui calculé par le serveur.
+            _customOfferedFare = estimate.estimatedFare;
           }
         });
       }
     } catch (_) {
-      // Estimation locale en fallback — l'API est non bloquante
+      // Pas de prix de repli (le prix de base du catalogue n'est pas un tarif) :
+      // message et « Réessayer », réservation bloquée jusqu'à une estimation.
+      if (mounted) setState(() => _fareEstimateFailed = true);
     } finally {
       if (mounted) setState(() => _isFetchingEstimate = false);
     }
@@ -935,6 +947,18 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
             SnackBar(content: Text('booking.destination'.tr()), backgroundColor: _AppColors.red),
           );
         }
+        return;
+      }
+
+      // 2.5. Prix calculé par le serveur obligatoire : jamais de réservation
+      // au prix de base du catalogue (ex. 1,50 TND sous le minimum de 3 TND).
+      if (_fareEstimate == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('booking.fare_estimate_error'.tr()), backgroundColor: _AppColors.red),
+          );
+        }
+        _fetchFareEstimate();
         return;
       }
 
@@ -1899,8 +1923,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
               setState(() {
                 _selectedCategory = category;
                 _selectedService = service;
-                _customOfferedFare = service.basePrice;
+                _customOfferedFare = null;
                 _fareEstimate = null;
+                _fareEstimateFailed = false;
               });
               _fetchFareEstimate();
             },
@@ -1994,11 +2019,18 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (service.basePrice != null)
+                // Prix calculé par le serveur seulement (jamais le prix de base du catalogue).
+                if (_fareEstimate != null)
                   Text(
-                    '${service.basePrice!.toStringAsFixed(2)} ${service.currency ?? 'TND'}',
+                    '${_fareEstimate!.estimatedFare.toStringAsFixed(2)} ${_fareEstimate!.currency}',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: visual.color),
-                  ),
+                  )
+                else if (_isFetchingEstimate)
+                  Text('booking_extra.calculating_fare'.tr(),
+                      style: const TextStyle(fontSize: 12, color: _AppColors.gray400))
+                else if (_fareEstimateFailed)
+                  Text('booking.fare_estimate_error'.tr(),
+                      style: const TextStyle(fontSize: 12, color: _AppColors.red)),
               ],
             ),
           ),
@@ -3291,7 +3323,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
 
   Widget _buildNegotiationSection() {
     if (_selectedService == null) return const SizedBox.shrink();
-    final defaultPrice = _selectedService!.basePrice ?? 0.0;
+    // Offre en cours : saisie, sinon prix estimé ; null tant qu'aucun prix
+    // n'est calculé (jamais le prix de base du catalogue).
+    final currentFare = _customOfferedFare ?? _fareEstimate?.estimatedFare;
     // Le montant affiché ci-dessous vient de _customOfferedFare, lui-même dérivé
     // de _fareEstimate.estimatedFare — la devise doit donc suivre la même source,
     // jamais celle (statique, catalogue) du service, sous peine d'afficher un
@@ -3357,11 +3391,8 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
                 onChanged: (val) {
                   setState(() {
                     _isNegotiable = val;
-                    if (val) {
-                      _customOfferedFare = defaultPrice;
-                    } else {
-                      _customOfferedFare = null;
-                    }
+                    // Dans les deux cas, on repart du prix calculé par le serveur.
+                    _customOfferedFare = _fareEstimate?.estimatedFare;
                   });
                 },
               ),
@@ -3388,8 +3419,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
                   color: _AppColors.white,
                   border: Border.all(color: _AppColors.gray200),
                   onTap: () {
-                    final minBound = _fareEstimate?.minBid ?? 1.0;
-                    final current = _customOfferedFare ?? (_fareEstimate?.estimatedFare ?? defaultPrice);
+                    final current = currentFare;
+                    final minBound = _fareEstimate?.minBid;
+                    if (current == null || minBound == null) return;
                     if (current > minBound) {
                       setState(() {
                         _customOfferedFare = double.parse(
@@ -3415,7 +3447,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            (_customOfferedFare ?? defaultPrice).toStringAsFixed(2),
+                            currentFare?.toStringAsFixed(2) ?? '—',
                             style: const TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
@@ -3441,8 +3473,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
                   color: _AppColors.white,
                   border: Border.all(color: _AppColors.gray200),
                   onTap: () {
-                    final maxBound = _fareEstimate?.maxBid ?? double.infinity;
-                    final current = _customOfferedFare ?? (_fareEstimate?.estimatedFare ?? defaultPrice);
+                    final current = currentFare;
+                    final maxBound = _fareEstimate?.maxBid;
+                    if (current == null || maxBound == null) return;
                     if (current < maxBound) {
                       setState(() {
                         _customOfferedFare = double.parse(
@@ -3456,19 +3489,20 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
               ],
             ),
             const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.info_outline_rounded, size: 12, color: _AppColors.gray400),
-                const SizedBox(width: 4),
-                Text(
-                  _fareEstimate != null
-                      ? 'booking_extra.fare_range'.tr(namedArgs: {'fare': _fareEstimate!.estimatedFare.toStringAsFixed(2), 'currency': _fareEstimate!.currency, 'min': _fareEstimate!.minBid.toStringAsFixed(2), 'max': _fareEstimate!.maxBid.toStringAsFixed(2)})
-                      : 'booking.standard_estimated_fare'.tr(namedArgs: {'amount': defaultPrice.toStringAsFixed(2), 'currency': currency ?? ''}),
-                  style: const TextStyle(fontSize: 11, color: _AppColors.gray400),
-                ),
-              ],
-            ),
+            if (_fareEstimate != null)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 12, color: _AppColors.gray400),
+                  const SizedBox(width: 4),
+                  Text(
+                    'booking_extra.fare_range'.tr(namedArgs: {'fare': _fareEstimate!.estimatedFare.toStringAsFixed(2), 'currency': _fareEstimate!.currency, 'min': _fareEstimate!.minBid.toStringAsFixed(2), 'max': _fareEstimate!.maxBid.toStringAsFixed(2)}),
+                    style: const TextStyle(fontSize: 11, color: _AppColors.gray400),
+                  ),
+                ],
+              )
+            else if (_fareEstimateFailed && !_isFetchingEstimate)
+              _buildFareEstimateError(),
             if (_extraStops.isNotEmpty &&
                 (_fareEstimate?.extraStopFee ?? 0) > 0)
               Padding(
@@ -3508,6 +3542,31 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen>
           ],
         ],
       ),
+    );
+  }
+
+  /// Estimation refusée : message et « Réessayer » (relance l'estimation).
+  Widget _buildFareEstimateError() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.error_outline_rounded, size: 13, color: _AppColors.red),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text('booking.fare_estimate_error'.tr(),
+              style: const TextStyle(fontSize: 11, color: _AppColors.red)),
+        ),
+        TextButton(
+          onPressed: _fetchFareEstimate,
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Text('common.retry'.tr(),
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+        ),
+      ],
     );
   }
 

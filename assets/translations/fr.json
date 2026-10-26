@@ -400,6 +400,7 @@
     "route_calculated": "Trajet calculé",
     "starting_proposal": "Votre proposition de départ :",
     "standard_estimated_fare": "Tarif estimé standard : {amount} {currency}",
+    "fare_estimate_error": "Impossible de calculer le prix pour le moment.",
     "available_services": "Services disponibles",
     "card": "Carte",
     "add_card": "Ajouter une carte",

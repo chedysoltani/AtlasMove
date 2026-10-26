@@ -1,9 +1,12 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/legal_service.dart';
 import '../models/requests/register_request.dart';
 import '../models/responses/auth_response.dart';
 import '../core/network/http_client.dart';
@@ -35,6 +38,14 @@ class _SignupScreenState extends State<SignupScreen>
   bool _obscureConfirm = true;
   bool _isLoading = false;
 
+  /// CGU et politique de confidentialité acceptées (case obligatoire) : envoyé
+  /// au serveur juste après la création du compte, sinon tout appel est refusé.
+  bool _acceptTerms = false;
+  static const _termsUrl = 'https://api.atla.business/legal/terms-and-conditions';
+  static const _privacyUrl = 'https://api.atla.business/legal/privacy-policy';
+  late final TapGestureRecognizer _termsTap;
+  late final TapGestureRecognizer _privacyTap;
+
   // Country dial code picker
   _CountryCode _dialCode = _CountryCode.defaultCode;
 
@@ -44,6 +55,8 @@ class _SignupScreenState extends State<SignupScreen>
   @override
   void initState() {
     super.initState();
+    _termsTap = TapGestureRecognizer()..onTap = () => _openUrl(_termsUrl);
+    _privacyTap = TapGestureRecognizer()..onTap = () => _openUrl(_privacyUrl);
     _heroCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 800))
       ..forward();
@@ -67,7 +80,15 @@ class _SignupScreenState extends State<SignupScreen>
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
     _referralCtrl.dispose();
+    _termsTap.dispose();
+    _privacyTap.dispose();
     super.dispose();
+  }
+
+  Future<void> _openUrl(String url) async {
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {}
   }
 
   Animation<double> _fade(AnimationController c) =>
@@ -98,6 +119,17 @@ class _SignupScreenState extends State<SignupScreen>
         referralCode: refCode.isNotEmpty ? refCode : null,
       );
       final response = await AuthService.registerClient(request);
+      // Consentement donné par la case cochée : enregistré tout de suite, sinon
+      // le serveur refuse tous les appels du compte (403 legal_acceptance_required).
+      // Échec (réseau…) : l'écran de consentement s'ouvrira au premier refus.
+      if (response.isComplete && response.token.isNotEmpty) {
+        try {
+          await Future.wait([
+            LegalService.acceptPrivacyPolicy(),
+            LegalService.acceptTermsAndConditions(),
+          ]);
+        } catch (_) {}
+      }
       // Inscription réussie : le système propose d'enregistrer le mot de passe
       TextInput.finishAutofillContext(shouldSave: true);
       if (mounted) {
@@ -240,7 +272,9 @@ class _SignupScreenState extends State<SignupScreen>
                           return null;
                         },
                       )),
-                      const SizedBox(height: 26),
+                      const SizedBox(height: 14),
+                      _a(5, _termsField()),
+                      const SizedBox(height: 18),
                       _a(6, _buildSignupButton()),
                       const SizedBox(height: 16),
                       _a(7, _buildLoginRow()),
@@ -441,6 +475,62 @@ class _SignupScreenState extends State<SignupScreen>
                     valueColor: AlwaysStoppedAnimation(Colors.white)))
             : Text('auth.register_btn'.tr(), style: GoogleFonts.poppins(
                 fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+      ),
+    );
+  }
+
+  /// Case « J'accepte les conditions d'utilisation et la politique de
+  /// confidentialité », obligatoire (validée avec le reste du formulaire).
+  Widget _termsField() {
+    final linkStyle = GoogleFonts.poppins(
+        fontSize: 12, fontWeight: FontWeight.w600, color: _orange,
+        decoration: TextDecoration.underline);
+    return FormField<bool>(
+      initialValue: _acceptTerms,
+      validator: (_) => _acceptTerms ? null : 'driver_v2.terms_required'.tr(),
+      builder: (state) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: _acceptTerms,
+                activeColor: _orange,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                onChanged: (v) {
+                  setState(() => _acceptTerms = v == true);
+                  state.didChange(_acceptTerms);
+                },
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text.rich(
+                    TextSpan(
+                      style: GoogleFonts.poppins(fontSize: 12, color: const Color(0xFF6B7280)),
+                      children: [
+                        TextSpan(text: '${'driver_v2.terms_prefix'.tr()} '),
+                        TextSpan(text: 'driver_v2.terms_link'.tr(), style: linkStyle, recognizer: _termsTap),
+                        TextSpan(text: ' ${'driver_v2.terms_and'.tr()} '),
+                        TextSpan(text: 'driver_v2.privacy_link'.tr(), style: linkStyle, recognizer: _privacyTap),
+                        const TextSpan(text: '.'),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (state.hasError)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 12, top: 2),
+              child: Text(state.errorText!,
+                  style: GoogleFonts.poppins(fontSize: 11.5, color: AppTheme.errorColor)),
+            ),
+        ],
       ),
     );
   }
