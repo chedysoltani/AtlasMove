@@ -400,6 +400,7 @@
     "route_calculated": "Route calculated",
     "starting_proposal": "Your starting offer:",
     "standard_estimated_fare": "Standard estimated fare: {amount} {currency}",
+    "fare_estimate_error": "The price can't be calculated right now.",
     "available_services": "Available services",
     "card": "Card",
     "add_card": "Add a card",

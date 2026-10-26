@@ -400,6 +400,7 @@
     "route_calculated": "تم حساب المسار",
     "starting_proposal": "اقتراحك الأولي:",
     "standard_estimated_fare": "التعريفة القياسية المقدرة: {amount} {currency}",
+    "fare_estimate_error": "تعذّر حساب السعر حاليًا.",
     "available_services": "الخدمات المتاحة",
     "card": "بطاقة",
     "add_card": "إضافة بطاقة",
